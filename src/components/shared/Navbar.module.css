@@ -1,0 +1,55 @@
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-xl);
+  background: var(--color-surface-glass);
+  border-bottom: 1px solid var(--color-border-glass);
+  backdrop-filter: var(--glass-blur);
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-accent-soft);
+  letter-spacing: 0.05em;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.roleBadge {
+  font-size: var(--text-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-pill);
+  border: 1px solid currentColor;
+}
+
+.roleBadge[data-role="superadmin"] { color: var(--color-role-superadmin); }
+.roleBadge[data-role="admin"]      { color: var(--color-role-admin); }
+.roleBadge[data-role="professor"]  { color: var(--color-role-professor); }
+.roleBadge[data-role="student"]    { color: var(--color-role-student); }
+
+.userName {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.logoutBtn {
+  background: transparent;
+  border: 1px solid var(--color-border-glass);
+  color: var(--color-text-secondary);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.logoutBtn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent-soft);
+}

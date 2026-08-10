@@ -1,0 +1,100 @@
+/* ============================================
+   HALO Design Tokens
+   Dark green glassmorphic system — values from Figma
+   Import this once in main.jsx
+   Structured with semantic names so a future
+   [data-theme="light"] block can override these
+   without touching component CSS.
+   ============================================ */
+
+[data-theme="dark"],
+:root {
+  /* --- Backgrounds / surfaces (darkest to most elevated) --- */
+  --color-bg-column: #030D02;        /* column background, deepest layer */
+  --color-bg-topbar: #0D1610;        /* topbar */
+  --color-bg-sidebar: #0F1A12;       /* sidebar */
+  --color-bg-content: #161616;       /* main content area, between sidebar/topbar */
+  --color-bg-card: #313131;          /* card / modal — most elevated surface */
+  --color-bg-input: #252F26;         /* input fields */
+
+  /* --- Login screen gradient background --- */
+  --gradient-bg: linear-gradient(180deg, #002E05 0%, #000000 100%);
+
+  /* --- Glass card gradient (used for form cards, dashboard cards, modals) --- */
+  --gradient-glass-card: linear-gradient(135deg, rgba(0, 46, 5, 0.55) 0%, rgba(0, 0, 0, 0.55) 100%);
+  --gradient-glass-card-hover: linear-gradient(135deg, rgba(0, 46, 5, 0.7) 0%, rgba(0, 0, 0, 0.7) 100%);
+  --color-border-glow: rgba(0, 212, 92, 0.15);
+
+  /* --- Stat/dashboard cards (solid fill + stroke, from Figma) --- */
+  --color-bg-stat-card: #171B18;
+  --color-border-stat-card: #145531;
+  --radius-stat-card: 12px;
+
+  /* --- Text --- */
+  --color-text-primary: #E0E0E0;     /* titles, normal text */
+  --color-text-muted: #9A9494;       /* placeholder / subtitle (fade) text */
+  --color-text-on-button: #000000;   /* text on top of green button */
+
+  /* --- Borders / strokes --- */
+  --color-border: #828282;
+  --color-border-panel: #2F2F2F;      /* sidebar / topbar stroke */
+
+  /* --- Green accents (each with a defined role — don't mix) --- */
+  --color-accent-active: rgb(18, 173, 4);    /* active/highlighted text, active icon, active stroke */
+  --color-accent-header: #3C9434;    /* column headers / section titles */
+
+  /* --- Buttons / CTA gradient --- */
+  --gradient-cta: linear-gradient(135deg, #07CE57 0%, #0D6735 100%);
+
+  /* --- Status (placeholder — palitan kapag na-define mo na sa Figma) --- */
+  --color-success: #00D45C;
+  --color-warning: #e6b84a;
+  --color-error: #e65a5a;
+
+  /* --- Role accents (placeholder — used for badges/labels per role) --- */
+  --color-role-superadmin: #e6b84a;
+  --color-role-admin: #00D45C;
+  --color-role-professor: #4ab0e6;
+  --color-role-student: #3C9434;
+
+  /* --- Sidebar active nav item background --- */
+  --color-bg-nav-active: #223C29;
+
+  /* --- Weekly module row (Subjects page) --- */
+  --color-bg-week-row: #052D0F;
+  --color-border-week-row: #055817;
+  --color-bg-week-icon: #1A4625;
+
+  /* --- Glassmorphism --- */
+  --glass-blur: blur(14px);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+
+  /* --- Radius --- */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* --- Spacing scale --- */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+
+  /* --- Typography --- */
+  --font-display: 'Poppins', 'Segoe UI', sans-serif;
+  --font-body: 'Poppins', 'Segoe UI', sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+
+  /* --- Transitions --- */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+}

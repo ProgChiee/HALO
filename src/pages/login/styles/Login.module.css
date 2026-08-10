@@ -1,0 +1,151 @@
+.wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+
+  /*
+    THE DARK FILTER TECHNIQUE:
+    We stack a dark linear-gradient ON TOP of the background image
+    in the same `background` property. The gradient is painted first
+    (frontmost), the image behind it — so the image shows through
+    but darkened/tinted by the gradient's opacity.
+    --bg-image is set inline in Login.jsx from the imported BG.jpeg.
+  */
+  background:
+    linear-gradient(180deg, rgba(3, 13, 2, 0.75) 0%, rgba(0, 0, 0, 0.92) 100%),
+    var(--bg-image) center / cover no-repeat;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.logo {
+  width: 180px;
+  height: auto;
+  margin-bottom: var(--space-md);
+}
+
+.tagline {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-xl);
+}
+
+.formCard {
+  width: 100%;
+  background: var(--gradient-glass-card);
+  border: 1px solid var(--color-border-glow);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--glass-shadow);
+  padding: var(--space-xl);
+}
+
+.welcome {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-xs);
+}
+
+.subtitle {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: var(--space-md);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md) var(--space-sm) 44px;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:focus {
+  border-color: var(--color-accent-active);
+}
+
+.eyeToggle {
+  position: absolute;
+  right: var(--space-md);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.forgotLink {
+  color: var(--color-accent-active);
+  font-size: var(--text-sm);
+}
+
+.error {
+  color: var(--color-error);
+  font-size: var(--text-sm);
+}
+
+.rememberRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: calc(var(--space-xs) * -1);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent-active);
+}
+
+.signupText {
+  text-align: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.signupLink {
+  color: var(--color-accent-active);
+  font-weight: 600;
+}
