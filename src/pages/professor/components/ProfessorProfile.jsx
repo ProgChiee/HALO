@@ -4,11 +4,11 @@ import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { useToast } from '../../../context/notifications/ToastContext';
-import { ADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getAdminProfile, updateAdminProfile } from '../../../services/admin/adminService';
-import styles from '../styles/AdminProfile.module.css';
+import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
+import { getProfessorProfile, updateProfessorProfile } from '../../../services/professor/professorService';
+import styles from '../styles/ProfessorProfile.module.css';
 
-export default function AdminProfile() {
+export default function ProfessorProfile() {
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -16,7 +16,7 @@ export default function AdminProfile() {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [adminId, setAdminId] = useState('');
+  const [professorId, setProfessorId] = useState('');
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -24,7 +24,7 @@ export default function AdminProfile() {
     let isMounted = true;
     async function loadData() {
       try {
-        const data = await getAdminProfile();
+        const data = await getProfessorProfile();
         if (isMounted) setProfile(data);
       } catch (err) {
         console.error(err);
@@ -38,7 +38,7 @@ export default function AdminProfile() {
   }, []);
 
   function openEditModal() {
-    setAdminId(profile.adminId);
+    setProfessorId(profile.professorId);
     setFormError('');
     setShowEditModal(true);
   }
@@ -48,16 +48,16 @@ export default function AdminProfile() {
     if (isSaving) return;
     setFormError('');
 
-    if (!adminId.trim()) {
-      setFormError('Please enter an Admin ID.');
+    if (!professorId.trim()) {
+      setFormError('Please enter a Professor ID.');
       return;
     }
 
     setIsSaving(true);
     try {
-      const updated = await updateAdminProfile({ adminId: adminId.trim() });
+      const updated = await updateProfessorProfile({ professorId: professorId.trim() });
       setProfile(updated);
-      showToast('Admin ID updated.', 'success');
+      showToast('Professor ID updated.', 'success');
       setShowEditModal(false);
     } catch (err) {
       console.error(err);
@@ -69,7 +69,7 @@ export default function AdminProfile() {
 
   if (isLoading) {
     return (
-      <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+      <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
         <p className={styles.loadingText}>Loading profile...</p>
       </PageShell>
     );
@@ -77,14 +77,14 @@ export default function AdminProfile() {
 
   if (loadError || !profile) {
     return (
-      <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+      <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
         <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
       </PageShell>
     );
   }
 
   return (
-    <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+    <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
       <header className={styles.topbar}>
         <div className={styles.breadcrumb}>
           <UserIcon size={16} />
@@ -112,9 +112,9 @@ export default function AdminProfile() {
         </div>
 
         <div className={styles.infoCard}>
-          <span className={styles.infoLabel}>Admin ID</span>
+          <span className={styles.infoLabel}>Professor ID</span>
           <div className={styles.infoValueRow}>
-            <span className={styles.infoValue}>{profile.adminId}</span>
+            <span className={styles.infoValue}>{profile.professorId}</span>
             <button className={styles.editLink} onClick={openEditModal}>
               Edit
             </button>
@@ -143,7 +143,7 @@ export default function AdminProfile() {
         <div className={styles.modalOverlay} onClick={() => setShowEditModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Edit Admin ID</h3>
+              <h3 className={styles.modalTitle}>Edit Professor ID</h3>
               <button className={styles.closeBtn} onClick={() => setShowEditModal(false)} aria-label="Close">
                 <X size={18} />
               </button>
@@ -151,13 +151,13 @@ export default function AdminProfile() {
 
             <form onSubmit={handleSaveEdit} className={styles.form}>
               <div className={styles.field}>
-                <label className={styles.label}>Admin ID</label>
+                <label className={styles.label}>Professor ID</label>
                 <input
                   type="text"
                   className={styles.input}
-                  value={adminId}
-                  onChange={(e) => setAdminId(e.target.value)}
-                  placeholder="e.g. ADMIN-2026-002"
+                  value={professorId}
+                  onChange={(e) => setProfessorId(e.target.value)}
+                  placeholder="e.g. PROF-2026-014"
                 />
               </div>
 

@@ -13,16 +13,21 @@ const ICONS = { BookOpen, FileText, Users };
 export default function ProfessorDashboard() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [data, setData] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
-      const result = await getProfessorDashboardData();
-      if (isMounted) {
-        setData(result);
-        setIsLoading(false);
+      try {
+        const result = await getProfessorDashboardData();
+        if (isMounted) setData(result);
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -30,12 +35,23 @@ export default function ProfessorDashboard() {
     return () => { isMounted = false; };
   }, []);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !data) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor" />
+        <div className={styles.contentArea}>
+          <p className={styles.loadingText}>Couldn't load the dashboard. Please refresh and try again.</p>
         </div>
       </div>
     );

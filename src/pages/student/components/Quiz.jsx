@@ -5,8 +5,7 @@ import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { mockModuleProgress } from '../../../data/student/studentDashboardData';
-import { getTopicAndWeek } from '../../../services/student/studentService';
+import { getTopicAndWeek, markLessonComplete, getOverallModuleProgress } from '../../../services/student/studentService';
 import { getQuiz, submitQuiz } from '../../../services/student/quizService';
 import styles from '../styles/Quiz.module.css';
 
@@ -16,27 +15,40 @@ export default function Quiz() {
   const { showToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [topic, setTopic] = useState(null);
   const [week, setWeek] = useState(null);
   const [quiz, setQuiz] = useState(null);
+  const [moduleProgress, setModuleProgress] = useState(null);
 
   const [stage, setStage] = useState('intro'); // 'intro' | 'active' | 'results'
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadQuiz() {
-      const [{ topic: fetchedTopic, week: fetchedWeek }, fetchedQuiz] = await Promise.all([
-        getTopicAndWeek(topicId, weekId),
-        getQuiz(topicId, weekId),
-      ]);
-      if (isMounted) {
-        setTopic(fetchedTopic);
-        setWeek(fetchedWeek);
-        setQuiz(fetchedQuiz);
-        setIsLoading(false);
+      setIsLoading(true);
+      setLoadError(false);
+      try {
+        const [{ topic: fetchedTopic, week: fetchedWeek }, fetchedQuiz, moduleProg] = await Promise.all([
+          getTopicAndWeek(topicId, weekId),
+          getQuiz(topicId, weekId),
+          getOverallModuleProgress(),
+        ]);
+        if (isMounted) {
+          setTopic(fetchedTopic);
+          setWeek(fetchedWeek);
+          setQuiz(fetchedQuiz);
+          setModuleProgress(moduleProg);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -44,12 +56,28 @@ export default function Quiz() {
     return () => { isMounted = false; };
   }, [topicId, weekId]);
 
-  if (isLoading || !quiz) {
+  if (isLoading) {
     return (
       <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress} />
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !quiz) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+        <div className={styles.contentArea}>
+          <div className={styles.introCard}>
+            <p className={styles.introDescription}>
+              Couldn't load this quiz. Please check your connection and try again.
+            </p>
+            <Button onClick={() => navigate(0)}>Retry</Button>
+          </div>
         </div>
       </div>
     );
@@ -71,13 +99,39 @@ export default function Quiz() {
 
   async function handleNext() {
     if (isLastQuestion) {
-      const score = quiz.questions.reduce(
-        (total, q) => total + (selectedAnswers[q.id] === q.correctIndex ? 1 : 0),
-        0
-      );
-      await submitQuiz(topicId, weekId, score, quiz.questions.length);
-      showToast('Quiz submitted!', 'success');
-      setStage('results');
+      if (isSubmitting) return; // block double-submit (e.g. double-click on "Submit quiz")
+
+      setIsSubmitting(true);
+      try {
+        const score = quiz.questions.reduce(
+          (total, q) => total + (selectedAnswers[q.id] === q.correctIndex ? 1 : 0),
+          0
+        );
+        await submitQuiz(topicId, weekId, score, quiz.questions.length);
+
+        // Mark the week complete (unlocking the next one) only when the
+        // student passes — matches the 70% threshold shown on the
+        // results screen below. Without this, the Subjects page's
+        // done/now/locked progression never actually advances no matter
+        // how many quizzes are taken.
+        const passed = Math.round((score / quiz.questions.length) * 100) >= 70;
+        if (passed) {
+          await markLessonComplete(topicId, weekId);
+          // Refresh the Sidebar's module progress right away, so the
+          // student sees the updated percentage on this results screen
+          // instead of only after navigating to a different page.
+          const updatedProgress = await getOverallModuleProgress();
+          setModuleProgress(updatedProgress);
+        }
+
+        showToast('Quiz submitted!', 'success');
+        setStage('results');
+      } catch (err) {
+        console.error(err);
+        showToast("Couldn't submit your quiz. Please try again.", 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
       setCurrentIndex((i) => i + 1);
     }
@@ -95,7 +149,7 @@ export default function Quiz() {
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -157,7 +211,11 @@ export default function Quiz() {
               </div>
 
               <div className={styles.actionsRow}>
-                <Button onClick={handleNext} disabled={!hasAnsweredCurrent}>
+                <Button
+                  onClick={handleNext}
+                  disabled={!hasAnsweredCurrent || isSubmitting}
+                  isLoading={isLastQuestion && isSubmitting}
+                >
                   {isLastQuestion ? 'Submit quiz' : 'Next question'}
                 </Button>
               </div>

@@ -19,7 +19,17 @@ export function AuthProvider({ children }) {
     const savedUser = remembered || sessionOnly;
 
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (err) {
+        // Corrupted/malformed data (e.g. manually edited in DevTools, or
+        // written by an old app version) — clear it and treat as logged
+        // out, instead of letting a JSON parse error crash the whole app
+        // (AuthProvider wraps every page).
+        console.error('Failed to parse saved user, clearing storage:', err);
+        localStorage.removeItem('halo_user');
+        sessionStorage.removeItem('halo_user');
+      }
     }
     setIsLoading(false);
   }, []);

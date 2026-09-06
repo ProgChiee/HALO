@@ -17,6 +17,7 @@ export default function StudentDashboard() {
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
   const [currentLesson, setCurrentLesson] = useState(null);
 
@@ -24,14 +25,20 @@ export default function StudentDashboard() {
     let isMounted = true;
 
     async function loadData() {
-      const [data, lesson] = await Promise.all([
-        getDashboardData(),
-        getCurrentTopicAndWeek(),
-      ]);
-      if (isMounted) {
-        setDashboardData(data);
-        setCurrentLesson(lesson);
-        setIsLoading(false);
+      try {
+        const [data, lesson] = await Promise.all([
+          getDashboardData(),
+          getCurrentTopicAndWeek(),
+        ]);
+        if (isMounted) {
+          setDashboardData(data);
+          setCurrentLesson(lesson);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -49,7 +56,7 @@ export default function StudentDashboard() {
     if (topic && week) navigate(`/student/quiz/${topic.id}/${week.id}`);
   }
 
-  if (isLoading || !dashboardData) {
+  if (isLoading) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
@@ -60,7 +67,19 @@ export default function StudentDashboard() {
     );
   }
 
-  const { stats, continueLearning, enrolledSubjects, moduleProgress } = dashboardData;
+  if (loadError || !dashboardData) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+        <div className={styles.contentArea}>
+          <p className={styles.loadingText}>Couldn't load your dashboard. Please refresh and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { stats, enrolledSubjects, moduleProgress } = dashboardData;
+  const hasCurrentLesson = Boolean(currentLesson?.topic && currentLesson?.week);
 
   return (
     <div className={styles.layout}>
@@ -72,7 +91,7 @@ export default function StudentDashboard() {
             <LayoutGrid size={16} />
             Dashboard
           </div>
-          <Button onClick={goToQuiz}>Start quiz</Button>
+          <Button onClick={goToQuiz} disabled={!hasCurrentLesson}>Start quiz</Button>
         </header>
 
         <main className={styles.main}>
@@ -99,12 +118,21 @@ export default function StudentDashboard() {
             <div className={styles.continueIcon}>
               <BookOpen size={20} />
             </div>
-            <div className={styles.continueInfo}>
-              <p className={styles.continueMeta}>{continueLearning.lastAccessedLabel}</p>
-              <p className={styles.continueTitle}>{continueLearning.title}</p>
-              <p className={styles.continueSubmeta}>{continueLearning.meta}</p>
-            </div>
-            <Button onClick={goToLesson}>Continue</Button>
+            {hasCurrentLesson ? (
+              <>
+                <div className={styles.continueInfo}>
+                  <p className={styles.continueMeta}>Up next</p>
+                  <p className={styles.continueTitle}>{currentLesson.topic.title}</p>
+                  <p className={styles.continueSubmeta}>{currentLesson.week.label}</p>
+                </div>
+                <Button onClick={goToLesson}>Continue</Button>
+              </>
+            ) : (
+              <div className={styles.continueInfo}>
+                <p className={styles.continueTitle}>You're all caught up! 🎉</p>
+                <p className={styles.continueSubmeta}>No lessons left to complete right now.</p>
+              </div>
+            )}
           </div>
 
           <h2 className={styles.sectionTitle}>Enrolled Subjects</h2>

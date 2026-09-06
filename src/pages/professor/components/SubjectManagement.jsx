@@ -28,6 +28,7 @@ export default function SubjectManagement() {
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [subjects, setSubjects] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
 
@@ -39,6 +40,7 @@ export default function SubjectManagement() {
 
   // Delete confirm modal
   const [deletingSubject, setDeletingSubject] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Add Module modal
   const [addingWeekTo, setAddingWeekTo] = useState(null); // subject or null
@@ -48,11 +50,26 @@ export default function SubjectManagement() {
     loadSubjects();
   }, []);
 
+  // Used once on mount — shows the "Loading subjects..." state.
   async function loadSubjects() {
     setIsLoading(true);
+    setLoadError(false);
+    try {
+      await refetchSubjects();
+    } catch (err) {
+      console.error(err);
+      setLoadError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Used after actions (create/edit/delete subject, add module) — updates
+  // the list in place without hiding it (and collapsing expanded cards)
+  // behind the loading state.
+  async function refetchSubjects() {
     const data = await getManagedSubjects();
     setSubjects(data);
-    setIsLoading(false);
   }
 
   function toggleExpand(subjectId) {
@@ -73,6 +90,7 @@ export default function SubjectManagement() {
 
   async function handleSaveSubject(e) {
     e.preventDefault();
+    if (isSubmitting) return;
     setFormError('');
 
     if (!subjectTitle.trim()) {
@@ -90,8 +108,9 @@ export default function SubjectManagement() {
         showToast('Subject updated.', 'success');
       }
       setSubjectModal(null);
-      loadSubjects();
+      await refetchSubjects();
     } catch (err) {
+      console.error(err);
       setFormError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -99,10 +118,20 @@ export default function SubjectManagement() {
   }
 
   async function handleConfirmDelete() {
-    await deleteSubject(deletingSubject.id);
-    showToast('Subject deleted.', 'success');
-    setDeletingSubject(null);
-    loadSubjects();
+    if (isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteSubject(deletingSubject.id);
+      showToast('Subject deleted.', 'success');
+      setDeletingSubject(null);
+      await refetchSubjects();
+    } catch (err) {
+      console.error(err);
+      showToast('Something went wrong. Please try again.', 'error');
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   function openAddWeek(subject) {
@@ -113,6 +142,7 @@ export default function SubjectManagement() {
 
   async function handleAddWeek(e) {
     e.preventDefault();
+    if (isSubmitting) return;
     setFormError('');
 
     if (!weekTitle.trim()) {
@@ -126,8 +156,9 @@ export default function SubjectManagement() {
       showToast('Module added.', 'success');
       setAddingWeekTo(null);
       setExpandedId(addingWeekTo.id);
-      loadSubjects();
+      await refetchSubjects();
     } catch (err) {
+      console.error(err);
       setFormError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -154,6 +185,16 @@ export default function SubjectManagement() {
       <main className={styles.main}>
         {isLoading ? (
           <p className={styles.loadingText}>Loading subjects...</p>
+        ) : loadError ? (
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <p className={styles.loadingText}>Couldn't load subjects. Please check your connection.</p>
+            <button
+              onClick={loadSubjects}
+              style={{ marginTop: '12px', color: 'var(--color-accent-active)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <div className={styles.subjectsList}>
             {subjects.map((subject) => {
@@ -274,8 +315,8 @@ export default function SubjectManagement() {
               This will also remove all {deletingSubject.weeks.length} module(s) inside it. This action cannot be undone.
             </p>
             <div className={styles.modalActions}>
-              <Button variant="secondary" onClick={() => setDeletingSubject(null)}>Cancel</Button>
-              <Button variant="danger" onClick={handleConfirmDelete}>Delete</Button>
+              <Button variant="secondary" onClick={() => setDeletingSubject(null)} disabled={isDeleting}>Cancel</Button>
+              <Button variant="danger" onClick={handleConfirmDelete} isLoading={isDeleting}>Delete</Button>
             </div>
           </div>
         </div>

@@ -14,8 +14,7 @@ import {
 import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { getSubjectsData, getCurrentTopicAndWeek } from '../../../services/student/studentService';
-import { mockModuleProgress } from '../../../data/student/studentDashboardData';
+import { getSubjectsData, getCurrentTopicAndWeek, getOverallModuleProgress } from '../../../services/student/studentService';
 import styles from '../styles/Subjects.module.css';
 
 const WEEK_STATUS_ICON = { done: CheckCircle2, now: Play, locked: Lock };
@@ -24,8 +23,10 @@ export default function Subjects() {
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [subjectsData, setSubjectsData] = useState(null);
   const [currentLesson, setCurrentLesson] = useState(null);
+  const [moduleProgress, setModuleProgress] = useState(null);
 
   const [activeYear, setActiveYear] = useState('All Years');
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,14 +36,22 @@ export default function Subjects() {
     let isMounted = true;
 
     async function loadData() {
-      const [data, lesson] = await Promise.all([
-        getSubjectsData(),
-        getCurrentTopicAndWeek(),
-      ]);
-      if (isMounted) {
-        setSubjectsData(data);
-        setCurrentLesson(lesson);
-        setIsLoading(false);
+      try {
+        const [data, lesson, moduleProg] = await Promise.all([
+          getSubjectsData(),
+          getCurrentTopicAndWeek(),
+          getOverallModuleProgress(),
+        ]);
+        if (isMounted) {
+          setSubjectsData(data);
+          setCurrentLesson(lesson);
+          setModuleProgress(moduleProg);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -59,6 +68,8 @@ export default function Subjects() {
     if (topic && week) navigate(`/student/quiz/${topic.id}/${week.id}`);
   }
 
+  const hasCurrentLesson = Boolean(currentLesson?.topic && currentLesson?.week);
+
   const filteredGroups = useMemo(() => {
     if (!subjectsData) return [];
     return subjectsData.subjectGroups
@@ -72,7 +83,7 @@ export default function Subjects() {
       .filter((group) => group.topics.length > 0);
   }, [subjectsData, activeYear, searchQuery]);
 
-  if (isLoading || !subjectsData) {
+  if (isLoading) {
     return (
       <PageShell navItems={STUDENT_NAV_ITEMS}>
         <p className={styles.loadingText}>Loading subjects...</p>
@@ -80,15 +91,23 @@ export default function Subjects() {
     );
   }
 
+  if (loadError || !subjectsData) {
+    return (
+      <PageShell navItems={STUDENT_NAV_ITEMS}>
+        <p className={styles.loadingText}>Couldn't load subjects. Please refresh and try again.</p>
+      </PageShell>
+    );
+  }
+
   const { yearFilters, overview } = subjectsData;
 
   return (
-    <PageShell navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress}>
+    <PageShell navItems={STUDENT_NAV_ITEMS} progress={moduleProgress}>
       <header className={styles.topbar}>
         <span className={styles.overviewPill}>
           {overview.topicsDone} of {overview.topicsTotal} topics done
         </span>
-        <Button onClick={goToQuiz}>Start quiz</Button>
+        <Button onClick={goToQuiz} disabled={!hasCurrentLesson}>Start quiz</Button>
       </header>
 
       <main className={styles.main}>

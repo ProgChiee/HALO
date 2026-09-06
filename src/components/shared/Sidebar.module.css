@@ -1,12 +1,16 @@
 .sidebar {
   width: 260px;
   height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
   flex-shrink: 0;
   background: var(--color-bg-sidebar);
   border-right: 1px solid var(--color-border-panel);
   display: flex;
   flex-direction: column;
   padding: var(--space-lg) var(--space-md);
+  overflow-y: auto;
 }
 
 .logo {
@@ -117,6 +121,27 @@
   gap: var(--space-sm);
   padding-top: var(--space-lg);
   border-top: 1px solid var(--color-border-panel);
+}
+
+.logoutBtn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--color-border-panel);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.logoutBtn:hover {
+  background: rgba(255, 82, 82, 0.12);
+  border-color: rgba(255, 82, 82, 0.4);
+  color: #ff5252;
 }
 
 .avatar {

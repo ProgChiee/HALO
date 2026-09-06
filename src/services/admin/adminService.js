@@ -12,6 +12,10 @@ import {
 import { mockProfessors } from '../../data/admin/professorsData';
 import { mockManagedStudents } from '../../data/admin/studentsData';
 import { mockAdminProfile } from '../../data/admin/adminProfileData';
+import { mockActivityLog } from '../../data/admin/monitoringData';
+import { mockAiUsageSummary, mockAiUsageBySubject, mockTopAskedTopics } from '../../data/admin/aiUsageData';
+import { mockQuizSummary, mockQuizPerformanceBySubject, mockLowestScoringQuizzes } from '../../data/admin/quizPerformanceData';
+import { mockSessionSummary, mockActiveSessionsByRole, mockLoginActivity } from '../../data/admin/sessionMonitoringData';
 
 function delay(ms = 400) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,6 +52,7 @@ export async function createProfessor({ fullName, email, professorId }) {
     professorId,
     subjectsCount: 0,
     lessonsCount: 0,
+    uploadedMaterialsCount: 0,
     lastLogin: 'Never',
     status: 'active',
   };
@@ -108,4 +113,51 @@ export async function updateAdminProfile(updates) {
   // TODO: const res = await apiClient.patch('/admin/profile', updates); return res.data;
   adminProfileStore = { ...adminProfileStore, ...updates };
   return adminProfileStore;
+}
+
+export async function getActivityLog() {
+  await delay();
+  // TODO: const res = await apiClient.get('/admin/activity-log'); return res.data;
+  // Suggestion for the real endpoint: support pagination + a `since`
+  // param, since this list only grows over time.
+  return mockActivityLog;
+}
+
+export async function getAiUsageData() {
+  await delay();
+  // TODO: const res = await apiClient.get('/admin/ai-usage'); return res.data;
+  // Suggestion for the real endpoint: aggregate straight from the AI chat
+  // logs table (COUNT queries GROUP BY subject_id / student_id), rather
+  // than computing this client-side once real chat volume grows large.
+  return {
+    summary: mockAiUsageSummary,
+    bySubject: mockAiUsageBySubject,
+    topTopics: mockTopAskedTopics,
+  };
+}
+
+export async function getQuizPerformanceData() {
+  await delay();
+  // TODO: const res = await apiClient.get('/admin/quiz-performance'); return res.data;
+  // Suggestion for the real endpoint: aggregate straight from stored quiz
+  // attempts (AVG(score) GROUP BY subject_id / quiz_id), rather than
+  // computing this client-side once real attempt volume grows large.
+  return {
+    summary: mockQuizSummary,
+    bySubject: mockQuizPerformanceBySubject,
+    lowestScoring: mockLowestScoringQuizzes,
+  };
+}
+
+export async function getSessionMonitoringData() {
+  await delay();
+  // TODO: const res = await apiClient.get('/admin/login-activity'); return res.data;
+  // Suggestion for the real endpoint: activeSessionsNow needs to come from
+  // the backend's session/token store (not something the frontend can
+  // derive), while loginActivity can be a simple paginated auth-events log.
+  return {
+    summary: mockSessionSummary,
+    byRole: mockActiveSessionsByRole,
+    activity: mockLoginActivity,
+  };
 }

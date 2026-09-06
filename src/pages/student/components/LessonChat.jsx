@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Bot, Send, ChevronRight } from 'lucide-react';
+import { Bot, Send, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { mockModuleProgress } from '../../../data/student/studentDashboardData';
-import { getTopicAndWeek } from '../../../services/student/studentService';
+import { getTopicAndWeek, getOverallModuleProgress } from '../../../services/student/studentService';
 import { getChatHistory, sendMessageToMentor } from '../../../services/student/aiMentorService';
+import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
+import { useToast } from '../../../context/notifications/ToastContext';
 import styles from '../styles/LessonChat.module.css';
 
 export default function LessonChat() {
@@ -14,29 +15,54 @@ export default function LessonChat() {
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [topic, setTopic] = useState(null);
   const [week, setWeek] = useState(null);
+  const [moduleProgress, setModuleProgress] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef(null);
+  const isMountedRef = useRef(true);
+  const { speak, stop, speakingId, isSupported: ttsSupported } = useTextToSpeech();
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    return () => { isMountedRef.current = false; };
+  }, []);
+
+  // Stop any reading in progress when switching to a different
+  // topic/week's lesson, so audio from the old lesson doesn't keep
+  // playing on the new one.
+  useEffect(() => {
+    return () => stop();
+  }, [topicId, weekId, stop]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadLesson() {
-      const { topic: fetchedTopic, week: fetchedWeek } = await getTopicAndWeek(topicId, weekId);
-      if (!isMounted) return;
+      try {
+        const [{ topic: fetchedTopic, week: fetchedWeek }, moduleProg] = await Promise.all([
+          getTopicAndWeek(topicId, weekId),
+          getOverallModuleProgress(),
+        ]);
+        if (!isMounted) return;
 
-      setTopic(fetchedTopic);
-      setWeek(fetchedWeek);
+        setTopic(fetchedTopic);
+        setWeek(fetchedWeek);
+        setModuleProgress(moduleProg);
 
-      if (fetchedTopic && fetchedWeek) {
-        const history = await getChatHistory(fetchedTopic.title, fetchedWeek.label);
-        if (isMounted) setMessages(history);
+        if (fetchedTopic && fetchedWeek) {
+          const history = await getChatHistory(fetchedTopic.title, fetchedWeek.label);
+          if (isMounted) setMessages(history);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
-
-      if (isMounted) setIsLoading(false);
     }
 
     loadLesson();
@@ -50,9 +76,23 @@ export default function LessonChat() {
   if (isLoading) {
     return (
       <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress} />
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading lesson...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+        <div className={styles.contentArea}>
+          <main className={styles.notFound}>
+            <p>Couldn't load this lesson. Please refresh and try again.</p>
+            <Button onClick={() => navigate('/student/subjects')}>Back to Subjects</Button>
+          </main>
         </div>
       </div>
     );
@@ -62,7 +102,7 @@ export default function LessonChat() {
   if (!topic || !week) {
     return (
       <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress} />
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
         <div className={styles.contentArea}>
           <main className={styles.notFound}>
             <p>We couldn't find that lesson.</p>
@@ -75,6 +115,8 @@ export default function LessonChat() {
 
   async function handleSend(e) {
     e.preventDefault();
+    if (isAiTyping) return; // block sending another message while AI is still answering
+
     const text = draft.trim();
     if (!text) return;
 
@@ -83,14 +125,23 @@ export default function LessonChat() {
     setDraft('');
     setIsAiTyping(true);
 
-    const reply = await sendMessageToMentor(text, weekId);
-    setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', text: reply }]);
-    setIsAiTyping(false);
+    try {
+      const reply = await sendMessageToMentor(text, weekId);
+      if (!isMountedRef.current) return;
+      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', text: reply }]);
+    } catch (err) {
+      console.error(err);
+      if (isMountedRef.current) {
+        showToast("AI Mentor couldn't respond. Please try again.", 'error');
+      }
+    } finally {
+      if (isMountedRef.current) setIsAiTyping(false);
+    }
   }
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
 
       <div className={styles.contentArea}>
         <header className={styles.topHeader}>
@@ -128,6 +179,18 @@ export default function LessonChat() {
               <div className={`${styles.bubble} ${msg.sender === 'user' ? styles.bubbleUser : styles.bubbleAi}`}>
                 {msg.text}
               </div>
+
+              {msg.sender === 'ai' && ttsSupported && (
+                <button
+                  type="button"
+                  className={`${styles.speakBtn} ${speakingId === msg.id ? styles.speakBtnActive : ''}`}
+                  onClick={() => speak(msg.id, msg.text)}
+                  aria-label={speakingId === msg.id ? 'Stop reading message aloud' : 'Read message aloud'}
+                >
+                  {speakingId === msg.id ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                  {speakingId === msg.id ? 'Stop' : 'Listen'}
+                </button>
+              )}
             </div>
           ))}
 
@@ -149,11 +212,12 @@ export default function LessonChat() {
           <input
             type="text"
             className={styles.chatInput}
-            placeholder="Ask AI Mentor"
+            placeholder={isAiTyping ? 'Waiting for AI Mentor to respond...' : 'Ask AI Mentor'}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            disabled={isAiTyping}
           />
-          <button type="submit" className={styles.sendBtn} aria-label="Send message">
+          <button type="submit" className={styles.sendBtn} aria-label="Send message" disabled={isAiTyping}>
             <Send size={18} />
           </button>
         </form>

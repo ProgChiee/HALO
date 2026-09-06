@@ -27,6 +27,7 @@ export default function ForgotPassword() {
   const [error, setError] = useState('');
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const { showToast } = useToast();
@@ -43,6 +44,7 @@ export default function ForgotPassword() {
 
   async function handleSendCode(e) {
     e.preventDefault();
+    if (isLoading) return;
     setError('');
 
     if (!email) {
@@ -63,6 +65,7 @@ export default function ForgotPassword() {
       setStep(2);
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err) {
+      console.error(err);
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -70,15 +73,24 @@ export default function ForgotPassword() {
   }
 
   async function handleResend() {
-    if (resendCooldown > 0) return;
+    if (resendCooldown > 0 || isResending) return;
 
-    await resendPasswordResetCode(email);
-    showToast('Verification code resent.', 'success');
-    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    setIsResending(true);
+    try {
+      await resendPasswordResetCode(email);
+      showToast('Verification code resent.', 'success');
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    } catch (err) {
+      console.error(err);
+      showToast("Couldn't resend the code. Please try again.", 'error');
+    } finally {
+      setIsResending(false);
+    }
   }
 
   async function handleResetPassword(e) {
     e.preventDefault();
+    if (isLoading) return;
     setError('');
 
     if (!code || !newPassword || !confirmPassword) {
@@ -91,6 +103,11 @@ export default function ForgotPassword() {
       return;
     }
 
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -98,6 +115,7 @@ export default function ForgotPassword() {
       showToast('Password reset successfully. Please sign in.', 'success');
       navigate('/login');
     } catch (err) {
+      console.error(err);
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -177,16 +195,20 @@ export default function ForgotPassword() {
                       className={styles.input}
                       value={code}
                       onChange={(e) => setCode(e.target.value)}
-                      placeholder={email || 'Verification code'}
+                      placeholder="Enter verification code"
                     />
                   </div>
                   <button
                     type="button"
                     className={styles.resendBtn}
                     onClick={handleResend}
-                    disabled={resendCooldown > 0}
+                    disabled={resendCooldown > 0 || isResending}
                   >
-                    {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+                    {resendCooldown > 0
+                      ? `Resend code in ${resendCooldown}s`
+                      : isResending
+                        ? 'Resending...'
+                        : 'Resend code'}
                   </button>
                 </div>
 
@@ -225,10 +247,10 @@ export default function ForgotPassword() {
                     />
                   </div>
                 </div>
-
+                      
                 {error && <p className={styles.error}>{error}</p>}
 
-                <Button type="submit" isLoading={isLoading}>Send Code</Button>
+                <Button type="submit" isLoading={isLoading}>Reset Password</Button>
               </form>
             </div>
           </>

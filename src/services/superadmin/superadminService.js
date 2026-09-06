@@ -17,7 +17,16 @@ function delay(ms = 400) {
 export async function getSuperAdminDashboardData() {
   await delay();
   // TODO: const res = await apiClient.get('/superadmin/dashboard'); return res.data;
-  return { stats: mockPlatformStats, recentActivity: mockRecentActivity };
+
+  // "Total Admins" is the one stat we can actually compute live from
+  // in-memory data (the Admins CRUD store below) — the rest (total users,
+  // students, subjects, etc.) would need real cross-role backend
+  // aggregation, so those stay as static mock numbers for now.
+  const stats = mockPlatformStats.map((stat) =>
+    stat.id === 'admins' ? { ...stat, value: String(adminsStore.length) } : stat
+  );
+
+  return { stats, recentActivity: mockRecentActivity };
 }
 
 // In-memory copy so Add/Delete feel real during the demo, even without a
@@ -50,6 +59,15 @@ export async function deleteAdmin(adminId) {
   // TODO: await apiClient.delete(`/superadmin/admins/${adminId}`);
   adminsStore = adminsStore.filter((a) => a.id !== adminId);
   return { success: true };
+}
+
+export async function toggleAdminStatus(adminId) {
+  await delay(200);
+  // TODO: const res = await apiClient.patch(`/superadmin/admins/${adminId}/toggle-status`); return res.data;
+  adminsStore = adminsStore.map((a) =>
+    a.id === adminId ? { ...a, status: a.status === 'active' ? 'inactive' : 'active' } : a
+  );
+  return adminsStore.find((a) => a.id === adminId);
 }
 
 export async function getSuperAdminProfile() {

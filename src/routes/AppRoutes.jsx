@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
+import { ROLES } from '../utils/roles';
 
 import Login from '../pages/login/components/Login';
 import Register from '../pages/login/components/Register';
@@ -13,10 +14,12 @@ import AdminDashboard from '../pages/admin/components/AdminDashboard';
 import ProfessorManagement from '../pages/admin/components/ProfessorManagement';
 import StudentManagement from '../pages/admin/components/StudentManagement';
 import AdminProfile from '../pages/admin/components/AdminProfile';
+import Monitoring from '../pages/admin/components/Monitoring';
 import ProfessorDashboard from '../pages/professor/components/ProfessorDashboard';
 import SubjectManagement from '../pages/professor/components/SubjectManagement';
 import LessonEditor from '../pages/professor/components/LessonEditor';
 import StudentProgress from '../pages/professor/components/StudentProgress';
+import ProfessorProfile from '../pages/professor/components/ProfessorProfile';
 import StudentDashboard from '../pages/student/components/StudentDashboard';
 import Subjects from '../pages/student/components/Subjects';
 import LessonChat from '../pages/student/components/LessonChat';
@@ -39,7 +42,7 @@ export default function AppRoutes() {
       <Route
         path="/superadmin"
         element={
-          <ProtectedRoute allowedRoles={['superadmin']}>
+          <ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}>
             <SuperAdminDashboard />
           </ProtectedRoute>
         }
@@ -48,7 +51,7 @@ export default function AppRoutes() {
       <Route
         path="/superadmin/admins"
         element={
-          <ProtectedRoute allowedRoles={['superadmin']}>
+          <ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}>
             <Admins />
           </ProtectedRoute>
         }
@@ -57,7 +60,7 @@ export default function AppRoutes() {
       <Route
         path="/superadmin/profile"
         element={
-          <ProtectedRoute allowedRoles={['superadmin']}>
+          <ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}>
             <SuperAdminProfile />
           </ProtectedRoute>
         }
@@ -66,7 +69,7 @@ export default function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <AdminDashboard />
           </ProtectedRoute>
         }
@@ -75,7 +78,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/professors"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
             <ProfessorManagement />
           </ProtectedRoute>
         }
@@ -84,8 +87,17 @@ export default function AppRoutes() {
       <Route
         path="/admin/students"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
             <StudentManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/monitoring"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+            <Monitoring />
           </ProtectedRoute>
         }
       />
@@ -93,7 +105,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/profile"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <AdminProfile />
           </ProtectedRoute>
         }
@@ -102,7 +114,7 @@ export default function AppRoutes() {
       <Route
         path="/professor"
         element={
-          <ProtectedRoute allowedRoles={['professor']}>
+          <ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}>
             <ProfessorDashboard />
           </ProtectedRoute>
         }
@@ -111,7 +123,7 @@ export default function AppRoutes() {
       <Route
         path="/professor/subjects"
         element={
-          <ProtectedRoute allowedRoles={['professor']}>
+          <ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}>
             <SubjectManagement />
           </ProtectedRoute>
         }
@@ -120,7 +132,7 @@ export default function AppRoutes() {
       <Route
         path="/professor/subjects/:subjectId/week/:weekId"
         element={
-          <ProtectedRoute allowedRoles={['professor']}>
+          <ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}>
             <LessonEditor />
           </ProtectedRoute>
         }
@@ -129,8 +141,17 @@ export default function AppRoutes() {
       <Route
         path="/professor/progress"
         element={
-          <ProtectedRoute allowedRoles={['professor']}>
+          <ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}>
             <StudentProgress />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/professor/profile"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}>
+            <ProfessorProfile />
           </ProtectedRoute>
         }
       />
@@ -138,7 +159,7 @@ export default function AppRoutes() {
       <Route
         path="/student"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
             <StudentDashboard />
           </ProtectedRoute>
         }
@@ -147,7 +168,7 @@ export default function AppRoutes() {
       <Route
         path="/student/subjects"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
             <Subjects />
           </ProtectedRoute>
         }
@@ -156,7 +177,7 @@ export default function AppRoutes() {
       <Route
         path="/student/lesson/:topicId/:weekId"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
             <LessonChat />
           </ProtectedRoute>
         }
@@ -165,7 +186,7 @@ export default function AppRoutes() {
       <Route
         path="/student/progress"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
             <Progress />
           </ProtectedRoute>
         }
@@ -174,7 +195,7 @@ export default function AppRoutes() {
       <Route
         path="/student/badges"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
             <Badges />
           </ProtectedRoute>
         }
@@ -183,7 +204,7 @@ export default function AppRoutes() {
       <Route
         path="/student/profile"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
             <Profile />
           </ProtectedRoute>
         }
@@ -192,7 +213,7 @@ export default function AppRoutes() {
       <Route
         path="/student/quiz/:topicId/:weekId"
         element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
             <Quiz />
           </ProtectedRoute>
         }

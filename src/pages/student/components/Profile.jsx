@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { User as UserIcon, Pencil, KeyRound } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
+import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { mockModuleProgress } from '../../../data/student/studentDashboardData';
-import { getProfileData, getCurrentTopicAndWeek } from '../../../services/student/studentService';
+import { getProfileData, getCurrentTopicAndWeek, getOverallModuleProgress } from '../../../services/student/studentService';
 import styles from '../styles/Profile.module.css';
 
 export default function Profile() {
@@ -14,21 +14,32 @@ export default function Profile() {
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
   const [currentLesson, setCurrentLesson] = useState(null);
+  const [moduleProgress, setModuleProgress] = useState(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
-      const [profileData, lesson] = await Promise.all([
-        getProfileData(),
-        getCurrentTopicAndWeek(),
-      ]);
-      if (isMounted) {
-        setProfile(profileData);
-        setCurrentLesson(lesson);
-        setIsLoading(false);
+      try {
+        const [profileData, lesson, moduleProg] = await Promise.all([
+          getProfileData(),
+          getCurrentTopicAndWeek(),
+          getOverallModuleProgress(),
+        ]);
+        if (isMounted) {
+          setProfile(profileData);
+          setCurrentLesson(lesson);
+          setModuleProgress(moduleProg);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -41,13 +52,15 @@ export default function Profile() {
     if (topic && week) navigate(`/student/quiz/${topic.id}/${week.id}`);
   }
 
+  const hasCurrentLesson = Boolean(currentLesson?.topic && currentLesson?.week);
+
   // TODO: replace with real navigation to an edit form/modal, or a PATCH
   // call to your backend, once those flows exist.
   function handleComingSoon(feature) {
     showToast(`${feature} coming soon.`, 'info');
   }
 
-  if (isLoading || !profile) {
+  if (isLoading) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
@@ -58,9 +71,20 @@ export default function Profile() {
     );
   }
 
+  if (loadError || !profile) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+        <div className={styles.contentArea}>
+          <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -68,7 +92,7 @@ export default function Profile() {
             <UserIcon size={16} />
             Profile
           </div>
-          <Button onClick={goToQuiz}>Start quiz</Button>
+          <Button onClick={goToQuiz} disabled={!hasCurrentLesson}>Start quiz</Button>
         </header>
 
         <main className={styles.main}>
@@ -124,7 +148,7 @@ export default function Profile() {
 
           <button
             className={styles.actionRow}
-            onClick={() => handleComingSoon('Changing your password')}
+            onClick={() => setShowChangePassword(true)}
           >
             <span className={styles.actionIcon}>
               <KeyRound size={16} />
@@ -133,6 +157,8 @@ export default function Profile() {
           </button>
         </main>
       </div>
+
+      <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
     </div>
   );
 }

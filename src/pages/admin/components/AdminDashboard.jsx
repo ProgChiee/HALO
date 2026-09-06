@@ -10,16 +10,21 @@ const ICONS = { Users, GraduationCap, BookOpen, FileText };
 
 export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [data, setData] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
-      const result = await getAdminDashboardData();
-      if (isMounted) {
-        setData(result);
-        setIsLoading(false);
+      try {
+        const result = await getAdminDashboardData();
+        if (isMounted) setData(result);
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -27,12 +32,23 @@ export default function AdminDashboard() {
     return () => { isMounted = false; };
   }, []);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError || !data) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin" />
+        <div className={styles.contentArea}>
+          <p className={styles.loadingText}>Couldn't load the dashboard. Please refresh and try again.</p>
         </div>
       </div>
     );

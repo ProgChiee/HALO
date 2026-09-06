@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Trash2, X } from 'lucide-react';
+import { Users, Plus, Trash2, X, Power } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getAdmins, addAdmin, deleteAdmin } from '../../../services/superadmin/superadminService';
+import { getAdmins, addAdmin, deleteAdmin, toggleAdminStatus } from '../../../services/superadmin/superadminService';
 import styles from '../styles/Admins.module.css';
 
 const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
@@ -13,8 +13,11 @@ export default function Admins() {
   const { showToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [admins, setAdmins] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -25,11 +28,25 @@ export default function Admins() {
     loadAdmins();
   }, []);
 
+  // Used once on mount — shows the "Loading admins..." state.
   async function loadAdmins() {
     setIsLoading(true);
+    setLoadError(false);
+    try {
+      await refetchAdmins();
+    } catch (err) {
+      console.error(err);
+      setLoadError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Used after actions (add, delete) — updates the table data in place
+  // without hiding it behind the loading state.
+  async function refetchAdmins() {
     const data = await getAdmins();
     setAdmins(data);
-    setIsLoading(false);
   }
 
   function openAddModal() {
@@ -41,6 +58,7 @@ export default function Admins() {
 
   async function handleAddAdmin(e) {
     e.preventDefault();
+    if (isSubmitting) return;
     setFormError('');
 
     if (!fullName || !email) {
@@ -58,8 +76,9 @@ export default function Admins() {
       await addAdmin({ fullName, email });
       showToast('Admin account created.', 'success');
       setShowAddModal(false);
-      loadAdmins();
+      await refetchAdmins();
     } catch (err) {
+      console.error(err);
       setFormError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -68,14 +87,43 @@ export default function Admins() {
 
   async function handleDelete(admin) {
     if (!window.confirm(`Remove ${admin.fullName} as an Admin?`)) return;
-    await deleteAdmin(admin.id);
-    showToast('Admin removed.', 'success');
-    loadAdmins();
+    if (deletingId === admin.id) return;
+
+    setDeletingId(admin.id);
+    try {
+      await deleteAdmin(admin.id);
+      showToast('Admin removed.', 'success');
+      await refetchAdmins();
+    } catch (err) {
+      console.error(err);
+      showToast('Something went wrong. Please try again.', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleToggleStatus(admin) {
+    if (togglingId === admin.id) return;
+
+    setTogglingId(admin.id);
+    try {
+      await toggleAdminStatus(admin.id);
+      showToast(
+        admin.status === 'active' ? 'Admin deactivated.' : 'Admin activated.',
+        'success'
+      );
+      await refetchAdmins();
+    } catch (err) {
+      console.error(err);
+      showToast('Something went wrong. Please try again.', 'error');
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={SUPERADMIN_NAV_ITEMS} />
+      <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -92,6 +140,16 @@ export default function Admins() {
         <main className={styles.main}>
           {isLoading ? (
             <p className={styles.loadingText}>Loading admins...</p>
+          ) : loadError ? (
+            <div className={styles.tableCard} style={{ padding: '3rem', textAlign: 'center' }}>
+              <p className={styles.loadingText}>Couldn't load admins. Please check your connection.</p>
+              <button
+                onClick={loadAdmins}
+                style={{ marginTop: '12px', color: 'var(--color-accent-active)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                Retry
+              </button>
+            </div>
           ) : (
             <div className={styles.tableCard}>
               <div className={styles.tableHeaderRow}>
@@ -110,13 +168,24 @@ export default function Admins() {
                   <span className={`${styles.statusBadge} ${styles[`status_${admin.status}`]}`}>
                     {admin.status === 'active' ? 'Active' : 'Inactive'}
                   </span>
-                  <button
-                    className={styles.deleteBtn}
-                    onClick={() => handleDelete(admin)}
-                    aria-label={`Remove ${admin.fullName}`}
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className={styles.actionsCell}>
+                    <button
+                      className={`${styles.actionBtn} ${admin.status === 'inactive' ? styles.actionBtnOff : ''}`}
+                      onClick={() => handleToggleStatus(admin)}
+                      disabled={togglingId === admin.id}
+                      aria-label={admin.status === 'active' ? 'Deactivate' : 'Activate'}
+                    >
+                      <Power size={15} />
+                    </button>
+                    <button
+                      className={styles.deleteBtn}
+                      onClick={() => handleDelete(admin)}
+                      disabled={deletingId === admin.id}
+                      aria-label={`Remove ${admin.fullName}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               ))}
 

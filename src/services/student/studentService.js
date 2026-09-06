@@ -10,7 +10,6 @@ import {
   mockStats,
   mockContinueLearning,
   mockEnrolledSubjects,
-  mockModuleProgress,
 } from '../../data/student/studentDashboardData';
 import {
   mockOverallProgress,
@@ -30,11 +29,39 @@ function delay(ms = 400) {
 export async function getDashboardData() {
   await delay();
   // TODO: const res = await axios.get('/api/student/dashboard'); return res.data;
+  const moduleProgress = await getOverallModuleProgress();
   return {
     stats: mockStats,
     continueLearning: mockContinueLearning,
     enrolledSubjects: mockEnrolledSubjects,
-    moduleProgress: mockModuleProgress,
+    moduleProgress,
+  };
+}
+
+// Computes the Sidebar's "Module progress" widget from REAL data (the
+// shared catalog + shared progress store), instead of the static mock.
+// Used across every student page so the widget actually reflects
+// quizzes the student has passed (see markLessonComplete()), rather
+// than always showing the same hardcoded 37%.
+export async function getOverallModuleProgress() {
+  await delay(150);
+  const catalog = getCatalog();
+
+  let totalWeeks = 0;
+  let doneWeeks = 0;
+  catalog.forEach((subject) => {
+    totalWeeks += subject.weeks.length;
+    subject.weeks.forEach((week) => {
+      if (isWeekCompleted(subject.id, week.id)) doneWeeks += 1;
+    });
+  });
+
+  const percent = totalWeeks === 0 ? 0 : Math.round((doneWeeks / totalWeeks) * 100);
+
+  return {
+    label: 'Module progress',
+    percent,
+    detail: `${doneWeeks} of ${totalWeeks} lessons done`,
   };
 }
 

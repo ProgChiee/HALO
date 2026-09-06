@@ -10,16 +10,21 @@ const ICONS = { TrendingUp, CheckCircle2, GraduationCap };
 
 export default function StudentProgress() {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [data, setData] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
-      const result = await getStudentProgressData();
-      if (isMounted) {
-        setData(result);
-        setIsLoading(false);
+      try {
+        const result = await getStudentProgressData();
+        if (isMounted) setData(result);
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -27,10 +32,18 @@ export default function StudentProgress() {
     return () => { isMounted = false; };
   }, []);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
         <p className={styles.loadingText}>Loading student progress...</p>
+      </PageShell>
+    );
+  }
+
+  if (loadError || !data) {
+    return (
+      <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+        <p className={styles.loadingText}>Couldn't load student progress. Please refresh and try again.</p>
       </PageShell>
     );
   }

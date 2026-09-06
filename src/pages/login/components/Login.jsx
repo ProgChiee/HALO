@@ -4,6 +4,7 @@ import { Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../../context/login/AuthContext';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { login as loginService } from '../../../services/authService';
+import { ROLE_HOME } from '../../../utils/roles';
 import Button from '../../../components/shared/Button';
 import bgImage from '../../../assets/login/BG.jpeg';
 import logo from '../../../assets/login/Logo.svg';
@@ -22,6 +23,7 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (isLoading) return;
     setError('');
 
     if (!email || !password) {
@@ -35,8 +37,9 @@ export default function Login() {
       const user = await loginService(email, password);
       login(user, rememberMe);
       showToast('Welcome back!', 'success');
-      navigate(`/${user.role}`);
+      navigate(ROLE_HOME[user.role] ?? '/login');
     } catch (err) {
+      console.error(err);
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);

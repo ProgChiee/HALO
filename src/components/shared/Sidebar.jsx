@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '../../context/login/AuthContext';
 import styles from './Sidebar.module.css';
 
@@ -13,7 +14,13 @@ import styles from './Sidebar.module.css';
  * />
  */
 export default function Sidebar({ navItems = [], progress, sectionLabel = 'Overview', roleBadge }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
   return (
     <aside className={styles.sidebar}>
@@ -64,6 +71,15 @@ export default function Sidebar({ navItems = [], progress, sectionLabel = 'Overv
             <p className={styles.userName}>{user.name}</p>
             <p className={styles.userStatus}>Online</p>
           </div>
+          <button
+            type="button"
+            className={styles.logoutBtn}
+            onClick={handleLogout}
+            aria-label="Log out"
+            title="Log out"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       )}
     </aside>

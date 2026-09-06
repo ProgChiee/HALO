@@ -10,16 +10,21 @@ const ICONS = { Users, UsersRound, UserCheck, UserX, GraduationCap, Layers };
 
 export default function SuperAdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [data, setData] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
-      const result = await getSuperAdminDashboardData();
-      if (isMounted) {
-        setData(result);
-        setIsLoading(false);
+      try {
+        const result = await getSuperAdminDashboardData();
+        if (isMounted) setData(result);
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -27,10 +32,18 @@ export default function SuperAdminDashboard() {
     return () => { isMounted = false; };
   }, []);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
-      <PageShell navItems={SUPERADMIN_NAV_ITEMS}>
+      <PageShell navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
         <p className={styles.loadingText}>Loading dashboard...</p>
+      </PageShell>
+    );
+  }
+
+  if (loadError || !data) {
+    return (
+      <PageShell navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
+        <p className={styles.loadingText}>Couldn't load the dashboard. Please refresh and try again.</p>
       </PageShell>
     );
   }
@@ -38,7 +51,7 @@ export default function SuperAdminDashboard() {
   const { stats, recentActivity } = data;
 
   return (
-    <PageShell navItems={SUPERADMIN_NAV_ITEMS}>
+    <PageShell navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
       <header className={styles.topbar}>
         <div className={styles.breadcrumb}>
           <LayoutGrid size={16} />

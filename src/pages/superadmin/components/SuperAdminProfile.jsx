@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User as UserIcon, KeyRound } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
+import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { getSuperAdminProfile } from '../../../services/superadmin/superadminService';
@@ -9,15 +10,21 @@ import styles from '../styles/SuperAdminProfile.module.css';
 export default function SuperAdminProfile() {
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
-      const data = await getSuperAdminProfile();
-      if (isMounted) {
-        setProfile(data);
-        setIsLoading(false);
+      try {
+        const data = await getSuperAdminProfile();
+        if (isMounted) setProfile(data);
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
     loadData();
@@ -28,10 +35,10 @@ export default function SuperAdminProfile() {
     showToast(`${feature} coming soon.`, 'info');
   }
 
-  if (isLoading || !profile) {
+  if (isLoading) {
     return (
       <div className={styles.layout}>
-        <Sidebar navItems={SUPERADMIN_NAV_ITEMS} />
+        <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading profile...</p>
         </div>
@@ -39,9 +46,20 @@ export default function SuperAdminProfile() {
     );
   }
 
+  if (loadError || !profile) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
+        <div className={styles.contentArea}>
+          <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={SUPERADMIN_NAV_ITEMS} />
+      <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -84,7 +102,7 @@ export default function SuperAdminProfile() {
 
           <button
             className={styles.actionRow}
-            onClick={() => handleComingSoon('Changing your password')}
+            onClick={() => setShowChangePassword(true)}
           >
             <span className={styles.actionIcon}>
               <KeyRound size={16} />
@@ -93,6 +111,8 @@ export default function SuperAdminProfile() {
           </button>
         </main>
       </div>
+
+      <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
     </div>
   );
 }

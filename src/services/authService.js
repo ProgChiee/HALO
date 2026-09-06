@@ -13,7 +13,20 @@ export async function login(email, password) {
   await delay();
   // TODO: const res = await axios.post('/api/auth/login', { email, password });
   // return res.data.user;
-  return { id: 1, name: 'Juan Dela Cruz', email, role: 'student' };
+  //
+  // Mock-only: derive the role from a keyword in the email so all 4 roles
+  // can actually be tested through the real Login form (the app has strict
+  // per-role route protection — see AppRoutes.jsx — so logging everyone in
+  // as the same role would lock you out of 3 of the 4 portals). Once the
+  // real backend is connected, the role will come from res.data.user
+  // instead, and this keyword logic can be deleted.
+  const lower = email.toLowerCase();
+  let role = 'admin';
+  if (lower.includes('superadmin')) role = 'superadmin';
+  else if (lower.includes('professor') || lower.includes('prof')) role = 'professor';
+  else if (lower.includes('student')) role = 'student';
+
+  return { id: 1, name: 'Juan Dela Cruz', email, role };
 }
 
 export async function register(fullName, email, password) {
@@ -37,5 +50,17 @@ export async function resendPasswordResetCode(email) {
 export async function resetPassword(email, code, newPassword) {
   await delay();
   // TODO: await axios.post('/api/auth/reset-password', { email, code, newPassword });
+  return { success: true };
+}
+
+// Used by the "Change password" action on every role's Profile page
+// (Student, Professor, Admin, Superadmin) — one shared function since the
+// logic is identical regardless of role.
+export async function changePassword(currentPassword, newPassword) {
+  await delay();
+  // TODO: await apiClient.post('/auth/change-password', { currentPassword, newPassword });
+  // The real backend MUST verify currentPassword matches before accepting
+  // the change — this mock has no way to check that, so it always
+  // "succeeds" here for demo purposes.
   return { success: true };
 }

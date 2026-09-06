@@ -3,7 +3,8 @@ import { GraduationCap, Search, Plus, Eye, Pencil, Power, X } from 'lucide-react
 import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/ToastContext';
-import { ADMIN_NAV_ITEMS } from '../../../data/navigationData';
+import { useAuth } from '../../../context/login/AuthContext';
+import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import {
   getProfessors,
   createProfessor,
@@ -14,13 +15,17 @@ import styles from '../styles/ProfessorManagement.module.css';
 
 export default function ProfessorManagement() {
   const { showToast } = useToast();
+  const { role } = useAuth();
+  const isSuperAdmin = role === 'superadmin';
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [professors, setProfessors] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingProfessor, setViewingProfessor] = useState(null);
   const [editingProfessor, setEditingProfessor] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -32,11 +37,28 @@ export default function ProfessorManagement() {
     loadProfessors();
   }, []);
 
+  // Used once on mount — shows the "Loading professors..." state.
   async function loadProfessors() {
     setIsLoading(true);
+    setLoadError(false);
+    try {
+      await refetchProfessors();
+    } catch (err) {
+      console.error(err);
+      setLoadError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Used after actions (create, edit, toggle status) — updates the table
+  // data in place without hiding it behind the loading state. Returns the
+  // fresh data so callers can sync other state (e.g. an open view modal)
+  // with the real result.
+  async function refetchProfessors() {
     const data = await getProfessors();
     setProfessors(data);
-    setIsLoading(false);
+    return data;
   }
 
   const filteredProfessors = useMemo(() => {
@@ -56,6 +78,7 @@ export default function ProfessorManagement() {
 
   async function handleCreate(e) {
     e.preventDefault();
+    if (isSubmitting) return;
     setFormError('');
 
     if (!fullName || !email || !professorId) {
@@ -68,8 +91,9 @@ export default function ProfessorManagement() {
       await createProfessor({ fullName, email, professorId });
       showToast('Professor account created.', 'success');
       setShowCreateModal(false);
-      loadProfessors();
+      await refetchProfessors();
     } catch (err) {
+      console.error(err);
       setFormError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -77,12 +101,26 @@ export default function ProfessorManagement() {
   }
 
   async function handleToggleStatus(professor) {
-    await toggleProfessorStatus(professor.id);
-    showToast(
-      professor.status === 'active' ? 'Professor deactivated.' : 'Professor activated.',
-      'success'
-    );
-    loadProfessors();
+    if (togglingId === professor.id) return;
+
+    setTogglingId(professor.id);
+    try {
+      await toggleProfessorStatus(professor.id);
+      showToast(
+        professor.status === 'active' ? 'Professor deactivated.' : 'Professor activated.',
+        'success'
+      );
+      const updated = await refetchProfessors();
+      const freshProfessor = updated.find((p) => p.id === professor.id);
+      setViewingProfessor((prev) =>
+        prev && prev.id === professor.id ? freshProfessor : prev
+      );
+    } catch (err) {
+      console.error(err);
+      showToast('Something went wrong. Please try again.', 'error');
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   function openEditModal(professor) {
@@ -95,6 +133,7 @@ export default function ProfessorManagement() {
 
   async function handleSaveEdit(e) {
     e.preventDefault();
+    if (isSubmitting) return;
     setFormError('');
 
     if (!fullName || !email || !professorId) {
@@ -107,8 +146,9 @@ export default function ProfessorManagement() {
       await updateProfessor(editingProfessor.id, { fullName, email, professorId });
       showToast('Professor info updated.', 'success');
       setEditingProfessor(null);
-      loadProfessors();
+      await refetchProfessors();
     } catch (err) {
+      console.error(err);
       setFormError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -116,7 +156,11 @@ export default function ProfessorManagement() {
   }
 
   return (
-    <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+    <PageShell
+      navItems={isSuperAdmin ? SUPERADMIN_NAV_ITEMS : ADMIN_NAV_ITEMS}
+      sectionLabel={isSuperAdmin ? 'Superadmin' : 'Admin'}
+      roleBadge={isSuperAdmin ? 'Superadmin' : 'Admin'}
+    >
       <header className={styles.topbar}>
         <div className={styles.breadcrumb}>
           <GraduationCap size={16} />
@@ -144,6 +188,16 @@ export default function ProfessorManagement() {
 
         {isLoading ? (
           <p className={styles.loadingText}>Loading professors...</p>
+        ) : loadError ? (
+          <div className={styles.tableCard} style={{ padding: '3rem', textAlign: 'center' }}>
+            <p className={styles.loadingText}>Couldn't load professors. Please check your connection.</p>
+            <button
+              onClick={loadProfessors}
+              style={{ marginTop: '12px', color: 'var(--color-accent-active)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <div className={styles.tableCard}>
             <div className={styles.tableHeaderRow}>
@@ -189,6 +243,7 @@ export default function ProfessorManagement() {
                   <button
                     className={`${styles.actionBtn} ${prof.status === 'inactive' ? styles.actionBtnOff : ''}`}
                     onClick={() => handleToggleStatus(prof)}
+                    disabled={togglingId === prof.id}
                     aria-label={prof.status === 'active' ? 'Deactivate' : 'Activate'}
                   >
                     <Power size={15} />

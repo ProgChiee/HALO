@@ -3,8 +3,7 @@ import { CheckCircle2, BookOpen, Star, Award } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../../../components/shared/Sidebar';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { mockModuleProgress } from '../../../data/student/studentDashboardData';
-import { getProgressData } from '../../../services/student/studentService';
+import { getProgressData, getOverallModuleProgress } from '../../../services/student/studentService';
 import styles from '../styles/Progress.module.css';
 
 // Maps the string icon names from the mock data to actual icon components
@@ -19,16 +18,28 @@ function gradeClass(grade) {
 
 export default function Progress() {
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [progressData, setProgressData] = useState(null);
+  const [moduleProgress, setModuleProgress] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
-      const data = await getProgressData();
-      if (isMounted) {
-        setProgressData(data);
-        setIsLoading(false);
+      try {
+        const [data, moduleProg] = await Promise.all([
+          getProgressData(),
+          getOverallModuleProgress(),
+        ]);
+        if (isMounted) {
+          setProgressData(data);
+          setModuleProgress(moduleProg);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -36,7 +47,7 @@ export default function Progress() {
     return () => { isMounted = false; };
   }, []);
 
-  if (isLoading || !progressData) {
+  if (isLoading) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
@@ -47,11 +58,22 @@ export default function Progress() {
     );
   }
 
+  if (loadError || !progressData) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+        <div className={styles.contentArea}>
+          <p className={styles.loadingText}>Couldn't load your progress. Please refresh and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
   const { overall, stats, completedSubjects, quizScores } = progressData;
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>

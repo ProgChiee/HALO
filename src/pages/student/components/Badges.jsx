@@ -4,29 +4,38 @@ import { Award, Lock } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { mockModuleProgress } from '../../../data/student/studentDashboardData';
-import { getBadgesData, getCurrentTopicAndWeek } from '../../../services/student/studentService';
+import { getBadgesData, getCurrentTopicAndWeek, getOverallModuleProgress } from '../../../services/student/studentService';
 import styles from '../styles/Badges.module.css';
 
 export default function Badges() {
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [badgesData, setBadgesData] = useState(null);
   const [currentLesson, setCurrentLesson] = useState(null);
+  const [moduleProgress, setModuleProgress] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
-      const [data, lesson] = await Promise.all([
-        getBadgesData(),
-        getCurrentTopicAndWeek(),
-      ]);
-      if (isMounted) {
-        setBadgesData(data);
-        setCurrentLesson(lesson);
-        setIsLoading(false);
+      try {
+        const [data, lesson, moduleProg] = await Promise.all([
+          getBadgesData(),
+          getCurrentTopicAndWeek(),
+          getOverallModuleProgress(),
+        ]);
+        if (isMounted) {
+          setBadgesData(data);
+          setCurrentLesson(lesson);
+          setModuleProgress(moduleProg);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) setLoadError(true);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
@@ -39,7 +48,9 @@ export default function Badges() {
     if (topic && week) navigate(`/student/quiz/${topic.id}/${week.id}`);
   }
 
-  if (isLoading || !badgesData) {
+  const hasCurrentLesson = Boolean(currentLesson?.topic && currentLesson?.week);
+
+  if (isLoading) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
@@ -50,11 +61,22 @@ export default function Badges() {
     );
   }
 
+  if (loadError || !badgesData) {
+    return (
+      <div className={styles.layout}>
+        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+        <div className={styles.contentArea}>
+          <p className={styles.loadingText}>Couldn't load your badges. Please refresh and try again.</p>
+        </div>
+      </div>
+    );
+  }
+
   const { earned, locked } = badgesData;
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={mockModuleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -63,7 +85,7 @@ export default function Badges() {
             Badges
             <span className={styles.countPill}>{earned.length} earned</span>
           </div>
-          <Button onClick={goToQuiz}>Start quiz</Button>
+          <Button onClick={goToQuiz} disabled={!hasCurrentLesson}>Start quiz</Button>
         </header>
 
         <main className={styles.main}>

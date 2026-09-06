@@ -8,6 +8,7 @@ import {
   mockProfessorStats,
   mockProfessorSubjects,
 } from '../../data/professor/professorDashboardData';
+import { mockProfessorProfile } from '../../data/professor/professorProfileData';
 import {
   mockProgressOverviewStats,
   mockStudentProgressList,
@@ -76,7 +77,16 @@ export async function addWeek(subjectId, title) {
     id: `w${Date.now()}`,
     title,
     objectives: [],
-    content: { method: 'text', fileName: '', fileType: '', linkUrl: '', text: '' },
+    content: {
+      method: 'text',
+      fileName: '',
+      fileType: '',
+      linkUrl: '',
+      text: '',
+      sourceFiles: [],
+      aiGeneratedText: '',
+      aiStatus: 'idle', // 'idle' | 'generating' | 'pending_review' | 'approved'
+    },
     video: { title: '', source: '', duration: '', url: '' },
   };
   setCatalog(
@@ -112,4 +122,48 @@ export async function updateWeekDetails(subjectId, weekId, updates) {
     })
   );
   return { success: true };
+}
+
+// Canned "AI-generated" lesson drafts, so Regenerate visibly produces a
+// DIFFERENT attempt each time (closer to how a real generation model
+// would behave) instead of the exact same text every click.
+const MOCK_GENERATED_DRAFTS = [
+  (fileNames) =>
+    `Based on the uploaded materials (${fileNames.join(', ')}), this lesson covers the core concepts step by step, starting with foundational terms before moving into practical application. Key definitions are introduced early, followed by real-world examples drawn directly from the source material. Students are encouraged to relate each concept back to actual hospitality scenarios they may encounter during OJT.`,
+  (fileNames) =>
+    `Drawing from ${fileNames.join(', ')}, this draft lesson opens with a short overview of the topic, then breaks the material into three digestible sections: background/context, core procedure, and common mistakes to avoid. Each section ends with a quick self-check question to reinforce understanding before the student proceeds to the quiz.`,
+  (fileNames) =>
+    `This lesson synthesizes the uploaded materials (${fileNames.join(', ')}) into a narrative-style walkthrough — introducing the "why" behind the topic before the "how." It includes callouts for industry best practices and flags a few edge cases that are easy to overlook, based on patterns found in the source documents.`,
+];
+
+// Mock AI lesson generation from uploaded source materials (PDFs/images).
+// TODO: once the real AI backend is ready, replace with something like:
+//   const res = await apiClient.post(`/professor/subjects/${subjectId}/weeks/${weekId}/generate-lesson`,
+//     { fileIds: sourceFiles.map(f => f.id) });
+//   return res.data.generatedText;
+// This mock ignores the actual file CONTENTS (no OCR/parsing here — that's
+// backend work) and just uses the file NAMES to make the output feel tied
+// to what was uploaded.
+export async function generateLessonFromMaterials(sourceFiles) {
+  await delay(1500); // longer delay — feels like real AI processing, not a quick CRUD save
+  const fileNames = sourceFiles.map((f) => f.name);
+  const draftFn = MOCK_GENERATED_DRAFTS[Math.floor(Math.random() * MOCK_GENERATED_DRAFTS.length)];
+  return draftFn(fileNames);
+}
+
+// In-memory copy so editing feels real during the demo, even without a
+// backend yet. Resets on page refresh — that's expected for mock data.
+let professorProfileStore = { ...mockProfessorProfile };
+
+export async function getProfessorProfile() {
+  await delay();
+  // TODO: const res = await apiClient.get('/professor/profile'); return res.data;
+  return professorProfileStore;
+}
+
+export async function updateProfessorProfile(updates) {
+  await delay();
+  // TODO: const res = await apiClient.patch('/professor/profile', updates); return res.data;
+  professorProfileStore = { ...professorProfileStore, ...updates };
+  return professorProfileStore;
 }
