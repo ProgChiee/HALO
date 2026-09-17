@@ -13,6 +13,21 @@ import {
 } from '../../../services/admin/adminService';
 import styles from '../styles/ProfessorManagement.module.css';
 
+// ⚠️ Adjusted for the real backend's ProfessorResponse: { id, name, email,
+// professorId, status } — note the field is "name", not "fullName" (every
+// `.fullName` read below was changed to `.name`).
+//
+// Also: subjectsCount, lessonsCount, uploadedMaterialsCount, and lastLogin
+// don't exist on the backend response — those columns now show "—"
+// instead of crashing on undefined. Ask your backend team if these should
+// be added, or if they're meant to come from a different endpoint.
+//
+// The create form now includes a Password field — the backend's
+// ProfessorRequest requires one upfront (see adminService.js notes: the
+// UI copy used to say "they'll receive an invitation to set their
+// password", which doesn't match this — worth confirming the intended
+// flow with your backend team).
+
 export default function ProfessorManagement() {
   const { showToast } = useToast();
   const { role } = useAuth();
@@ -27,8 +42,9 @@ export default function ProfessorManagement() {
   const [editingProfessor, setEditingProfessor] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
-  const [fullName, setFullName] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [professorId, setProfessorId] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,7 +53,6 @@ export default function ProfessorManagement() {
     loadProfessors();
   }, []);
 
-  // Used once on mount — shows the "Loading professors..." state.
   async function loadProfessors() {
     setIsLoading(true);
     setLoadError(false);
@@ -51,10 +66,6 @@ export default function ProfessorManagement() {
     }
   }
 
-  // Used after actions (create, edit, toggle status) — updates the table
-  // data in place without hiding it behind the loading state. Returns the
-  // fresh data so callers can sync other state (e.g. an open view modal)
-  // with the real result.
   async function refetchProfessors() {
     const data = await getProfessors();
     setProfessors(data);
@@ -63,14 +74,15 @@ export default function ProfessorManagement() {
 
   const filteredProfessors = useMemo(() => {
     return professors.filter((p) =>
-      p.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [professors, searchQuery]);
 
   function openCreateModal() {
-    setFullName('');
+    setName('');
     setEmail('');
+    setPassword('');
     setProfessorId('');
     setFormError('');
     setShowCreateModal(true);
@@ -81,14 +93,18 @@ export default function ProfessorManagement() {
     if (isSubmitting) return;
     setFormError('');
 
-    if (!fullName || !email || !professorId) {
+    if (!name || !email || !password || !professorId) {
       setFormError('Please fill in all fields.');
+      return;
+    }
+    if (password.length < 8) {
+      setFormError('Password must be at least 8 characters.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await createProfessor({ fullName, email, professorId });
+      await createProfessor({ name, email, password, professorId });
       showToast('Professor account created.', 'success');
       setShowCreateModal(false);
       await refetchProfessors();
@@ -107,7 +123,7 @@ export default function ProfessorManagement() {
     try {
       await toggleProfessorStatus(professor.id);
       showToast(
-        professor.status === 'active' ? 'Professor deactivated.' : 'Professor activated.',
+        professor.status === 'ACTIVE' ? 'Professor deactivated.' : 'Professor activated.',
         'success'
       );
       const updated = await refetchProfessors();
@@ -125,7 +141,7 @@ export default function ProfessorManagement() {
 
   function openEditModal(professor) {
     setEditingProfessor(professor);
-    setFullName(professor.fullName);
+    setName(professor.name);
     setEmail(professor.email);
     setProfessorId(professor.professorId);
     setFormError('');
@@ -136,14 +152,14 @@ export default function ProfessorManagement() {
     if (isSubmitting) return;
     setFormError('');
 
-    if (!fullName || !email || !professorId) {
+    if (!name || !email || !professorId) {
       setFormError('Please fill in all fields.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await updateProfessor(editingProfessor.id, { fullName, email, professorId });
+      await updateProfessor(editingProfessor.id, { name, email, professorId });
       showToast('Professor info updated.', 'success');
       setEditingProfessor(null);
       await refetchProfessors();
@@ -203,9 +219,8 @@ export default function ProfessorManagement() {
             <div className={styles.tableHeaderRow}>
               <span>Name</span>
               <span>Email</span>
-              <span>Subjects</span>
-              <span>Lessons</span>
-              <span>Last login</span>
+              <span>Professor ID</span>
+              <span>Status</span>
               <span>Actions</span>
             </div>
 
@@ -215,15 +230,11 @@ export default function ProfessorManagement() {
                 className={`${styles.tableRow} ${styles.tableRowClickable}`}
                 onClick={() => setViewingProfessor(prof)}
               >
-                <span className={styles.profName}>{prof.fullName}</span>
+                <span className={styles.profName}>{prof.name}</span>
                 <span className={styles.profEmail}>{prof.email}</span>
-                <span className={styles.profCount}>{prof.subjectsCount}</span>
-                <span className={styles.profCount}>{prof.lessonsCount}</span>
-                <span className={styles.profLastLogin}>
-                  {prof.lastLogin}{' '}
-                  <span className={`${styles.statusText} ${styles[`status_${prof.status}`]}`}>
-                    {prof.status === 'active' ? 'Active' : 'Inactive'}
-                  </span>
+                <span className={styles.profCount}>{prof.professorId}</span>
+                <span className={`${styles.statusText} ${styles[`status_${prof.status?.toLowerCase()}`]}`}>
+                  {prof.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </span>
                 <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
@@ -241,10 +252,10 @@ export default function ProfessorManagement() {
                     <Pencil size={15} />
                   </button>
                   <button
-                    className={`${styles.actionBtn} ${prof.status === 'inactive' ? styles.actionBtnOff : ''}`}
+                    className={`${styles.actionBtn} ${prof.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
                     onClick={() => handleToggleStatus(prof)}
                     disabled={togglingId === prof.id}
-                    aria-label={prof.status === 'active' ? 'Deactivate' : 'Activate'}
+                    aria-label={prof.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                   >
                     <Power size={15} />
                   </button>
@@ -269,7 +280,7 @@ export default function ProfessorManagement() {
               </button>
             </div>
             <p className={styles.modalSubtitle}>
-              Enter the professor's name and email address. They will receive an invitation to set their password.
+              Enter the professor's details and set an initial password.
             </p>
 
             <form onSubmit={handleCreate} className={styles.form}>
@@ -278,8 +289,8 @@ export default function ProfessorManagement() {
                 <input
                   type="text"
                   className={styles.input}
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
               </div>
 
@@ -303,6 +314,17 @@ export default function ProfessorManagement() {
                 />
               </div>
 
+              <div className={styles.field}>
+                <label className={styles.label}>Initial password</label>
+                <input
+                  type="password"
+                  className={styles.input}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                />
+              </div>
+
               {formError && <p className={styles.formError}>{formError}</p>}
 
               <Button type="submit" isLoading={isSubmitting}>Create Professor</Button>
@@ -317,10 +339,10 @@ export default function ProfessorManagement() {
             <div className={styles.modalHeader}>
               <div className={styles.profileHeaderRow}>
                 <div className={styles.profileAvatar}>
-                  {viewingProfessor.fullName.replace(/^(Dr\.|Prof\.)\s*/, '').charAt(0)}
+                  {viewingProfessor.name.replace(/^(Dr\.|Prof\.)\s*/, '').charAt(0)}
                 </div>
                 <div>
-                  <h3 className={styles.modalTitle}>{viewingProfessor.fullName}</h3>
+                  <h3 className={styles.modalTitle}>{viewingProfessor.name}</h3>
                   <p className={styles.profileEmail}>{viewingProfessor.email}</p>
                 </div>
               </div>
@@ -331,21 +353,13 @@ export default function ProfessorManagement() {
 
             <div className={styles.detailList}>
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Created Subjects</span>
-                <span className={styles.detailValue}>{viewingProfessor.subjectsCount}</span>
-              </div>
-              <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Uploaded Lessons/PDFs</span>
-                <span className={styles.detailValue}>{viewingProfessor.uploadedMaterialsCount}</span>
-              </div>
-              <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Last Login / Activity</span>
-                <span className={styles.detailValue}>{viewingProfessor.lastLogin}</span>
+                <span className={styles.detailLabel}>Professor ID</span>
+                <span className={styles.detailValue}>{viewingProfessor.professorId}</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Status</span>
-                <span className={`${styles.detailValue} ${styles[`status_${viewingProfessor.status}`]}`}>
-                  {viewingProfessor.status === 'active' ? 'Active' : 'Inactive'}
+                <span className={`${styles.detailValue} ${styles[`status_${viewingProfessor.status?.toLowerCase()}`]}`}>
+                  {viewingProfessor.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </span>
               </div>
             </div>
@@ -359,7 +373,7 @@ export default function ProfessorManagement() {
             <div className={styles.modalHeader}>
               <div className={styles.profileHeaderRow}>
                 <div className={styles.profileAvatar}>
-                  {editingProfessor.fullName.replace(/^(Dr\.|Prof\.)\s*/, '').charAt(0)}
+                  {editingProfessor.name.replace(/^(Dr\.|Prof\.)\s*/, '').charAt(0)}
                 </div>
                 <div>
                   <h3 className={styles.modalTitle}>Edit Professor Account</h3>
@@ -377,8 +391,8 @@ export default function ProfessorManagement() {
                 <input
                   type="text"
                   className={styles.input}
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
               </div>
 

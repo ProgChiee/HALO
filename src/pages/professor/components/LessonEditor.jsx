@@ -1,24 +1,31 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, X, FileText, Upload, Link2, Type, Sparkles, Check, Pencil, RefreshCw, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, FileText, Upload, Link2, Sparkles, Check, X, RefreshCw, Image as ImageIcon } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
-import { getSubjectAndWeek, updateWeekDetails, generateLessonFromMaterials } from '../../../services/professor/professorService';
+import {
+  createLearningModule,
+  generateLesson,
+  approveLesson,
+  declineLesson,
+} from '../../../services/professor/professorService';
 import styles from '../styles/LessonEditor.module.css';
 
-// Keeps the source-materials list from growing unbounded — also keeps
-// the mock generation prompt (file names joined together) sane, and
-// stands in for the kind of limit a real AI backend would enforce
-// (context window / processing time constraints).
 const MAX_SOURCE_FILES = 10;
 
-const CONTENT_METHODS = [
-  { id: 'file', label: 'Upload File', icon: Upload },
-  { id: 'link', label: 'Paste Link', icon: Link2 },
-  { id: 'text', label: 'Write Text', icon: Type },
-];
+// ⚠️ KNOWN BACKEND GAP: there is no GET endpoint for a professor to fetch
+// an existing AI Learning Module for a week (the only GET-by-week route,
+// on StudentAiLearningController, only returns APPROVED modules and 404s
+// otherwise). Until your backend team adds one, this page always starts
+// from a blank "create new module" state — it can't resume/edit a
+// module that was already created earlier for this week. Ask your
+// backend team for something like:
+//   GET /api/professor/ai-learning-modules/week/{weekId}
+// that returns the module regardless of status (or null/404 if none
+// exists yet), so this page can load prior progress instead of always
+// starting fresh.
 
 export default function LessonEditor() {
   const { subjectId, weekId } = useParams();
@@ -26,103 +33,24 @@ export default function LessonEditor() {
   const { showToast } = useToast();
   const materialsInputRef = useRef(null);
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [subject, setSubject] = useState(null);
-  const [week, setWeek] = useState(null);
-
-  // Kept separate (instead of one shared "isSaving") so clicking Save on
-  // one panel (e.g. Objectives) doesn't show a loading/disabled state on
-  // unrelated buttons in a different panel (e.g. Save Content).
-  const [isSavingObjectives, setIsSavingObjectives] = useState(false);
-  const [isSavingContent, setIsSavingContent] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // AI review card (Approve / Save Edited Version)
-
-  // Local editable state
-  const [objectives, setObjectives] = useState([]);
-  const [contentMethod, setContentMethod] = useState('text');
-  const [fileName, setFileName] = useState('');
-  const [fileType, setFileType] = useState('');
-  const [linkUrl, setLinkUrl] = useState('');
+  // Raw materials the professor provides
   const [lessonText, setLessonText] = useState('');
+  const [youtubeLink, setYoutubeLink] = useState('');
+  const [aiNotes, setAiNotes] = useState('');
+  const [files, setFiles] = useState([]); // File objects, not yet uploaded
 
-  // AI generation (from uploaded source materials) state
-  const [sourceFiles, setSourceFiles] = useState([]);
-  const [aiGeneratedText, setAiGeneratedText] = useState('');
-  const [aiStatus, setAiStatus] = useState('idle'); // 'idle' | 'generating' | 'pending_review' | 'approved'
+  // Module state (populated once createLearningModule() succeeds)
+  const [module, setModule] = useState(null); // full AiLearningModuleResponse
+  const [isCreating, setIsCreating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isEditingGenerated, setIsEditingGenerated] = useState(false);
-  const [editedGeneratedText, setEditedGeneratedText] = useState('');
+  const [isApproving, setIsApproving] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      try {
-        const result = await getSubjectAndWeek(subjectId, weekId);
-        if (!isMounted) return;
-
-        setSubject(result.subject);
-        setWeek(result.week);
-
-        if (result.week) {
-          setObjectives(result.week.objectives?.length ? result.week.objectives : ['']);
-          setContentMethod(result.week.content?.method ?? 'text');
-          setFileName(result.week.content?.fileName ?? '');
-          setFileType(result.week.content?.fileType ?? '');
-          setLinkUrl(result.week.content?.linkUrl ?? '');
-          setLessonText(result.week.content?.text ?? '');
-          setSourceFiles(result.week.content?.sourceFiles ?? []);
-          setAiGeneratedText(result.week.content?.aiGeneratedText ?? '');
-          setAiStatus(result.week.content?.aiStatus ?? 'idle');
-        }
-      } catch (err) {
-        console.error(err);
-        if (isMounted) setLoadError(true);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-    loadData();
-    return () => { isMounted = false; };
-  }, [subjectId, weekId]);
-
-  // --- Objectives handlers ---
-  function updateObjective(index, value) {
-    setObjectives((prev) => prev.map((o, i) => (i === index ? value : o)));
-  }
-
-  function addObjective() {
-    setObjectives((prev) => [...prev, '']);
-  }
-
-  function removeObjective(index) {
-    setObjectives((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  async function saveObjectives() {
-    if (isSavingObjectives) return;
-    setIsSavingObjectives(true);
-    try {
-      const cleaned = objectives.map((o) => o.trim()).filter(Boolean);
-      await updateWeekDetails(subjectId, weekId, { objectives: cleaned });
-      setObjectives(cleaned.length ? cleaned : ['']);
-      showToast('Objectives saved.', 'success');
-    } catch (err) {
-      console.error(err);
-      showToast("Couldn't save objectives. Please try again.", 'error');
-    } finally {
-      setIsSavingObjectives(false);
-    }
-  }
-
-  // --- Content handlers ---
-
-  // --- Source materials (multiple PDFs/images, used for AI generation) ---
-  function handleMaterialsPicked(e) {
+  function handleFilesPicked(e) {
     const picked = Array.from(e.target.files || []);
     if (picked.length === 0) return;
 
-    const availableSlots = MAX_SOURCE_FILES - sourceFiles.length;
+    const availableSlots = MAX_SOURCE_FILES - files.length;
     if (availableSlots <= 0) {
       showToast(`You can upload up to ${MAX_SOURCE_FILES} files. Remove some before adding more.`, 'error');
       e.target.value = '';
@@ -130,12 +58,7 @@ export default function LessonEditor() {
     }
 
     const accepted = picked.slice(0, availableSlots);
-    const newFiles = accepted.map((file) => ({
-      id: `${Date.now()}-${file.name}`,
-      name: file.name,
-      type: file.type.startsWith('image/') ? 'image' : 'pdf',
-    }));
-    setSourceFiles((prev) => [...prev, ...newFiles]);
+    setFiles((prev) => [...prev, ...accepted]);
 
     if (picked.length > accepted.length) {
       showToast(
@@ -143,156 +66,80 @@ export default function LessonEditor() {
         'error'
       );
     }
-
-    // Allow re-picking the same file again later (e.g. after removing it)
     e.target.value = '';
   }
 
-  function removeSourceFile(id) {
-    setSourceFiles((prev) => prev.filter((f) => f.id !== id));
+  function removeFile(index) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function persistContent(updates) {
-    await updateWeekDetails(subjectId, weekId, {
-      content: {
-        method: contentMethod,
-        fileName,
-        fileType,
-        linkUrl,
-        text: lessonText,
-        sourceFiles,
-        aiGeneratedText,
-        aiStatus,
-        ...updates,
-      },
-    });
-  }
-
-  async function handleGenerateLesson() {
-    if (sourceFiles.length === 0) {
-      showToast('Upload at least one file (PDF or image) first.', 'error');
+  async function handleCreateModule() {
+    if (!lessonText && !youtubeLink && files.length === 0) {
+      showToast('Add at least a lesson text, a YouTube link, or a file first.', 'error');
       return;
     }
-    if (isGenerating) return;
-
-    setIsGenerating(true);
-    setAiStatus('generating');
+    if (isCreating) return;
+    setIsCreating(true);
     try {
-      const generated = await generateLessonFromMaterials(sourceFiles);
-      setAiGeneratedText(generated);
-      setAiStatus('pending_review');
-      await persistContent({ aiGeneratedText: generated, aiStatus: 'pending_review', sourceFiles });
+      const created = await createLearningModule(weekId, { lessonText, youtubeLink, aiNotes, files });
+      setModule(created);
+      showToast('Module created. You can now generate the lesson with AI.', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast("Couldn't create the module. Please try again.", 'error');
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!module || isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const updated = await generateLesson(module.id);
+      setModule(updated);
       showToast('Lesson generated. Please review before approving.', 'success');
     } catch (err) {
       console.error(err);
-      setAiStatus(sourceFiles.length ? 'idle' : 'idle');
       showToast("Couldn't generate the lesson. Please try again.", 'error');
     } finally {
       setIsGenerating(false);
     }
   }
 
-  async function handleRegenerateLesson() {
-    if (isGenerating) return;
-
-    setIsGenerating(true);
+  async function handleApprove() {
+    if (!module || isApproving) return;
+    setIsApproving(true);
     try {
-      const generated = await generateLessonFromMaterials(sourceFiles);
-      setAiGeneratedText(generated);
-      setAiStatus('pending_review');
-      setIsEditingGenerated(false);
-      await persistContent({ aiGeneratedText: generated, aiStatus: 'pending_review' });
-      showToast('New draft generated. Please review before approving.', 'success');
-    } catch (err) {
-      console.error(err);
-      showToast("Couldn't regenerate the lesson. Please try again.", 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function handleApproveLesson() {
-    if (isSaving) return;
-    setIsSaving(true);
-    try {
-      setAiStatus('approved');
-      await persistContent({ aiStatus: 'approved' });
+      const updated = await approveLesson(module.id);
+      setModule(updated);
       showToast('Lesson approved and published to students.', 'success');
     } catch (err) {
       console.error(err);
-      setAiStatus('pending_review');
       showToast("Couldn't approve the lesson. Please try again.", 'error');
     } finally {
-      setIsSaving(false);
+      setIsApproving(false);
     }
   }
 
-  function startEditingGenerated() {
-    setEditedGeneratedText(aiGeneratedText);
-    setIsEditingGenerated(true);
-  }
-
-  async function handleSaveEditedLesson() {
-    if (isSaving) return;
-    setIsSaving(true);
+  async function handleDecline() {
+    if (!module || isDeclining) return;
+    setIsDeclining(true);
     try {
-      const finalText = editedGeneratedText.trim();
-      setAiGeneratedText(finalText);
-      setAiStatus('approved');
-      await persistContent({ aiGeneratedText: finalText, aiStatus: 'approved' });
-      setIsEditingGenerated(false);
-      showToast('Edited lesson approved and published to students.', 'success');
+      const updated = await declineLesson(module.id);
+      setModule(updated);
+      showToast('Lesson declined. You can regenerate a new draft.', 'success');
     } catch (err) {
       console.error(err);
-      showToast("Couldn't save your edits. Please try again.", 'error');
+      showToast("Couldn't decline the lesson. Please try again.", 'error');
     } finally {
-      setIsSaving(false);
+      setIsDeclining(false);
     }
   }
 
-  async function saveContent() {
-    if (isSavingContent) return;
-    setIsSavingContent(true);
-    try {
-      await persistContent({});
-      showToast('Content saved.', 'success');
-    } catch (err) {
-      console.error(err);
-      showToast("Couldn't save content. Please try again.", 'error');
-    } finally {
-      setIsSavingContent(false);
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-        <p className={styles.loadingText}>Loading lesson...</p>
-      </PageShell>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-        <main className={styles.main}>
-          <p className={styles.loadingText}>Couldn't load this lesson. Please refresh and try again.</p>
-          <Button onClick={() => navigate('/professor/subjects')}>Back to Subjects</Button>
-        </main>
-      </PageShell>
-    );
-  }
-
-  if (!subject || !week) {
-    return (
-      <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-        <main className={styles.main}>
-          <p className={styles.loadingText}>Lesson not found.</p>
-          <Button onClick={() => navigate('/professor/subjects')}>Back to Subjects</Button>
-        </main>
-      </PageShell>
-    );
-  }
+  const aiStatus = module?.aiGenerationStatus; // 'PENDING' | 'COMPLETED' | 'DECLINED' | 'FAILED'
+  const lessonStatus = module?.status; // 'PENDING' | 'APPROVED' | 'DECLINED'
+  const hasGeneratedContent = aiStatus === 'COMPLETED';
 
   return (
     <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
@@ -303,237 +150,178 @@ export default function LessonEditor() {
             Back
           </button>
           <div>
-            <p className={styles.eyebrow}>{subject.title} · {week.title.split(':')[0]}</p>
-            <h1 className={styles.title}>{week.title.includes(':') ? week.title.split(':')[1].trim() : week.title}</h1>
+            <p className={styles.eyebrow}>Subject #{subjectId} · Week #{weekId}</p>
+            <h1 className={styles.title}>Lesson Materials</h1>
           </div>
         </div>
       </header>
 
       <main className={styles.main}>
-        {/* --- Objectives --- */}
+        {/* --- Step 1: Raw materials --- */}
         <div className={styles.panelCard}>
           <div className={styles.panelHeader}>
             <span className={styles.panelIcon}><FileText size={16} /></span>
             <div>
-              <h2 className={styles.panelTitle}>Learning Objectives</h2>
-              <p className={styles.panelSubtitle}>By the end of this lesson, students will be able to:</p>
+              <h2 className={styles.panelTitle}>Lesson Materials</h2>
+              <p className={styles.panelSubtitle}>
+                Add whatever you have — text, a YouTube link, notes, and/or files. The AI mentor will use all of it.
+              </p>
             </div>
           </div>
 
-          <div className={styles.objectivesList}>
-            {objectives.map((obj, i) => (
-              <div key={i} className={styles.objectiveRow}>
-                <span className={styles.objectiveNumber}>{i + 1}</span>
-                <input
-                  type="text"
-                  className={styles.objectiveInput}
-                  value={obj}
-                  onChange={(e) => updateObjective(i, e.target.value)}
-                  placeholder="for demonstration, examples, or additional explaination"
-                />
-                <button
-                  className={styles.removeBtn}
-                  onClick={() => removeObjective(i)}
-                  aria-label="Remove objective"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+          <div className={styles.field}>
+            <label className={styles.label}>Lesson text</label>
+            <textarea
+              className={styles.textarea}
+              rows={6}
+              value={lessonText}
+              onChange={(e) => setLessonText(e.target.value)}
+              placeholder="Paste or write the lesson content here"
+              disabled={!!module}
+            />
           </div>
 
-          <button className={styles.addRowBtn} onClick={addObjective}>
-            <Plus size={14} />
-            Add Objective
-          </button>
-
-          <div className={styles.saveRow}>
-            <Button onClick={saveObjectives} isLoading={isSavingObjectives}>Save Objectives</Button>
-          </div>
-        </div>
-
-        {/* --- Content --- */}
-        <div className={styles.panelCard}>
-          <div className={styles.panelHeader}>
-            <span className={styles.panelIcon}><FileText size={16} /></span>
-            <div>
-              <h2 className={styles.panelTitle}>Lesson Content</h2>
-              <p className={styles.panelSubtitle}>Choose how you'd like to provide this lesson's material</p>
-            </div>
+          <div className={styles.linkRow}>
+            <Link2 size={18} className={styles.linkIcon} />
+            <input
+              type="text"
+              className={styles.input}
+              value={youtubeLink}
+              onChange={(e) => setYoutubeLink(e.target.value)}
+              placeholder="YouTube link (optional)"
+              disabled={!!module}
+            />
           </div>
 
-          <div className={styles.methodTabs}>
-            {CONTENT_METHODS.map((m) => (
-              <button
-                key={m.id}
-                className={`${styles.methodTab} ${contentMethod === m.id ? styles.methodTabActive : ''}`}
-                onClick={() => setContentMethod(m.id)}
-              >
-                <m.icon size={14} />
-                {m.label}
-              </button>
-            ))}
+          <div className={styles.field}>
+            <label className={styles.label}>Notes for the AI mentor (optional)</label>
+            <textarea
+              className={styles.textarea}
+              rows={3}
+              value={aiNotes}
+              onChange={(e) => setAiNotes(e.target.value)}
+              placeholder="Anything the AI should emphasize or avoid"
+              disabled={!!module}
+            />
           </div>
 
-          {contentMethod === 'file' && (
-            <div className={styles.materialsSection}>
-              <button
-                className={styles.fileUploadBox}
-                onClick={() => materialsInputRef.current?.click()}
-                disabled={sourceFiles.length >= MAX_SOURCE_FILES}
-              >
-                <Upload size={22} />
-                <span className={styles.fileUploadLabel}>Upload Source Materials</span>
-                <span className={styles.fileUploadHint}>
-                  {sourceFiles.length >= MAX_SOURCE_FILES
-                    ? `Limit reached (${MAX_SOURCE_FILES} files max)`
-                    : `PDFs and images — ${sourceFiles.length}/${MAX_SOURCE_FILES} uploaded`}
-                </span>
-              </button>
-              <input
-                ref={materialsInputRef}
-                type="file"
-                accept=".pdf,image/*"
-                multiple
-                hidden
-                onChange={handleMaterialsPicked}
-              />
+          <div className={styles.materialsSection}>
+            <button
+              className={styles.fileUploadBox}
+              onClick={() => materialsInputRef.current?.click()}
+              disabled={!!module || files.length >= MAX_SOURCE_FILES}
+            >
+              <Upload size={22} />
+              <span className={styles.fileUploadLabel}>Upload Files</span>
+              <span className={styles.fileUploadHint}>
+                PDFs and images — {files.length}/{MAX_SOURCE_FILES} added
+              </span>
+            </button>
+            <input
+              ref={materialsInputRef}
+              type="file"
+              accept=".pdf,image/*"
+              multiple
+              hidden
+              onChange={handleFilesPicked}
+            />
 
-              {sourceFiles.length > 0 && (
-                <ul className={styles.fileList}>
-                  {sourceFiles.map((f) => (
-                    <li key={f.id} className={styles.fileListItem}>
-                      {f.type === 'image' ? <ImageIcon size={15} /> : <FileText size={15} />}
-                      <span className={styles.fileListName}>{f.name}</span>
-                      <button
-                        className={styles.removeBtn}
-                        onClick={() => removeSourceFile(f.id)}
-                        aria-label={`Remove ${f.name}`}
-                      >
+            {files.length > 0 && (
+              <ul className={styles.fileList}>
+                {files.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className={styles.fileListItem}>
+                    {f.type.startsWith('image/') ? <ImageIcon size={15} /> : <FileText size={15} />}
+                    <span className={styles.fileListName}>{f.name}</span>
+                    {!module && (
+                      <button className={styles.removeBtn} onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
                         <X size={14} />
                       </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
+          {!module && (
+            <div className={styles.saveRow}>
+              <Button onClick={handleCreateModule} isLoading={isCreating}>Save Materials</Button>
+            </div>
+          )}
+        </div>
+
+        {/* --- Step 2: Generate + review --- */}
+        {module && (
+          <div className={styles.panelCard}>
+            <div className={styles.panelHeader}>
+              <span className={styles.panelIcon}><Sparkles size={16} /></span>
+              <div>
+                <h2 className={styles.panelTitle}>AI-Generated Lesson</h2>
+                <p className={styles.panelSubtitle}>Review before approving — this is what students will see.</p>
+              </div>
+            </div>
+
+            {!hasGeneratedContent && (
               <div className={styles.generateRow}>
-                <Button
-                  variant="secondary"
-                  onClick={handleGenerateLesson}
-                  isLoading={isGenerating && aiStatus === 'generating'}
-                  disabled={sourceFiles.length === 0}
-                >
+                <Button onClick={handleGenerate} isLoading={isGenerating}>
                   <Sparkles size={15} style={{ marginRight: 6 }} />
-                  Generate Lesson with AI
+                  {aiStatus === 'FAILED' ? 'Retry Generation' : 'Generate Lesson with AI'}
                 </Button>
               </div>
+            )}
 
-              {aiStatus !== 'idle' && (isGenerating || aiGeneratedText) && (
-                <div className={styles.aiReviewCard}>
-                  <div className={styles.aiReviewHeader}>
-                    <span className={styles.aiReviewTitle}>
-                      <Sparkles size={14} /> AI-Generated Lesson
-                    </span>
-                    <span
-                      className={`${styles.statusBadge} ${
-                        aiStatus === 'approved' ? styles.statusApproved : styles.statusPending
-                      }`}
-                    >
-                      {aiStatus === 'generating' && 'Generating...'}
-                      {aiStatus === 'pending_review' && 'Pending Review'}
-                      {aiStatus === 'approved' && 'Approved'}
-                    </span>
-                  </div>
-
-                  {isGenerating ? (
-                    <p className={styles.aiGeneratingText}>AI Mentor is drafting the lesson from your materials...</p>
-                  ) : isEditingGenerated ? (
-                    <>
-                      <textarea
-                        className={styles.textarea}
-                        rows={8}
-                        value={editedGeneratedText}
-                        onChange={(e) => setEditedGeneratedText(e.target.value)}
-                      />
-                      <div className={styles.aiReviewActions}>
-                        <Button onClick={handleSaveEditedLesson} isLoading={isSaving}>
-                          <Check size={15} style={{ marginRight: 6 }} />
-                          Save Edited Version
-                        </Button>
-                        <Button variant="secondary" onClick={() => setIsEditingGenerated(false)} disabled={isSaving}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p className={styles.aiGeneratedText}>{aiGeneratedText}</p>
-                      {aiStatus !== 'approved' && (
-                        <div className={styles.aiReviewActions}>
-                          <Button onClick={handleApproveLesson} isLoading={isSaving}>
-                            <Check size={15} style={{ marginRight: 6 }} />
-                            Approve
-                          </Button>
-                          <Button variant="secondary" onClick={startEditingGenerated} disabled={isSaving || isGenerating}>
-                            <Pencil size={15} style={{ marginRight: 6 }} />
-                            Edit
-                          </Button>
-                          <Button variant="secondary" onClick={handleRegenerateLesson} isLoading={isGenerating}>
-                            <RefreshCw size={15} style={{ marginRight: 6 }} />
-                            Regenerate
-                          </Button>
-                        </div>
-                      )}
-                      {aiStatus === 'approved' && (
-                        <div className={styles.aiReviewActions}>
-                          <Button variant="secondary" onClick={startEditingGenerated}>
-                            <Pencil size={15} style={{ marginRight: 6 }} />
-                            Edit Approved Lesson
-                          </Button>
-                          <Button variant="secondary" onClick={handleRegenerateLesson} isLoading={isGenerating}>
-                            <RefreshCw size={15} style={{ marginRight: 6 }} />
-                            Regenerate
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )}
+            {hasGeneratedContent && (
+              <div className={styles.aiReviewCard}>
+                <div className={styles.aiReviewHeader}>
+                  <span className={styles.aiReviewTitle}><Sparkles size={14} /> Generated Content</span>
+                  <span
+                    className={`${styles.statusBadge} ${
+                      lessonStatus === 'APPROVED' ? styles.statusApproved : styles.statusPending
+                    }`}
+                  >
+                    {lessonStatus === 'PENDING' && 'Pending Review'}
+                    {lessonStatus === 'APPROVED' && 'Approved'}
+                    {lessonStatus === 'DECLINED' && 'Declined'}
+                  </span>
                 </div>
-              )}
-            </div>
-          )}
 
-          {contentMethod === 'link' && (
-            <div className={styles.linkRow}>
-              <Link2 size={18} className={styles.linkIcon} />
-              <input
-                type="text"
-                className={styles.input}
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="https://drive.google.com/... or any hosted material link"
-              />
-            </div>
-          )}
+                <div className={styles.field}>
+                  <label className={styles.label}>Objectives</label>
+                  <p className={styles.aiGeneratedText}>{module.generatedObjectives}</p>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Knowledge</label>
+                  <p className={styles.aiGeneratedText}>{module.generatedKnowledge}</p>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Examples</label>
+                  <p className={styles.aiGeneratedText}>{module.generatedExamples}</p>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Summary</label>
+                  <p className={styles.aiGeneratedText}>{module.generatedSummary}</p>
+                </div>
 
-          {contentMethod === 'text' && (
-            <div className={styles.field}>
-              <label className={styles.label}>Full lesson text</label>
-              <textarea
-                className={styles.textarea}
-                rows={10}
-                value={lessonText}
-                onChange={(e) => setLessonText(e.target.value)}
-                placeholder="Additional lesson content and notes to ai mentor"
-              />
-            </div>
-          )}
-
-          <div className={styles.saveRow}>
-            <Button onClick={saveContent} isLoading={isSavingContent}>Save Content</Button>
+                {lessonStatus !== 'APPROVED' && (
+                  <div className={styles.aiReviewActions}>
+                    <Button onClick={handleApprove} isLoading={isApproving}>
+                      <Check size={15} style={{ marginRight: 6 }} />
+                      Approve
+                    </Button>
+                    <Button variant="secondary" onClick={handleDecline} isLoading={isDeclining}>
+                      <X size={15} style={{ marginRight: 6 }} />
+                      Decline
+                    </Button>
+                    <Button variant="secondary" onClick={handleGenerate} isLoading={isGenerating}>
+                      <RefreshCw size={15} style={{ marginRight: 6 }} />
+                      Regenerate
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </main>
     </PageShell>
   );

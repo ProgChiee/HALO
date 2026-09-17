@@ -1,24 +1,23 @@
 import { useState, useEffect } from 'react';
-import { User as UserIcon, KeyRound, X } from 'lucide-react';
+import { User as UserIcon, KeyRound } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
-import Button from '../../../components/shared/Button';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
-import { useToast } from '../../../context/notifications/ToastContext';
 import { ADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getAdminProfile, updateAdminProfile } from '../../../services/admin/adminService';
+import { getAdminProfile } from '../../../services/admin/adminService';
 import styles from '../styles/AdminProfile.module.css';
 
+// ✅ Wired to the real backend — UserProfileResponse only has
+// { userId, name, email, role, status }. No adminId, avatarInitial,
+// title, or dateJoined fields exist for Admins on this backend — those
+// were mock-only. Avatar initial is derived client-side from the name.
+// There's also no update endpoint yet, so "Edit" actions are removed
+// until one exists.
+
 export default function AdminProfile() {
-  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
-
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [adminId, setAdminId] = useState('');
-  const [formError, setFormError] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -37,36 +36,6 @@ export default function AdminProfile() {
     return () => { isMounted = false; };
   }, []);
 
-  function openEditModal() {
-    setAdminId(profile.adminId);
-    setFormError('');
-    setShowEditModal(true);
-  }
-
-  async function handleSaveEdit(e) {
-    e.preventDefault();
-    if (isSaving) return;
-    setFormError('');
-
-    if (!adminId.trim()) {
-      setFormError('Please enter an Admin ID.');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const updated = await updateAdminProfile({ adminId: adminId.trim() });
-      setProfile(updated);
-      showToast('Admin ID updated.', 'success');
-      setShowEditModal(false);
-    } catch (err) {
-      console.error(err);
-      setFormError('Something went wrong. Please try again.');
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
   if (isLoading) {
     return (
       <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
@@ -83,6 +52,8 @@ export default function AdminProfile() {
     );
   }
 
+  const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
+
   return (
     <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
       <header className={styles.topbar}>
@@ -94,16 +65,16 @@ export default function AdminProfile() {
 
       <main className={styles.main}>
         <div className={styles.profileHeader}>
-          <div className={styles.avatar}>{profile.avatarInitial}</div>
+          <div className={styles.avatar}>{avatarInitial}</div>
           <div>
-            <p className={styles.fullName}>{profile.fullName}</p>
-            <p className={styles.subMeta}>{profile.title}</p>
+            <p className={styles.fullName}>{profile.name}</p>
+            <p className={styles.subMeta}>Admin</p>
           </div>
         </div>
 
         <div className={styles.infoCard}>
           <span className={styles.infoLabel}>Full name</span>
-          <span className={styles.infoValue}>{profile.fullName}</span>
+          <span className={styles.infoValue}>{profile.name}</span>
         </div>
 
         <div className={styles.infoCard}>
@@ -112,18 +83,8 @@ export default function AdminProfile() {
         </div>
 
         <div className={styles.infoCard}>
-          <span className={styles.infoLabel}>Admin ID</span>
-          <div className={styles.infoValueRow}>
-            <span className={styles.infoValue}>{profile.adminId}</span>
-            <button className={styles.editLink} onClick={openEditModal}>
-              Edit
-            </button>
-          </div>
-        </div>
-
-        <div className={styles.infoCard}>
-          <span className={styles.infoLabel}>Date joined</span>
-          <span className={styles.infoValue}>{profile.dateJoined}</span>
+          <span className={styles.infoLabel}>Status</span>
+          <span className={styles.infoValue}>{profile.status === 'ACTIVE' ? 'Active' : 'Inactive'}</span>
         </div>
 
         <h2 className={styles.sectionTitle}>Account</h2>
@@ -138,36 +99,6 @@ export default function AdminProfile() {
           Change password
         </button>
       </main>
-
-      {showEditModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowEditModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Edit Admin ID</h3>
-              <button className={styles.closeBtn} onClick={() => setShowEditModal(false)} aria-label="Close">
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className={styles.form}>
-              <div className={styles.field}>
-                <label className={styles.label}>Admin ID</label>
-                <input
-                  type="text"
-                  className={styles.input}
-                  value={adminId}
-                  onChange={(e) => setAdminId(e.target.value)}
-                  placeholder="e.g. ADMIN-2026-002"
-                />
-              </div>
-
-              {formError && <p className={styles.formError}>{formError}</p>}
-
-              <Button type="submit" isLoading={isSaving}>Save Changes</Button>
-            </form>
-          </div>
-        </div>
-      )}
 
       <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
     </PageShell>

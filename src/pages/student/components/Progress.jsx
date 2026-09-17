@@ -1,39 +1,43 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle2, BookOpen, Star, Award } from 'lucide-react';
+import { CheckCircle2, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../../../components/shared/Sidebar';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { getProgressData, getOverallModuleProgress } from '../../../services/student/studentService';
+import { getProgressData, getSubjectsData } from '../../../services/student/studentService';
 import styles from '../styles/Progress.module.css';
 
-// Maps the string icon names from the mock data to actual icon components
-const ICONS = { BookOpen, CheckCircle2, Star, Award };
-
-// Simple color coding for letter grades — tweak as needed
-function gradeClass(grade) {
-  if (grade.startsWith('A')) return styles.gradeA;
-  if (grade.startsWith('B')) return styles.gradeB;
-  return styles.gradeC;
-}
+// ⚠️ Redesigned for the real backend. getProgressData() only returns a
+// flat [{ moduleId, weekId, completed, completedAt }] list — no subject
+// names, no quiz scores, no single "overall %" field. The per-subject
+// breakdown below reuses getSubjectsData() instead (it already has
+// subjectName + completedWeeks/totalWeeks per subject, which maps well to
+// the old "Completed Subjects" section).
+//
+// The "Quiz Scores" section from the old mock is NOT included — showing
+// real per-quiz history would mean calling
+// quizService.getAttemptHistory(moduleId) once per completed module (an
+// extra N+1 round of requests). Worth adding once the rest of the app is
+// confirmed working; skipped here to keep this page's load time
+// reasonable for now.
 
 export default function Progress() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [progressData, setProgressData] = useState(null);
-  const [moduleProgress, setModuleProgress] = useState(null);
+  const [completedModules, setCompletedModules] = useState([]);
+  const [subjects, setSubjects] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
       try {
-        const [data, moduleProg] = await Promise.all([
+        const [progress, subjectList] = await Promise.all([
           getProgressData(),
-          getOverallModuleProgress(),
+          getSubjectsData(),
         ]);
         if (isMounted) {
-          setProgressData(data);
-          setModuleProgress(moduleProg);
+          setCompletedModules(progress.filter((p) => p.completed));
+          setSubjects(subjectList);
         }
       } catch (err) {
         console.error(err);
@@ -58,7 +62,7 @@ export default function Progress() {
     );
   }
 
-  if (loadError || !progressData) {
+  if (loadError) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
@@ -69,11 +73,12 @@ export default function Progress() {
     );
   }
 
-  const { overall, stats, completedSubjects, quizScores } = progressData;
+  const totalWeeks = subjects.reduce((sum, s) => sum + s.totalWeeks, 0);
+  const overall = totalWeeks > 0 ? Math.round((completedModules.length / totalWeeks) * 100) : 0;
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -88,14 +93,7 @@ export default function Progress() {
             <div className={styles.overallBlock}>
               <div className={styles.progressRing}>
                 <svg width="140" height="140" viewBox="0 0 140 140">
-                  <circle
-                    cx="70"
-                    cy="70"
-                    r="60"
-                    fill="none"
-                    stroke="rgba(255, 255, 255, 0.08)"
-                    strokeWidth="10"
-                  />
+                  <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="10" />
                   <circle
                     cx="70"
                     cy="70"
@@ -118,49 +116,37 @@ export default function Progress() {
             </div>
 
             <div className={styles.statsGrid}>
-              {stats.map((stat) => {
-                const Icon = ICONS[stat.icon];
-                return (
-                  <div key={stat.id} className={styles.statCard}>
-                    <span className={styles.statIcon}>
-                      <Icon size={16} />
-                    </span>
-                    <div>
-                      <p className={styles.statValue}>{stat.value}</p>
-                      <p className={styles.statLabel}>{stat.label}</p>
-                    </div>
-                  </div>
-                );
-              })}
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}><CheckCircle2 size={16} /></span>
+                <div>
+                  <p className={styles.statValue}>{completedModules.length}</p>
+                  <p className={styles.statLabel}>Modules completed</p>
+                </div>
+              </div>
+              <div className={styles.statCard}>
+                <span className={styles.statIcon}><BookOpen size={16} /></span>
+                <div>
+                  <p className={styles.statValue}>{totalWeeks}</p>
+                  <p className={styles.statLabel}>Total modules</p>
+                </div>
+              </div>
             </div>
           </div>
 
           <div className={styles.sectionHeaderRow}>
-            <h2 className={styles.sectionTitle}>Completed Subjects</h2>
+            <h2 className={styles.sectionTitle}>Subject Progress</h2>
             <Link to="/student/subjects" className={styles.viewAllLink}>View all →</Link>
           </div>
           <div className={styles.rowsList}>
-            {completedSubjects.map((subject) => (
-              <div key={subject.id} className={styles.subjectRow}>
-                <span className={styles.subjectName}>{subject.name}</span>
-                <span className={styles.subjectProgress}>{subject.progress}%</span>
+            {subjects.map((subject) => (
+              <div key={subject.subjectId} className={styles.subjectRow}>
+                <span className={styles.subjectName}>{subject.subjectName}</span>
+                <span className={styles.subjectProgress}>{subject.progressPercentage}%</span>
               </div>
             ))}
-          </div>
-
-          <h2 className={styles.sectionTitle}>Quiz Scores</h2>
-          <div className={styles.rowsList}>
-            {quizScores.map((quiz) => (
-              <div key={quiz.id} className={styles.quizRow}>
-                <span className={styles.quizTitle}>{quiz.title}</span>
-                <span className={styles.quizScoreGroup}>
-                  <span className={styles.quizScore}>{quiz.score}%</span>
-                  <span className={`${styles.gradeBadge} ${gradeClass(quiz.grade)}`}>
-                    {quiz.grade}
-                  </span>
-                </span>
-              </div>
-            ))}
+            {subjects.length === 0 && (
+              <p className={styles.emptyState}>No subjects enrolled yet.</p>
+            )}
           </div>
         </main>
       </div>

@@ -1,23 +1,59 @@
-// Centralized service for the Quiz feature.
+// Centralized service for the Quiz/Assessment feature.
 //
-// TODO: swap the mock logic below for real API calls once your backend is
-// ready. getQuiz() should fetch the actual quiz questions for a given
-// lesson; submitQuiz() should record the student's score.
+// Wired to the real backend (com.ptc.halo.controller.StudentAssessmentController).
+// This is a richer attempt-based flow than "get quiz, submit score" — the
+// backend tracks each attempt separately and enforces pass/retry rules.
 
-import { getQuizForLesson, submitQuizResult } from '../../data/student/quizData';
+import apiClient from '../apiClient';
 
-function delay(ms = 300) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// Check this BEFORE showing the "Start quiz" button — tells you whether an
+// assessment exists yet, whether the student already passed, has an
+// unfinished attempt to resume, etc.
+// Returns: { moduleId, assessmentExists, assessmentAvailable, hasUnfinishedAttempt, alreadyPassed, canTakeAssessment }
+export async function getAssessmentStatus(moduleId) {
+  const res = await apiClient.get(`/student/assessment/status/${moduleId}`);
+  return res.data;
 }
 
-export async function getQuiz(topicId, weekId) {
-  await delay();
-  // TODO: const res = await axios.get(`/api/lessons/${topicId}/${weekId}/quiz`); return res.data;
-  return getQuizForLesson(topicId, weekId);
+// Returns: { id, title, passingScore, questions: [{ id, questionNumber, questionText, optionA, optionB, optionC, optionD }] }
+export async function getAssessment(moduleId) {
+  const res = await apiClient.get(`/student/assessment/${moduleId}`);
+  return res.data;
 }
 
-export async function submitQuiz(topicId, weekId, score, total) {
-  await delay();
-  // TODO: await axios.post('/api/quiz-attempts', { topicId, weekId, score, total });
-  return submitQuizResult(topicId, weekId, score, total);
+// Returns: { attemptId, assessmentId, startedAt }
+export async function startAttempt(moduleId) {
+  const res = await apiClient.post(`/student/assessment/start/${moduleId}`);
+  return res.data;
 }
+
+// answers: [{ questionId, answer }] — answer is the selected option letter
+// as a string, e.g. "A" | "B" | "C" | "D" (matches optionA/B/C/D on the
+// question — confirm the exact expected format with your backend team).
+// Returns: { attemptId, score, passed, feedback: [{ questionId,
+// questionNumber, questionText, studentAnswer, correctAnswer, correct }] }
+// — per-question feedback IS included, so a full "review your answers"
+// screen is possible after all.
+export async function submitAttempt(attemptId, answers) {
+  const res = await apiClient.post(`/student/assessment/submit/${attemptId}`, { answers });
+  return res.data;
+}
+
+// Returns: [{ attemptId, score, passed, startedAt, submittedAt }]
+export async function getAttemptHistory(moduleId) {
+  const res = await apiClient.get(`/student/assessment/attempts/${moduleId}`);
+  return res.data;
+}
+
+// Same shape as submitAttempt's response — includes the full per-question
+// feedback list too.
+export async function getAttemptResult(attemptId) {
+  const res = await apiClient.get(`/student/assessment/result/${attemptId}`);
+  return res.data;
+}
+
+// NOTE: there is also POST /assessment/generate/{moduleId}, but the
+// professor's approveLesson() action already triggers assessment
+// generation automatically on the backend — the frontend likely never
+// needs to call this directly. Not wrapped here; ask your backend team to
+// confirm before wiring up a manual "generate quiz" button anywhere.

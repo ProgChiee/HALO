@@ -1,15 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, BookOpen, TrendingUp, Award, CheckCircle2 } from 'lucide-react';
+import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { useAuth } from '../../../context/login/AuthContext';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { getDashboardData, getCurrentTopicAndWeek } from '../../../services/student/studentService';
+import { getDashboardData, getSubjectsData, getSubjectWeeks } from '../../../services/student/studentService';
 import styles from '../styles/StudentDashboard.module.css';
 
-// Maps the string icon names from the mock data to actual icon components
-const ICONS = { BookOpen, TrendingUp, Award, CheckCircle2 };
+// ✅ Redesigned for the real backend shapes (StudentDashboardController +
+// StudentLearningProgressionController).
+//
+// 1. getDashboardData() returns a flat summary — { completedModules,
+//    totalBadges, passedAssessments, latestAssessmentScore }.
+//
+// 2. There's still no dedicated "current week" shortcut endpoint, but
+//    "Continue Where You Left Off" now finds the actual next lesson
+//    itself: it takes the first not-yet-completed subject, then fetches
+//    that subject's weeks and picks the first one that's unlocked but not
+//    completed — and deep-links straight into it, instead of just
+//    pointing at the Subjects list.
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -18,21 +28,33 @@ export default function StudentDashboard() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [dashboardData, setDashboardData] = useState(null);
-  const [currentLesson, setCurrentLesson] = useState(null);
+  const [summary, setSummary] = useState(null); // StudentDashboardResponse
+  const [subjects, setSubjects] = useState([]); // StudentSubjectResponse[]
+  const [nextLesson, setNextLesson] = useState(null); // { subject, week } | null
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
       try {
-        const [data, lesson] = await Promise.all([
+        const [dashboardSummary, subjectList] = await Promise.all([
           getDashboardData(),
-          getCurrentTopicAndWeek(),
+          getSubjectsData(),
         ]);
-        if (isMounted) {
-          setDashboardData(data);
-          setCurrentLesson(lesson);
+        if (!isMounted) return;
+        setSummary(dashboardSummary);
+        setSubjects(subjectList);
+
+        // Find the actual next lesson: first incomplete subject, then its
+        // first unlocked-but-not-completed week.
+        const incompleteSubject = subjectList.find((s) => s.progressPercentage < 100);
+        if (incompleteSubject) {
+          const weeks = await getSubjectWeeks(incompleteSubject.subjectId);
+          if (!isMounted) return;
+          const upNextWeek = weeks.find((w) => w.unlocked && !w.completed);
+          if (upNextWeek) {
+            setNextLesson({ subject: incompleteSubject, week: upNextWeek });
+          }
         }
       } catch (err) {
         console.error(err);
@@ -46,16 +68,6 @@ export default function StudentDashboard() {
     return () => { isMounted = false; };
   }, []);
 
-  function goToLesson() {
-    const { topic, week } = currentLesson || {};
-    if (topic && week) navigate(`/student/lesson/${topic.id}/${week.id}`);
-  }
-
-  function goToQuiz() {
-    const { topic, week } = currentLesson || {};
-    if (topic && week) navigate(`/student/quiz/${topic.id}/${week.id}`);
-  }
-
   if (isLoading) {
     return (
       <div className={styles.layout}>
@@ -67,7 +79,7 @@ export default function StudentDashboard() {
     );
   }
 
-  if (loadError || !dashboardData) {
+  if (loadError || !summary) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
@@ -78,12 +90,18 @@ export default function StudentDashboard() {
     );
   }
 
-  const { stats, enrolledSubjects, moduleProgress } = dashboardData;
-  const hasCurrentLesson = Boolean(currentLesson?.topic && currentLesson?.week);
+  const statCards = [
+    { id: 'completedModules', icon: CheckCircle2, value: summary.completedModules, label: 'Modules completed' },
+    { id: 'passedAssessments', icon: TrendingUp, value: summary.passedAssessments, label: 'Assessments passed' },
+    { id: 'totalBadges', icon: Award, value: summary.totalBadges, label: 'Badges earned' },
+    { id: 'latestScore', icon: BookOpen, value: `${summary.latestAssessmentScore ?? 0}%`, label: 'Latest assessment score' },
+  ];
+
+  const nextSubject = subjects.find((s) => s.progressPercentage < 100);
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -91,7 +109,6 @@ export default function StudentDashboard() {
             <LayoutGrid size={16} />
             Dashboard
           </div>
-          <Button onClick={goToQuiz} disabled={!hasCurrentLesson}>Start quiz</Button>
         </header>
 
         <main className={styles.main}>
@@ -99,8 +116,8 @@ export default function StudentDashboard() {
           <p className={styles.subtext}>Here's your learning overview for today</p>
 
           <div className={styles.statsGrid}>
-            {stats.map((stat) => {
-              const Icon = ICONS[stat.icon];
+            {statCards.map((stat) => {
+              const Icon = stat.icon;
               return (
                 <div key={stat.id} className={styles.statCard}>
                   <div className={styles.statIcon}>
@@ -118,31 +135,46 @@ export default function StudentDashboard() {
             <div className={styles.continueIcon}>
               <BookOpen size={20} />
             </div>
-            {hasCurrentLesson ? (
+            {nextSubject ? (
               <>
                 <div className={styles.continueInfo}>
                   <p className={styles.continueMeta}>Up next</p>
-                  <p className={styles.continueTitle}>{currentLesson.topic.title}</p>
-                  <p className={styles.continueSubmeta}>{currentLesson.week.label}</p>
+                  <p className={styles.continueTitle}>
+                    {nextLesson ? `Week ${nextLesson.week.weekNumber}: ${nextLesson.week.title}` : nextSubject.subjectName}
+                  </p>
+                  <p className={styles.continueSubmeta}>
+                    {nextLesson ? nextSubject.subjectName : `${nextSubject.completedWeeks}/${nextSubject.totalWeeks} weeks completed`}
+                  </p>
                 </div>
-                <Button onClick={goToLesson}>Continue</Button>
+                <Button
+                  onClick={() =>
+                    nextLesson
+                      ? navigate(`/student/lesson/${nextLesson.subject.subjectId}/${nextLesson.week.weekId}`)
+                      : navigate('/student/subjects')
+                  }
+                >
+                  Continue
+                </Button>
               </>
             ) : (
               <div className={styles.continueInfo}>
                 <p className={styles.continueTitle}>You're all caught up! 🎉</p>
-                <p className={styles.continueSubmeta}>No lessons left to complete right now.</p>
+                <p className={styles.continueSubmeta}>No subjects left to complete right now.</p>
               </div>
             )}
           </div>
 
           <h2 className={styles.sectionTitle}>Enrolled Subjects</h2>
           <div className={styles.subjectsList}>
-            {enrolledSubjects.map((subject) => (
-              <div key={subject.id} className={styles.subjectRow}>
-                <span className={styles.subjectName}>{subject.name}</span>
-                <span className={styles.subjectProgress}>{subject.progress}%</span>
+            {subjects.map((subject) => (
+              <div key={subject.subjectId} className={styles.subjectRow}>
+                <span className={styles.subjectName}>{subject.subjectName}</span>
+                <span className={styles.subjectProgress}>{subject.progressPercentage}%</span>
               </div>
             ))}
+            {subjects.length === 0 && (
+              <p className={styles.emptyState}>No subjects enrolled yet.</p>
+            )}
           </div>
         </main>
       </div>

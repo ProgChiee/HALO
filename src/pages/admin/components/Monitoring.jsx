@@ -14,14 +14,14 @@ import PageShell from '../../../components/shared/PageShell';
 import { useAuth } from '../../../context/login/AuthContext';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { MONITORING_CATEGORIES } from '../../../data/admin/monitoringData';
-import { getActivityLog, getAiUsageData, getQuizPerformanceData, getSessionMonitoringData } from '../../../services/admin/adminService';
+import { getActivityLog, getProfessorMonitoring, getStudentMonitoring, getSessionMonitoringData } from '../../../services/admin/adminService';
 import { useToast } from '../../../context/notifications/ToastContext';
 import styles from '../styles/Monitoring.module.css';
 
 const TABS = [
   { id: 'activity', label: 'Activity Log' },
-  { id: 'ai-usage', label: 'AI Usage' },
-  { id: 'quiz-performance', label: 'Quiz Performance' },
+  { id: 'ai-usage', label: 'Professor Activity' },
+  { id: 'quiz-performance', label: 'Student Performance' },
   { id: 'login-sessions', label: 'Login Activity' },
 ];
 
@@ -143,14 +143,19 @@ function ActivityLogTab() {
 
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
-      const matchesCategory = activeCategory === 'all' || log.category === activeCategory;
-      const matchesSearch = log.text.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = activeCategory === 'all' || log.activityType === activeCategory;
+      const matchesSearch =
+        log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.userName.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [logs, searchQuery, activeCategory]);
 
-  const errorCount = useMemo(
-    () => logs.filter((log) => log.type === 'error').length,
+  // No severity/error concept exists on the real ActivityLogResponse (no
+  // "type: success|error" field) — showing AUTH-category event count
+  // instead of a fabricated "flagged events" number.
+  const authEventCount = useMemo(
+    () => logs.filter((log) => log.activityType === 'AUTH').length,
     [logs]
   );
 
@@ -176,9 +181,9 @@ function ActivityLogTab() {
           <p className={styles.summaryValue}>{logs.length}</p>
           <p className={styles.summaryLabel}>Total events</p>
         </div>
-        <div className={`${styles.summaryCard} ${styles.summaryCardAlert}`}>
-          <p className={styles.summaryValue}>{errorCount}</p>
-          <p className={styles.summaryLabel}>Flagged events</p>
+        <div className={styles.summaryCard}>
+          <p className={styles.summaryValue}>{authEventCount}</p>
+          <p className={styles.summaryLabel}>Auth events</p>
         </div>
       </div>
 
@@ -210,12 +215,13 @@ function ActivityLogTab() {
       <div className={styles.logCard}>
         {filteredLogs.map((log) => (
           <div key={log.id} className={styles.logRow}>
-            <span className={`${styles.logDot} ${styles[`logDot_${log.type}`]}`} />
             <div className={styles.logContent}>
-              <p className={styles.logText}>{log.text}</p>
-              <p className={styles.logTime}>{log.time}</p>
+              <p className={styles.logText}>
+                <span className={styles.activityActor}>{log.userName}</span> {log.action}
+              </p>
+              <p className={styles.logTime}>{new Date(log.createdAt).toLocaleString()}</p>
             </div>
-            <span className={styles.logCategoryTag}>{log.category}</span>
+            <span className={styles.logCategoryTag}>{log.activityType}</span>
           </div>
         ))}
 
@@ -233,7 +239,7 @@ function ActivityLogTab() {
 function AiUsageTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [data, setData] = useState(null);
+  const [professors, setProfessors] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -243,8 +249,8 @@ function AiUsageTab() {
     setIsLoading(true);
     setLoadError(false);
     try {
-      const result = await getAiUsageData();
-      setData(result);
+      const result = await getProfessorMonitoring();
+      setProfessors(result);
     } catch (err) {
       console.error(err);
       setLoadError(true);
@@ -253,59 +259,67 @@ function AiUsageTab() {
     }
   }
 
-  const sortedSubjects = useMemo(() => {
-    if (!data) return [];
-    return [...data.bySubject].sort((a, b) => b.queries - a.queries);
-  }, [data]);
+  const sortedByActivity = useMemo(() => {
+    return [...professors].sort((a, b) => (b.moduleActivities ?? 0) - (a.moduleActivities ?? 0));
+  }, [professors]);
+
+  const mostRecentlyActive = useMemo(() => {
+    return [...professors]
+      .filter((p) => p.lastActivity)
+      .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity))
+      .slice(0, 8);
+  }, [professors]);
 
   if (isLoading) {
-    return <div className={styles.main}><p className={styles.loadingText}>Loading AI usage data...</p></div>;
+    return <div className={styles.main}><p className={styles.loadingText}>Loading professor activity...</p></div>;
   }
 
-  if (loadError || !data) {
+  if (loadError) {
     return (
       <div className={styles.main}>
         <div className={styles.errorState}>
-          <p>Couldn't load AI usage data. Please check your connection and try again.</p>
+          <p>Couldn't load professor activity. Please check your connection and try again.</p>
           <button className={styles.retryBtn} onClick={loadData}>Retry</button>
         </div>
       </div>
     );
   }
 
-  const { summary, topTopics } = data;
+  const activeCount = professors.filter((p) => p.status === 'ACTIVE').length;
+  const totalActivities = professors.reduce((sum, p) => sum + (p.moduleActivities ?? 0), 0);
+  const avgActivities = professors.length > 0 ? Math.round(totalActivities / professors.length) : 0;
 
   return (
     <main className={styles.main}>
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <div className={styles.statIcon}><MessageSquare size={18} /></div>
-          <p className={styles.statValue}>{summary.totalQueriesToday}</p>
-          <p className={styles.statLabel}>Queries today</p>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}><TrendingUp size={18} /></div>
-          <p className={styles.statValue}>{summary.totalQueriesThisWeek}</p>
-          <p className={styles.statLabel}>Queries this week</p>
-        </div>
-        <div className={styles.statCard}>
           <div className={styles.statIcon}><Users size={18} /></div>
-          <p className={styles.statValue}>{summary.activeStudentsToday}</p>
-          <p className={styles.statLabel}>Active students today</p>
+          <p className={styles.statValue}>{professors.length}</p>
+          <p className={styles.statLabel}>Total professors</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><Bot size={18} /></div>
-          <p className={styles.statValue}>{summary.avgQueriesPerStudent}</p>
-          <p className={styles.statLabel}>Avg. queries / student</p>
+          <p className={styles.statValue}>{activeCount}</p>
+          <p className={styles.statLabel}>Active professors</p>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statIcon}><MessageSquare size={18} /></div>
+          <p className={styles.statValue}>{totalActivities}</p>
+          <p className={styles.statLabel}>Total module activities</p>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statIcon}><TrendingUp size={18} /></div>
+          <p className={styles.statValue}>{avgActivities}</p>
+          <p className={styles.statLabel}>Avg. activities / professor</p>
         </div>
       </div>
 
       <div className={styles.bottomGrid}>
         <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Usage by Subject</h2>
-          <ResponsiveContainer width="100%" height={Math.max(sortedSubjects.length * 42, 200)}>
+          <h2 className={styles.panelTitle}>Module Activities by Professor</h2>
+          <ResponsiveContainer width="100%" height={Math.max(sortedByActivity.length * 42, 200)}>
             <BarChart
-              data={sortedSubjects}
+              data={sortedByActivity}
               layout="vertical"
               margin={{ top: 0, right: 24, bottom: 0, left: 0 }}
               barCategoryGap={10}
@@ -320,7 +334,7 @@ function AiUsageTab() {
               />
               <YAxis
                 type="category"
-                dataKey="subject"
+                dataKey="name"
                 width={160}
                 stroke={CHART_COLORS.textMuted}
                 fontSize={11}
@@ -329,10 +343,10 @@ function AiUsageTab() {
                 tickFormatter={(name) => (name.length > 22 ? `${name.slice(0, 22)}…` : name)}
               />
               <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<UsageChartTooltip />} />
-              <Bar dataKey="queries" radius={[0, 4, 4, 0]} maxBarSize={18}>
-                {sortedSubjects.map((entry, index) => (
+              <Bar dataKey="moduleActivities" radius={[0, 4, 4, 0]} maxBarSize={18}>
+                {sortedByActivity.map((entry, index) => (
                   <Cell
-                    key={entry.id}
+                    key={entry.userId}
                     fill={index === 0 ? CHART_COLORS.bar : CHART_COLORS.barMuted}
                   />
                 ))}
@@ -342,17 +356,20 @@ function AiUsageTab() {
         </div>
 
         <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Most Asked Topics</h2>
+          <h2 className={styles.panelTitle}>Recently Active Professors</h2>
           <div className={styles.topicList}>
-            {topTopics.map((item) => (
-              <div key={item.id} className={styles.topicRow}>
-                <div className={styles.topicRank}>{item.count}</div>
+            {mostRecentlyActive.map((prof) => (
+              <div key={prof.userId} className={styles.topicRow}>
+                <div className={styles.topicRank}>{prof.moduleActivities}</div>
                 <div>
-                  <p className={styles.topicText}>{item.topic}</p>
-                  <p className={styles.topicSubject}>{item.subject}</p>
+                  <p className={styles.topicText}>{prof.name}</p>
+                  <p className={styles.topicSubject}>{new Date(prof.lastActivity).toLocaleString()}</p>
                 </div>
               </div>
             ))}
+            {mostRecentlyActive.length === 0 && (
+              <p className={styles.loadingText}>No recent professor activity.</p>
+            )}
           </div>
         </div>
       </div>
@@ -366,7 +383,7 @@ function AiUsageTab() {
 function QuizPerformanceTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [data, setData] = useState(null);
+  const [students, setStudents] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -376,8 +393,8 @@ function QuizPerformanceTab() {
     setIsLoading(true);
     setLoadError(false);
     try {
-      const result = await getQuizPerformanceData();
-      setData(result);
+      const result = await getStudentMonitoring();
+      setStudents(result);
     } catch (err) {
       console.error(err);
       setLoadError(true);
@@ -386,16 +403,25 @@ function QuizPerformanceTab() {
     }
   }
 
-  const sortedSubjects = useMemo(() => {
-    if (!data) return [];
-    return [...data.bySubject].sort((a, b) => b.avgScore - a.avgScore);
-  }, [data]);
+  // Only students with at least one scored assessment show up in the chart
+  const scoredStudents = useMemo(
+    () => students.filter((s) => s.latestAssessmentScore != null),
+    [students]
+  );
+
+  const sortedByScore = useMemo(() => {
+    return [...scoredStudents].sort((a, b) => b.latestAssessmentScore - a.latestAssessmentScore);
+  }, [scoredStudents]);
+
+  const lowestScoring = useMemo(() => {
+    return [...scoredStudents].sort((a, b) => a.latestAssessmentScore - b.latestAssessmentScore).slice(0, 8);
+  }, [scoredStudents]);
 
   if (isLoading) {
     return <div className={styles.main}><p className={styles.loadingText}>Loading quiz performance data...</p></div>;
   }
 
-  if (loadError || !data) {
+  if (loadError) {
     return (
       <div className={styles.main}>
         <div className={styles.errorState}>
@@ -406,47 +432,48 @@ function QuizPerformanceTab() {
     );
   }
 
-  const { summary, lowestScoring } = data;
-
-  // Color-code bars by score band so low-performing subjects stand out
-  // at a glance, not just on hover.
   function barColorFor(score) {
     if (score < 60) return CHART_COLORS.barLow;
     if (score < 75) return CHART_COLORS.barMid;
     return CHART_COLORS.bar;
   }
 
+  const avgScoreOverall = scoredStudents.length > 0
+    ? Math.round(scoredStudents.reduce((sum, s) => sum + s.latestAssessmentScore, 0) / scoredStudents.length)
+    : 0;
+  const totalPassedAssessments = students.reduce((sum, s) => sum + (s.passedAssessments ?? 0), 0);
+
   return (
     <main className={styles.main}>
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><GraduationCap size={18} /></div>
-          <p className={styles.statValue}>{summary.avgScoreOverall}%</p>
-          <p className={styles.statLabel}>Average score</p>
+          <p className={styles.statValue}>{avgScoreOverall}%</p>
+          <p className={styles.statLabel}>Average latest score</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><TrendingUp size={18} /></div>
-          <p className={styles.statValue}>{summary.passRateOverall}%</p>
-          <p className={styles.statLabel}>Pass rate</p>
+          <p className={styles.statValue}>{totalPassedAssessments}</p>
+          <p className={styles.statLabel}>Total passed assessments</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><Users size={18} /></div>
-          <p className={styles.statValue}>{summary.totalAttemptsToday}</p>
-          <p className={styles.statLabel}>Attempts today</p>
+          <p className={styles.statValue}>{scoredStudents.length}</p>
+          <p className={styles.statLabel}>Students with a scored attempt</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><MessageSquare size={18} /></div>
-          <p className={styles.statValue}>{summary.totalQuizzesTaken}</p>
-          <p className={styles.statLabel}>Total quizzes taken</p>
+          <p className={styles.statValue}>{students.length}</p>
+          <p className={styles.statLabel}>Total students</p>
         </div>
       </div>
 
       <div className={styles.bottomGrid}>
         <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Average Score by Subject</h2>
-          <ResponsiveContainer width="100%" height={Math.max(sortedSubjects.length * 42, 200)}>
+          <h2 className={styles.panelTitle}>Latest Score by Student</h2>
+          <ResponsiveContainer width="100%" height={Math.max(sortedByScore.length * 42, 200)}>
             <BarChart
-              data={sortedSubjects}
+              data={sortedByScore}
               layout="vertical"
               margin={{ top: 0, right: 24, bottom: 0, left: 0 }}
               barCategoryGap={10}
@@ -463,7 +490,7 @@ function QuizPerformanceTab() {
               />
               <YAxis
                 type="category"
-                dataKey="subject"
+                dataKey="name"
                 width={160}
                 stroke={CHART_COLORS.textMuted}
                 fontSize={11}
@@ -472,9 +499,9 @@ function QuizPerformanceTab() {
                 tickFormatter={(name) => (name.length > 22 ? `${name.slice(0, 22)}…` : name)}
               />
               <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<QuizChartTooltip />} />
-              <Bar dataKey="avgScore" radius={[0, 4, 4, 0]} maxBarSize={18}>
-                {sortedSubjects.map((entry) => (
-                  <Cell key={entry.id} fill={barColorFor(entry.avgScore)} />
+              <Bar dataKey="latestAssessmentScore" radius={[0, 4, 4, 0]} maxBarSize={18}>
+                {sortedByScore.map((entry) => (
+                  <Cell key={entry.userId} fill={barColorFor(entry.latestAssessmentScore)} />
                 ))}
               </Bar>
             </BarChart>
@@ -487,22 +514,25 @@ function QuizPerformanceTab() {
         </div>
 
         <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Lowest-Scoring Quizzes</h2>
-          <p className={styles.panelSubtitle}>May need content review by the subject professor</p>
+          <h2 className={styles.panelTitle}>Lowest-Scoring Students</h2>
+          <p className={styles.panelSubtitle}>May need extra support from their professor</p>
           <div className={styles.topicList}>
-            {lowestScoring.map((item) => (
-              <div key={item.id} className={styles.topicRow}>
+            {lowestScoring.map((student) => (
+              <div key={student.userId} className={styles.topicRow}>
                 <div className={`${styles.topicRank} ${styles.topicRankAlert}`}>
                   <AlertTriangle size={14} />
                 </div>
                 <div>
-                  <p className={styles.topicText}>{item.quizTitle}</p>
+                  <p className={styles.topicText}>{student.name}</p>
                   <p className={styles.topicSubject}>
-                    {item.subject} · {item.avgScore}% avg · {item.attempts} attempts
+                    {student.section} · {student.latestAssessmentScore}% latest score
                   </p>
                 </div>
               </div>
             ))}
+            {lowestScoring.length === 0 && (
+              <p className={styles.loadingText}>No scored assessments yet.</p>
+            )}
           </div>
         </div>
       </div>

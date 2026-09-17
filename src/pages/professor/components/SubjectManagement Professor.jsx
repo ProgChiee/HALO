@@ -1,27 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  BookOpen,
-  Plus,
-  Pencil,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  Folder,
-  X,
-} from 'lucide-react';
+import { BookOpen, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import {
-  getManagedSubjects,
+  getSubjects,
   createSubject,
   updateSubject,
   deleteSubject,
+  getWeeks,
   addWeek,
 } from '../../../services/professor/professorService';
 import styles from '../styles/SubjectManagement.module.css';
+
+// ✅ Professors now have their own full subject/week CRUD
+// (ProfessorAcademicController, /api/professor/subjects & /weeks) — same
+// shared subjects table as Admin's version, just a separate endpoint.
+// This page mirrors admin/components/SubjectManagement.jsx, with one
+// addition: each week has an "Author Lesson" link straight into
+// LessonEditor.jsx, since that's the actual reason a professor needs to
+// browse subjects/weeks in the first place.
+
+const YEAR_LEVELS = [
+  { value: 'FIRST_YEAR', label: '1st Year' },
+  { value: 'SECOND_YEAR', label: '2nd Year' },
+];
 
 export default function SubjectManagement() {
   const { showToast } = useToast();
@@ -31,26 +36,28 @@ export default function SubjectManagement() {
   const [loadError, setLoadError] = useState(false);
   const [subjects, setSubjects] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
+  const [weeksBySubject, setWeeksBySubject] = useState({});
+  const [weeksLoading, setWeeksLoading] = useState(false);
 
-  // Create/Edit Subject modal
   const [subjectModal, setSubjectModal] = useState(null); // null | 'create' | { editing: subject }
-  const [subjectTitle, setSubjectTitle] = useState('');
+  const [subjectCode, setSubjectCode] = useState('');
+  const [subjectName, setSubjectName] = useState('');
+  const [description, setDescription] = useState('');
+  const [yearLevel, setYearLevel] = useState('FIRST_YEAR');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Delete confirm modal
   const [deletingSubject, setDeletingSubject] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Add Module modal
-  const [addingWeekTo, setAddingWeekTo] = useState(null); // subject or null
+  const [addingWeekTo, setAddingWeekTo] = useState(null);
+  const [weekNumber, setWeekNumber] = useState('');
   const [weekTitle, setWeekTitle] = useState('');
 
   useEffect(() => {
     loadSubjects();
   }, []);
 
-  // Used once on mount — shows the "Loading subjects..." state.
   async function loadSubjects() {
     setIsLoading(true);
     setLoadError(false);
@@ -64,27 +71,43 @@ export default function SubjectManagement() {
     }
   }
 
-  // Used after actions (create/edit/delete subject, add module) — updates
-  // the list in place without hiding it (and collapsing expanded cards)
-  // behind the loading state.
   async function refetchSubjects() {
-    const data = await getManagedSubjects();
+    const data = await getSubjects();
     setSubjects(data);
   }
 
-  function toggleExpand(subjectId) {
-    setExpandedId((prev) => (prev === subjectId ? null : subjectId));
-  }
+  const toggleExpand = useCallback(async (subjectId) => {
+    if (expandedId === subjectId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(subjectId);
+    setWeeksLoading(true);
+    try {
+      const weeks = await getWeeks(subjectId);
+      setWeeksBySubject((prev) => ({ ...prev, [subjectId]: weeks }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setWeeksLoading(false);
+    }
+  }, [expandedId]);
 
   function openCreateSubject() {
     setSubjectModal('create');
-    setSubjectTitle('');
+    setSubjectCode('');
+    setSubjectName('');
+    setDescription('');
+    setYearLevel('FIRST_YEAR');
     setFormError('');
   }
 
   function openEditSubject(subject) {
     setSubjectModal({ editing: subject });
-    setSubjectTitle(subject.title);
+    setSubjectCode(subject.subjectCode);
+    setSubjectName(subject.subjectName);
+    setDescription(subject.description ?? '');
+    setYearLevel(subject.yearLevel);
     setFormError('');
   }
 
@@ -93,18 +116,20 @@ export default function SubjectManagement() {
     if (isSubmitting) return;
     setFormError('');
 
-    if (!subjectTitle.trim()) {
-      setFormError('Please enter a subject title.');
+    if (!subjectCode.trim() || !subjectName.trim()) {
+      setFormError('Please fill in the subject code and name.');
       return;
     }
+
+    const payload = { subjectCode: subjectCode.trim(), subjectName: subjectName.trim(), description: description.trim(), yearLevel };
 
     setIsSubmitting(true);
     try {
       if (subjectModal === 'create') {
-        await createSubject(subjectTitle.trim());
+        await createSubject(payload);
         showToast('Subject created.', 'success');
       } else {
-        await updateSubject(subjectModal.editing.id, subjectTitle.trim());
+        await updateSubject(subjectModal.editing.id, payload);
         showToast('Subject updated.', 'success');
       }
       setSubjectModal(null);
@@ -119,7 +144,6 @@ export default function SubjectManagement() {
 
   async function handleConfirmDelete() {
     if (isDeleting) return;
-
     setIsDeleting(true);
     try {
       await deleteSubject(deletingSubject.id);
@@ -136,6 +160,7 @@ export default function SubjectManagement() {
 
   function openAddWeek(subject) {
     setAddingWeekTo(subject);
+    setWeekNumber('');
     setWeekTitle('');
     setFormError('');
   }
@@ -145,18 +170,19 @@ export default function SubjectManagement() {
     if (isSubmitting) return;
     setFormError('');
 
-    if (!weekTitle.trim()) {
-      setFormError('Please enter a module title.');
+    if (!weekNumber || !weekTitle.trim()) {
+      setFormError('Please enter both a week number and a title.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await addWeek(addingWeekTo.id, weekTitle.trim());
+      await addWeek(addingWeekTo.id, { weekNumber: Number(weekNumber), title: weekTitle.trim() });
       showToast('Module added.', 'success');
       setAddingWeekTo(null);
+      const weeks = await getWeeks(addingWeekTo.id);
+      setWeeksBySubject((prev) => ({ ...prev, [addingWeekTo.id]: weeks }));
       setExpandedId(addingWeekTo.id);
-      await refetchSubjects();
     } catch (err) {
       console.error(err);
       setFormError('Something went wrong. Please try again.');
@@ -165,7 +191,7 @@ export default function SubjectManagement() {
     }
   }
 
-  function goToWeekEditor(subject, week) {
+  function goToLessonEditor(subject, week) {
     navigate(`/professor/subjects/${subject.id}/week/${week.id}`);
   }
 
@@ -174,7 +200,7 @@ export default function SubjectManagement() {
       <header className={styles.topbar}>
         <div className={styles.breadcrumb}>
           <BookOpen size={16} />
-          Subject Management
+          Subjects
         </div>
         <Button onClick={openCreateSubject}>
           <Plus size={16} style={{ marginRight: 6 }} />
@@ -199,26 +225,20 @@ export default function SubjectManagement() {
           <div className={styles.subjectsList}>
             {subjects.map((subject) => {
               const isExpanded = expandedId === subject.id;
+              const weeks = weeksBySubject[subject.id];
               return (
                 <div key={subject.id} className={styles.subjectCard}>
                   <div className={styles.subjectHeader}>
-                    <button
-                      className={styles.subjectHeaderClickable}
-                      onClick={() => toggleExpand(subject.id)}
-                    >
+                    <button className={styles.subjectHeaderClickable} onClick={() => toggleExpand(subject.id)}>
                       <BookOpen size={16} className={styles.subjectIcon} />
-                      <span className={styles.subjectTitle}>{subject.title}</span>
-                      {isExpanded
-                        ? <ChevronUp size={16} className={styles.chevron} />
-                        : <ChevronDown size={16} className={styles.chevron} />}
+                      <span className={styles.subjectTitle}>
+                        {subject.subjectCode} — {subject.subjectName}
+                      </span>
+                      {isExpanded ? <ChevronUp size={16} className={styles.chevron} /> : <ChevronDown size={16} className={styles.chevron} />}
                     </button>
 
                     <div className={styles.subjectActions}>
-                      <button
-                        className={styles.iconBtn}
-                        onClick={() => openEditSubject(subject)}
-                        aria-label="Edit subject"
-                      >
+                      <button className={styles.iconBtn} onClick={() => openEditSubject(subject)} aria-label="Edit subject">
                         <Pencil size={14} />
                       </button>
                       <button
@@ -233,27 +253,20 @@ export default function SubjectManagement() {
 
                   {isExpanded && (
                     <div className={styles.weeksPanel}>
-                      {subject.weeks.length === 0 && (
-                        <p className={styles.noWeeksText}>No modules yet.</p>
-                      )}
+                      {weeksLoading && !weeks && <p className={styles.noWeeksText}>Loading modules...</p>}
+                      {weeks?.length === 0 && <p className={styles.noWeeksText}>No modules yet.</p>}
 
-                      {subject.weeks.map((week) => (
+                      {weeks?.map((week) => (
                         <div key={week.id} className={styles.weekRow}>
-                          <Folder size={14} className={styles.weekIcon} />
-                          <span className={styles.weekTitle}>{week.title}</span>
-                          <button
-                            className={styles.weekEditLink}
-                            onClick={() => goToWeekEditor(subject, week)}
-                          >
-                            Edit
+                          <Sparkles size={14} className={styles.weekIcon} />
+                          <span className={styles.weekTitle}>Week {week.weekNumber}: {week.title}</span>
+                          <button className={styles.weekEditLink} onClick={() => goToLessonEditor(subject, week)}>
+                            Author Lesson
                           </button>
                         </div>
                       ))}
 
-                      <button
-                        className={styles.addWeekBtn}
-                        onClick={() => openAddWeek(subject)}
-                      >
+                      <button className={styles.addWeekBtn} onClick={() => openAddWeek(subject)}>
                         <Plus size={14} />
                         Add New Module
                       </button>
@@ -270,14 +283,11 @@ export default function SubjectManagement() {
         )}
       </main>
 
-      {/* Create / Edit Subject modal */}
       {subjectModal && (
         <div className={styles.modalOverlay} onClick={() => setSubjectModal(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>
-                {subjectModal === 'create' ? 'Create Subject' : 'Edit Subject'}
-              </h3>
+              <h3 className={styles.modalTitle}>{subjectModal === 'create' ? 'Create Subject' : 'Edit Subject'}</h3>
               <button className={styles.closeBtn} onClick={() => setSubjectModal(null)} aria-label="Close">
                 <X size={18} />
               </button>
@@ -285,15 +295,46 @@ export default function SubjectManagement() {
 
             <form onSubmit={handleSaveSubject} className={styles.form}>
               <div className={styles.field}>
-                <label className={styles.label}>Subject title</label>
+                <label className={styles.label}>Subject code</label>
                 <input
                   type="text"
                   className={styles.input}
-                  value={subjectTitle}
-                  onChange={(e) => setSubjectTitle(e.target.value)}
-                  placeholder="e.g. Front Office Operations"
+                  value={subjectCode}
+                  onChange={(e) => setSubjectCode(e.target.value)}
+                  placeholder="e.g. HRM101"
                   autoFocus
                 />
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.label}>Subject name</label>
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={subjectName}
+                  onChange={(e) => setSubjectName(e.target.value)}
+                  placeholder="e.g. Front Office Operations"
+                />
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.label}>Description</label>
+                <textarea
+                  className={styles.input}
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Short description of this subject"
+                />
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.label}>Year level</label>
+                <select className={styles.input} value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}>
+                  {YEAR_LEVELS.map((yl) => (
+                    <option key={yl.value} value={yl.value}>{yl.label}</option>
+                  ))}
+                </select>
               </div>
 
               {formError && <p className={styles.formError}>{formError}</p>}
@@ -306,13 +347,12 @@ export default function SubjectManagement() {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
       {deletingSubject && (
         <div className={styles.modalOverlay} onClick={() => setDeletingSubject(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Delete "{deletingSubject.title}"?</h3>
+            <h3 className={styles.modalTitle}>Delete "{deletingSubject.subjectName}"?</h3>
             <p className={styles.modalWarning}>
-              This will also remove all {deletingSubject.weeks.length} module(s) inside it. This action cannot be undone.
+              This will also remove all modules inside it. This action cannot be undone.
             </p>
             <div className={styles.modalActions}>
               <Button variant="secondary" onClick={() => setDeletingSubject(null)} disabled={isDeleting}>Cancel</Button>
@@ -322,7 +362,6 @@ export default function SubjectManagement() {
         </div>
       )}
 
-      {/* Add New Module modal */}
       {addingWeekTo && (
         <div className={styles.modalOverlay} onClick={() => setAddingWeekTo(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -332,9 +371,22 @@ export default function SubjectManagement() {
                 <X size={18} />
               </button>
             </div>
-            <p className={styles.modalSubtitle}>Adding to: {addingWeekTo.title}</p>
+            <p className={styles.modalSubtitle}>Adding to: {addingWeekTo.subjectName}</p>
 
             <form onSubmit={handleAddWeek} className={styles.form}>
+              <div className={styles.field}>
+                <label className={styles.label}>Week number</label>
+                <input
+                  type="number"
+                  min="1"
+                  className={styles.input}
+                  value={weekNumber}
+                  onChange={(e) => setWeekNumber(e.target.value)}
+                  placeholder="e.g. 4"
+                  autoFocus
+                />
+              </div>
+
               <div className={styles.field}>
                 <label className={styles.label}>Module title</label>
                 <input
@@ -342,8 +394,7 @@ export default function SubjectManagement() {
                   className={styles.input}
                   value={weekTitle}
                   onChange={(e) => setWeekTitle(e.target.value)}
-                  placeholder="e.g. Week 4: Guest Relations"
-                  autoFocus
+                  placeholder="e.g. Guest Relations"
                 />
               </div>
 

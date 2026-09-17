@@ -4,23 +4,29 @@ const AuthContext = createContext(null);
 
 /**
  * Wrap the whole app with <AuthProvider> in App.jsx.
- * Provides: user, role, login(), logout(), isLoading
+ * Provides: user, role, token, login(), logout(), isLoading
  *
  * Roles used across HALO: 'superadmin' | 'admin' | 'professor' | 'student'
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // On first load, check localStorage first (remembered), then sessionStorage
   useEffect(() => {
-    const remembered = localStorage.getItem('halo_user');
-    const sessionOnly = sessionStorage.getItem('halo_user');
-    const savedUser = remembered || sessionOnly;
+    const rememberedUser = localStorage.getItem('halo_user');
+    const sessionUser = sessionStorage.getItem('halo_user');
+    const savedUser = rememberedUser || sessionUser;
+
+    const rememberedToken = localStorage.getItem('halo_token');
+    const sessionToken = sessionStorage.getItem('halo_token');
+    const savedToken = rememberedToken || sessionToken;
 
     if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
+        if (savedToken) setToken(savedToken);
       } catch (err) {
         // Corrupted/malformed data (e.g. manually edited in DevTools, or
         // written by an old app version) — clear it and treat as logged
@@ -29,33 +35,48 @@ export function AuthProvider({ children }) {
         console.error('Failed to parse saved user, clearing storage:', err);
         localStorage.removeItem('halo_user');
         sessionStorage.removeItem('halo_user');
+        localStorage.removeItem('halo_token');
+        sessionStorage.removeItem('halo_token');
       }
     }
     setIsLoading(false);
   }, []);
 
-  function login(userData, rememberMe = true) {
-    // userData shape: { id, name, email, role }
+  // userData shape: { id, name, email, role }
+  // authToken: the token returned by the backend on login (undefined while
+  // authService.js is still mocked — apiClient.js simply won't attach an
+  // Authorization header until a real token exists).
+  function login(userData, authToken, rememberMe = true) {
     setUser(userData);
+    setToken(authToken ?? null);
 
-    if (rememberMe) {
-      localStorage.setItem('halo_user', JSON.stringify(userData));
-      sessionStorage.removeItem('halo_user');
+    const storage = rememberMe ? localStorage : sessionStorage;
+    const otherStorage = rememberMe ? sessionStorage : localStorage;
+
+    storage.setItem('halo_user', JSON.stringify(userData));
+    otherStorage.removeItem('halo_user');
+
+    if (authToken) {
+      storage.setItem('halo_token', authToken);
+      otherStorage.removeItem('halo_token');
     } else {
-      // Only persists for this browser tab/session
-      sessionStorage.setItem('halo_user', JSON.stringify(userData));
-      localStorage.removeItem('halo_user');
+      storage.removeItem('halo_token');
+      otherStorage.removeItem('halo_token');
     }
   }
 
   function logout() {
     setUser(null);
+    setToken(null);
     localStorage.removeItem('halo_user');
     sessionStorage.removeItem('halo_user');
+    localStorage.removeItem('halo_token');
+    sessionStorage.removeItem('halo_token');
   }
 
   const value = {
     user,
+    token,
     role: user?.role ?? null,
     isAuthenticated: !!user,
     isLoading,

@@ -1,53 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Grip, User, Mail, KeyRound, Eye, EyeOff, Hash, Users2 } from 'lucide-react';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/ToastContext';
-import {
-  sendPasswordResetCode,
-  resendPasswordResetCode,
-  resetPassword,
-} from '../../../services/authService';
+import { register as registerService } from '../../../services/authService';
 import bgImage from '../../../assets/login/BG.jpeg';
-import styles from '../styles/ForgotPassword.module.css';
+import styles from '../styles/Register.module.css';
 
 // Change this if your institutional domain is different
 const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
-const RESEND_COOLDOWN_SECONDS = 30;
 
-export default function ForgotPassword() {
-  const [step, setStep] = useState(1); // 1 = enter email, 2 = enter code + new password
+// Matches the backend's YearLevel enum exactly.
+const YEAR_LEVELS = [
+  { value: 'FIRST_YEAR', label: '1st Year' },
+  { value: 'SECOND_YEAR', label: '2nd Year' },
+];
 
+export default function Register() {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
+  const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [studentId, setStudentId] = useState('');
+  const [section, setSection] = useState('');
+  const [yearLevel, setYearLevel] = useState('FIRST_YEAR');
   const [showPassword, setShowPassword] = useState(false);
-
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
-  const [showEmailModal, setShowEmailModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
-
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const { showToast } = useToast();
   const navigate = useNavigate();
 
-  // Countdown ticker for the resend cooldown
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setResendCooldown((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [resendCooldown]);
-
-  async function handleSendCode(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
 
-    if (!email) {
-      setError('Please enter your email.');
+    if (!fullName || !email || !password || !confirmPassword || !studentId || !section) {
+      setError('Please fill in all fields.');
       return;
     }
 
@@ -56,52 +46,12 @@ export default function ForgotPassword() {
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      await sendPasswordResetCode(email);
-      showToast('Verification code sent to your email.', 'success');
-      setStep(2);
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    } catch (err) {
-      console.error(err);
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleResend() {
-    if (resendCooldown > 0 || isResending) return;
-
-    setIsResending(true);
-    try {
-      await resendPasswordResetCode(email);
-      showToast('Verification code resent.', 'success');
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    } catch (err) {
-      console.error(err);
-      showToast("Couldn't resend the code. Please try again.", 'error');
-    } finally {
-      setIsResending(false);
-    }
-  }
-
-  async function handleResetPassword(e) {
-    e.preventDefault();
-    setError('');
-
-    if (!code || !newPassword || !confirmPassword) {
-      setError('Please fill in all fields.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
+    if (password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
     }
 
-    if (newPassword.length < 8) {
+    if (password.length < 8) {
       setError('Password must be at least 8 characters.');
       return;
     }
@@ -109,8 +59,8 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      await resetPassword(email, code, newPassword);
-      showToast('Password reset successfully. Please sign in.', 'success');
+      await registerService(fullName, email, password, studentId, section, yearLevel);
+      showToast('Account created! Please sign in.', 'success');
       navigate('/login');
     } catch (err) {
       console.error(err);
@@ -120,139 +70,144 @@ export default function ForgotPassword() {
     }
   }
 
-  function handleBack() {
-    if (step === 2) {
-      setStep(1);
-      setError('');
-    } else {
-      navigate('/login');
-    }
-  }
-
   return (
     <div className={styles.wrapper} style={{ '--bg-image': `url(${bgImage})` }}>
       <div className={styles.card}>
-        <button className={styles.backBtn} onClick={handleBack}>
+        <button className={styles.backBtn} onClick={() => navigate(-1)}>
           <ArrowLeft size={16} />
           Back
         </button>
 
         <div className={styles.iconBadge}>
-          <Mail size={18} />
+          <Grip size={18} />
         </div>
 
-        <h1 className={styles.title}>Forgot Password?</h1>
+        <h1 className={styles.title}>Register account</h1>
+        <p className={styles.subtitle}>
+          Create your HALO account to start your learning journey.
+        </p>
 
-        {step === 1 ? (
-          <>
-            <p className={styles.subtitle}>
-              Enter your email and we'll send you a code to reset your password.
-            </p>
-
-            <div className={styles.formCard}>
-              <form onSubmit={handleSendCode} className={styles.form}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Email Address</label>
-                  <div className={styles.inputWrapper}>
-                    <Mail size={18} className={styles.inputIcon} />
-                    <input
-                      type="email"
-                      className={styles.input}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder={`Your@${INSTITUTIONAL_DOMAIN.slice(1)}`}
-                    />
-                  </div>
-                </div>
-
-                {error && <p className={styles.error}>{error}</p>}
-
-                <Button type="submit" isLoading={isLoading}>Send Code</Button>
-
-                <p className={styles.signinText}>
-                  Remember your password?{' '}
-                  <Link to="/login" className={styles.signinLink}>Sign in</Link>
-                </p>
-              </form>
+        <div className={styles.formCard}>
+          <form onSubmit={handleSubmit} className={styles.form}>
+            <div className={styles.field}>
+              <label className={styles.label}>Fullname</label>
+              <div className={styles.inputWrapper}>
+                <User size={18} className={styles.inputIcon} />
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your full name"
+                />
+              </div>
             </div>
-          </>
-        ) : (
-          <>
-            <p className={styles.subtitle}>
-              Enter the verification code we sent to your email, then set your new password.
-            </p>
 
-            <div className={styles.formCard}>
-              <form onSubmit={handleResetPassword} className={styles.form}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Enter verification code</label>
-                  <div className={styles.inputWrapper}>
-                    <Mail size={18} className={styles.inputIcon} />
-                    <input
-                      type="text"
-                      className={styles.input}
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="Enter verification code"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.resendBtn}
-                    onClick={handleResend}
-                    disabled={resendCooldown > 0 || isResending}
-                  >
-                    {resendCooldown > 0
-                      ? `Resend code in ${resendCooldown}s`
-                      : isResending
-                        ? 'Resending...'
-                        : 'Resend code'}
-                  </button>
-                </div>
-
-                <div className={styles.field}>
-                  <label className={styles.label}>New password</label>
-                  <div className={styles.inputWrapper}>
-                    <KeyRound size={18} className={styles.inputIcon} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      className={styles.input}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Password"
-                    />
-                    <button
-                      type="button"
-                      className={styles.eyeToggle}
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className={styles.field}>
-                  <label className={styles.label}>Password</label>
-                  <div className={styles.inputWrapper}>
-                    <KeyRound size={18} className={styles.inputIcon} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      className={styles.input}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-                </div>
-                      
-                {error && <p className={styles.error}>{error}</p>}
-
-                <Button type="submit" isLoading={isLoading}>Reset Password</Button>
-              </form>
+            <div className={styles.field}>
+              <label className={styles.label}>Email</label>
+              <div className={styles.inputWrapper}>
+                <Mail size={18} className={styles.inputIcon} />
+                <input
+                  type="email"
+                  className={styles.input}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your@Paterostechnologicalcollege.edu.ph"
+                />
+              </div>
             </div>
-          </>
-        )}
+
+            <div className={styles.field}>
+              <label className={styles.label}>Student ID</label>
+              <div className={styles.inputWrapper}>
+                <Hash size={18} className={styles.inputIcon} />
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
+                  placeholder="e.g. 2023-00123"
+                />
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Section</label>
+              <div className={styles.inputWrapper}>
+                <Users2 size={18} className={styles.inputIcon} />
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={section}
+                  onChange={(e) => setSection(e.target.value)}
+                  placeholder="e.g. BSHM 1A"
+                />
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Year level</label>
+              <select className={styles.input} value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}>
+                {YEAR_LEVELS.map((yl) => (
+                  <option key={yl.value} value={yl.value}>{yl.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Password</label>
+              <div className={styles.inputWrapper}>
+                <KeyRound size={18} className={styles.inputIcon} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className={styles.input}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                />
+                <button
+                  type="button"
+                  className={styles.eyeToggle}
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Confirm password</label>
+              <div className={styles.inputWrapper}>
+                <KeyRound size={18} className={styles.inputIcon} />
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  className={styles.input}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat your password"
+                />
+                <button
+                  type="button"
+                  className={styles.eyeToggle}
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {error && <p className={styles.error}>{error}</p>}
+
+            <Button type="submit" isLoading={isLoading}>Create account</Button>
+
+            <p className={styles.signinText}>
+              Already have an account?{' '}
+              <Link to="/login" className={styles.signinLink}>Sign in</Link>
+            </p>
+          </form>
+        </div>
       </div>
 
       {/* Institutional email popup */}
@@ -261,7 +216,7 @@ export default function ForgotPassword() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.modalTitle}>Institutional email required</h3>
             <p className={styles.modalText}>
-              Please use your school email address (ending in {INSTITUTIONAL_DOMAIN}) to reset your password.
+              Please use your school email address (ending in {INSTITUTIONAL_DOMAIN}) to create your account.
             </p>
             <Button onClick={() => setShowEmailModal(false)}>Okay</Button>
           </div>

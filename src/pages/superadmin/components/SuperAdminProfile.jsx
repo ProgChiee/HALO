@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { User as UserIcon, KeyRound } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
-import { useToast } from '../../../context/notifications/ToastContext';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { getSuperAdminProfile } from '../../../services/superadmin/superadminService';
 import styles from '../styles/SuperAdminProfile.module.css';
 
+// ✅ Wired to the real backend — UserProfileResponse only has
+// { userId, name, email, role, status }. No avatarInitial, title, or
+// dateJoined fields exist — those were mock-only. Avatar initial is
+// derived client-side from the name.
+
 export default function SuperAdminProfile() {
-  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -30,10 +33,6 @@ export default function SuperAdminProfile() {
     loadData();
     return () => { isMounted = false; };
   }, []);
-
-  function handleComingSoon(feature) {
-    showToast(`${feature} coming soon.`, 'info');
-  }
 
   if (isLoading) {
     return (
@@ -57,6 +56,8 @@ export default function SuperAdminProfile() {
     );
   }
 
+  const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
+
   return (
     <div className={styles.layout}>
       <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
@@ -71,21 +72,16 @@ export default function SuperAdminProfile() {
 
         <main className={styles.main}>
           <div className={styles.profileHeader}>
-            <div className={styles.avatar}>{profile.avatarInitial}</div>
+            <div className={styles.avatar}>{avatarInitial}</div>
             <div>
-              <p className={styles.fullName}>{profile.fullName}</p>
-              <p className={styles.subMeta}>{profile.title}</p>
+              <p className={styles.fullName}>{profile.name}</p>
+              <p className={styles.subMeta}>Super Admin</p>
             </div>
           </div>
 
           <div className={styles.infoCard}>
             <span className={styles.infoLabel}>Full name</span>
-            <div className={styles.infoValueRow}>
-              <span className={styles.infoValue}>{profile.fullName}</span>
-              <button className={styles.editLink} onClick={() => handleComingSoon('Editing your name')}>
-                Edit
-              </button>
-            </div>
+            <span className={styles.infoValue}>{profile.name}</span>
           </div>
 
           <div className={styles.infoCard}>
@@ -94,8 +90,8 @@ export default function SuperAdminProfile() {
           </div>
 
           <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Date joined</span>
-            <span className={styles.infoValue}>{profile.dateJoined}</span>
+            <span className={styles.infoLabel}>Status</span>
+            <span className={styles.infoValue}>{profile.status === 'ACTIVE' ? 'Active' : 'Inactive'}</span>
           </div>
 
           <h2 className={styles.sectionTitle}>Account</h2>

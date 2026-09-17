@@ -1,163 +1,215 @@
 // Centralized service for all Admin-role data.
 //
-// TODO: swap the mock returns below for real API calls once your backend
-// is ready. Every function already returns a Promise, so the components
-// calling these won't need to change shape-wise — only this file will.
+// Wired to the real backend (com.ptc.halo.controller.AdminController).
+// Subject/Week management lives here (not in professorService.js) because
+// that's where the backend actually put it.
 
-import {
-  mockAdminStats,
-  mockSubjectEnrollment,
-  mockAdminRecentActivity,
-} from '../../data/admin/adminDashboardData';
-import { mockProfessors } from '../../data/admin/professorsData';
-import { mockManagedStudents } from '../../data/admin/studentsData';
-import { mockAdminProfile } from '../../data/admin/adminProfileData';
-import { mockActivityLog } from '../../data/admin/monitoringData';
-import { mockAiUsageSummary, mockAiUsageBySubject, mockTopAskedTopics } from '../../data/admin/aiUsageData';
-import { mockQuizSummary, mockQuizPerformanceBySubject, mockLowestScoringQuizzes } from '../../data/admin/quizPerformanceData';
-import { mockSessionSummary, mockActiveSessionsByRole, mockLoginActivity } from '../../data/admin/sessionMonitoringData';
+import apiClient from '../apiClient';
 
-function delay(ms = 400) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-export async function getAdminDashboardData() {
-  await delay();
-  // TODO: const res = await apiClient.get('/admin/dashboard'); return res.data;
-  return {
-    stats: mockAdminStats,
-    subjectEnrollment: mockSubjectEnrollment,
-    recentActivity: mockAdminRecentActivity,
-  };
-}
-
-// In-memory copy so Create/Edit/Deactivate feel real during the demo, even
-// without a backend yet. Resets on page refresh — that's expected for mock data.
-let professorsStore = [...mockProfessors];
+// ── Professors ──────────────────────────────────────────────────────────
 
 export async function getProfessors() {
-  await delay();
-  // TODO: const res = await apiClient.get('/admin/professors'); return res.data;
-  return professorsStore;
+  const res = await apiClient.get('/admin/professors');
+  return res.data;
 }
 
-export async function createProfessor({ fullName, email, professorId }) {
-  await delay();
-  // TODO: const res = await apiClient.post('/admin/professors', { fullName, email, professorId });
-  // return res.data;
-  const newProfessor = {
-    id: Date.now(),
-    fullName,
+export async function getProfessorById(id) {
+  const res = await apiClient.get(`/admin/professors/${id}`);
+  return res.data;
+}
+
+// NOTE: backend's ProfessorRequest also requires a password field, which
+// the current "add professor" form doesn't collect — decide with your
+// backend team whether the admin sets an initial password here, or the
+// backend should auto-generate one / send a setup email instead.
+export async function createProfessor({ name, email, password, professorId }) {
+  const res = await apiClient.post('/admin/create-professor', {
+    name,
     email,
+    password,
     professorId,
-    subjectsCount: 0,
-    lessonsCount: 0,
-    uploadedMaterialsCount: 0,
-    lastLogin: 'Never',
-    status: 'active',
-  };
-  professorsStore = [...professorsStore, newProfessor];
-  return newProfessor;
+  });
+  return res.data;
 }
 
-export async function toggleProfessorStatus(professorId) {
-  await delay(200);
-  // TODO: await apiClient.patch(`/admin/professors/${professorId}/toggle-status`);
-  professorsStore = professorsStore.map((p) =>
-    p.id === professorId ? { ...p, status: p.status === 'active' ? 'inactive' : 'active' } : p
-  );
-  return { success: true };
+export async function updateProfessor(id, { name, email, professorId }) {
+  const res = await apiClient.put(`/admin/professors/${id}`, { name, email, professorId });
+  return res.data;
 }
 
-export async function updateProfessor(professorId, updates) {
-  await delay();
-  // TODO: const res = await apiClient.patch(`/admin/professors/${professorId}`, updates);
-  // return res.data;
-  professorsStore = professorsStore.map((p) =>
-    p.id === professorId ? { ...p, ...updates } : p
-  );
-  return professorsStore.find((p) => p.id === professorId);
+// No request body — backend flips the status server-side.
+export async function toggleProfessorStatus(id) {
+  const res = await apiClient.patch(`/admin/professors/${id}/status`);
+  return res.data;
 }
 
-// In-memory copy so Deactivate/Activate feel real during the demo, even
-// without a backend yet. Resets on page refresh — that's expected for mock data.
-let studentsStore = [...mockManagedStudents];
+// ── Students ─────────────────────────────────────────────────────────────
 
 export async function getStudents() {
-  await delay();
-  // TODO: const res = await apiClient.get('/admin/students'); return res.data;
-  return studentsStore;
+  const res = await apiClient.get('/admin/students');
+  return res.data;
 }
 
-export async function toggleStudentStatus(studentId) {
-  await delay(200);
-  // TODO: await apiClient.patch(`/admin/students/${studentId}/toggle-status`);
-  studentsStore = studentsStore.map((s) =>
-    s.id === studentId ? { ...s, status: s.status === 'active' ? 'inactive' : 'active' } : s
-  );
-  return { success: true };
+export async function getStudentById(id) {
+  const res = await apiClient.get(`/admin/students/${id}`);
+  return res.data;
 }
 
-// In-memory copy so editing feels real during the demo, even without a
-// backend yet. Resets on page refresh — that's expected for mock data.
-let adminProfileStore = { ...mockAdminProfile };
+export async function toggleStudentStatus(id) {
+  const res = await apiClient.patch(`/admin/students/${id}/status`);
+  return res.data;
+}
 
+export async function updateStudent(id, { name, studentId, section, yearLevel }) {
+  const res = await apiClient.put(`/admin/students/${id}`, {
+    name,
+    studentId,
+    section,
+    yearLevel,
+  });
+  return res.data;
+}
+
+// ── Subjects ─────────────────────────────────────────────────────────────
+// Moved here from professorService.js — the backend's subject/week CRUD
+// lives entirely under AdminController, professors don't manage their own
+// subjects directly on this backend.
+
+// NOTE: backend's SubjectRequest needs subjectCode, subjectName,
+// description, and yearLevel — the current "create subject" UI only
+// collects a title. The form needs extra fields before this can be wired
+// up for real.
+export async function createSubject({ subjectCode, subjectName, description, yearLevel }) {
+  const res = await apiClient.post('/admin/subjects', {
+    subjectCode,
+    subjectName,
+    description,
+    yearLevel,
+  });
+  return res.data;
+}
+
+export async function getSubjects() {
+  const res = await apiClient.get('/admin/subjects');
+  return res.data;
+}
+
+export async function getSubjectById(id) {
+  const res = await apiClient.get(`/admin/subjects/${id}`);
+  return res.data;
+}
+
+export async function updateSubject(id, { subjectCode, subjectName, description, yearLevel }) {
+  const res = await apiClient.put(`/admin/subjects/${id}`, {
+    subjectCode,
+    subjectName,
+    description,
+    yearLevel,
+  });
+  return res.data;
+}
+
+export async function deleteSubject(id) {
+  const res = await apiClient.delete(`/admin/subjects/${id}`);
+  return res.data;
+}
+
+// ── Weeks ────────────────────────────────────────────────────────────────
+
+// NOTE: backend's WeekRequest needs a weekNumber (Integer) in addition to
+// title — the current "add week" UI only collects a title.
+export async function addWeek(subjectId, { weekNumber, title }) {
+  const res = await apiClient.post(`/admin/subjects/${subjectId}/weeks`, { weekNumber, title });
+  return res.data;
+}
+
+export async function getWeeks(subjectId) {
+  const res = await apiClient.get(`/admin/subjects/${subjectId}/weeks`);
+  return res.data;
+}
+
+export async function getWeekById(id) {
+  const res = await apiClient.get(`/admin/weeks/${id}`);
+  return res.data;
+}
+
+export async function updateWeek(id, { weekNumber, title }) {
+  const res = await apiClient.put(`/admin/weeks/${id}`, { weekNumber, title });
+  return res.data;
+}
+
+export async function deleteWeek(id) {
+  const res = await apiClient.delete(`/admin/weeks/${id}`);
+  return res.data;
+}
+
+// ✅ Confirmed working — new AdminDashboardController.
+// Returns: { totalStudents, totalProfessors, activeUsers, inactiveUsers, totalSubjects, totalModules }
+export async function getAdminDashboardData() {
+  const res = await apiClient.get('/admin/dashboard');
+  return res.data;
+}
+
+// ✅ Confirmed working — same controller.
+// Returns: [{ id, userName, email, role, activityType, action, createdAt }]
+export async function getAdminRecentActivity() {
+  const res = await apiClient.get('/admin/dashboard/recent-activity');
+  return res.data;
+}
+
+// ✅ Confirmed working — new AdminProfessorMonitoringController.
+// Returns: [{ userId, professorId, name, email, status, moduleActivities, lastActivity }]
+export async function getProfessorMonitoring() {
+  const res = await apiClient.get('/admin/professors/monitoring');
+  return res.data;
+}
+
+// ✅ Confirmed working — new AdminStudentMonitoringController.
+// Returns: [{ userId, studentId, name, email, section, yearLevel, status,
+// completedModules, passedAssessments, totalBadges, latestAssessmentScore }]
+// This finally gives real quiz/assessment-related numbers per student —
+// could replace the old getQuizPerformanceData()/getAiUsageData() cards
+// on the Monitoring page with real aggregates computed from this list.
+export async function getStudentMonitoring() {
+  const res = await apiClient.get('/admin/students/monitoring');
+  return res.data;
+}
+
+// ✅ Confirmed working — added to AdminController.
+// Returns: { userId, name, email, role, status }
 export async function getAdminProfile() {
-  await delay();
-  // TODO: const res = await apiClient.get('/admin/profile'); return res.data;
-  return adminProfileStore;
+  const res = await apiClient.get('/admin/profile');
+  return res.data;
 }
 
 export async function updateAdminProfile(updates) {
-  await delay();
-  // TODO: const res = await apiClient.patch('/admin/profile', updates); return res.data;
-  adminProfileStore = { ...adminProfileStore, ...updates };
-  return adminProfileStore;
+  const res = await apiClient.patch('/admin/profile', updates);
+  return res.data;
 }
 
-export async function getActivityLog() {
-  await delay();
-  // TODO: const res = await apiClient.get('/admin/activity-log'); return res.data;
-  // Suggestion for the real endpoint: support pagination + a `since`
-  // param, since this list only grows over time.
-  return mockActivityLog;
+// ✅ Confirmed working — AdminController's new /admin/activity-logs.
+// role: optional Role filter ('ADMIN' | 'PROFESSOR' | 'STUDENT' | 'SUPER_ADMIN')
+// activityType: optional ActivityType filter — check the ActivityType enum
+// on the backend for valid values.
+// Returns: [{ id, userName, userEmail, userRole, activityType, action, createdAt }]
+export async function getActivityLog({ role, activityType } = {}) {
+  const res = await apiClient.get('/admin/activity-logs', {
+    params: { role, type: activityType },
+  });
+  return res.data;
 }
 
 export async function getAiUsageData() {
-  await delay();
-  // TODO: const res = await apiClient.get('/admin/ai-usage'); return res.data;
-  // Suggestion for the real endpoint: aggregate straight from the AI chat
-  // logs table (COUNT queries GROUP BY subject_id / student_id), rather
-  // than computing this client-side once real chat volume grows large.
-  return {
-    summary: mockAiUsageSummary,
-    bySubject: mockAiUsageBySubject,
-    topTopics: mockTopAskedTopics,
-  };
+  const res = await apiClient.get('/admin/ai-usage');
+  return res.data;
 }
 
 export async function getQuizPerformanceData() {
-  await delay();
-  // TODO: const res = await apiClient.get('/admin/quiz-performance'); return res.data;
-  // Suggestion for the real endpoint: aggregate straight from stored quiz
-  // attempts (AVG(score) GROUP BY subject_id / quiz_id), rather than
-  // computing this client-side once real attempt volume grows large.
-  return {
-    summary: mockQuizSummary,
-    bySubject: mockQuizPerformanceBySubject,
-    lowestScoring: mockLowestScoringQuizzes,
-  };
+  const res = await apiClient.get('/admin/quiz-performance');
+  return res.data;
 }
 
 export async function getSessionMonitoringData() {
-  await delay();
-  // TODO: const res = await apiClient.get('/admin/login-activity'); return res.data;
-  // Suggestion for the real endpoint: activeSessionsNow needs to come from
-  // the backend's session/token store (not something the frontend can
-  // derive), while loginActivity can be a simple paginated auth-events log.
-  return {
-    summary: mockSessionSummary,
-    byRole: mockActiveSessionsByRole,
-    activity: mockLoginActivity,
-  };
+  const res = await apiClient.get('/admin/login-activity');
+  return res.data;
 }

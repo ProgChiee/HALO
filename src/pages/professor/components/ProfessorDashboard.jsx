@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { LayoutGrid, BookOpen, FileText, Users, GraduationCap } from 'lucide-react';
+import { LayoutGrid, Users, BookOpen, FileText, CheckCircle2, ClipboardCheck, Award } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import { useAuth } from '../../../context/login/AuthContext';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { getProfessorDashboardData } from '../../../services/professor/professorService';
 import styles from '../styles/ProfessorDashboard.module.css';
 
-// Maps the string icon names from the mock data to actual icon components
-const ICONS = { BookOpen, FileText, Users };
+// ✅ Wired to the real backend — ProfessorDashboardController.
+// Returns a flat summary, not the old { stats, subjects } shape.
 
 export default function ProfessorDashboard() {
   const { user } = useAuth();
+  const firstName = user?.name?.split(' ')[0] ?? 'there';
+
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [data, setData] = useState(null);
@@ -57,8 +58,14 @@ export default function ProfessorDashboard() {
     );
   }
 
-  const { stats, subjects } = data;
-  const lastName = user?.name?.split(' ').slice(-1)[0] ?? 'there';
+  const statCards = [
+    { id: 'totalStudents', icon: Users, value: data.totalStudents, label: 'Students' },
+    { id: 'totalSubjects', icon: BookOpen, value: data.totalSubjects, label: 'Subjects' },
+    { id: 'totalModules', icon: FileText, value: data.totalModules, label: 'Total Modules' },
+    { id: 'approvedModules', icon: CheckCircle2, value: data.approvedModules, label: 'Approved Modules' },
+    { id: 'totalAssessments', icon: ClipboardCheck, value: data.totalAssessments, label: 'Assessments' },
+    { id: 'totalPassedAttempts', icon: Award, value: data.totalPassedAttempts, label: 'Passed Attempts' },
+  ];
 
   return (
     <div className={styles.layout}>
@@ -73,12 +80,12 @@ export default function ProfessorDashboard() {
         </header>
 
         <main className={styles.main}>
-          <h1 className={styles.greeting}>Welcome, Dr. {lastName}!</h1>
-          <p className={styles.subtext}>Here's an overview of your teaching activity</p>
+          <h1 className={styles.greeting}>Welcome back, {firstName}! 👋</h1>
+          <p className={styles.subtext}>Here's your teaching overview</p>
 
           <div className={styles.statsGrid}>
-            {stats.map((stat) => {
-              const Icon = ICONS[stat.icon];
+            {statCards.map((stat) => {
+              const Icon = stat.icon;
               return (
                 <div key={stat.id} className={styles.statCard}>
                   <div className={styles.statIcon}>
@@ -89,30 +96,6 @@ export default function ProfessorDashboard() {
                 </div>
               );
             })}
-          </div>
-
-          <div className={styles.sectionHeaderRow}>
-            <h2 className={styles.sectionTitle}>Enrolled Subjects</h2>
-            <Link to="/professor/subjects" className={styles.manageLink}>Manage</Link>
-          </div>
-
-          <div className={styles.subjectsList}>
-            {subjects.map((subject) => (
-              <div key={subject.id} className={styles.subjectRow}>
-                <span className={styles.subjectIcon}>
-                  <GraduationCap size={16} />
-                </span>
-                <div className={styles.subjectInfo}>
-                  <span className={styles.subjectName}>{subject.name}</span>
-                  <span className={styles.subjectMeta}>
-                    {subject.modules} modules · {subject.students} students
-                  </span>
-                </div>
-                <span className={styles.subjectStatus}>
-                  {subject.status === 'active' ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            ))}
           </div>
         </main>
       </div>

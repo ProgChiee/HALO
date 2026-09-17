@@ -4,11 +4,21 @@ import { Bot, Send, ChevronRight, Volume2, VolumeX } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { getTopicAndWeek, getOverallModuleProgress } from '../../../services/student/studentService';
-import { getChatHistory, sendMessageToMentor } from '../../../services/student/aiMentorService';
+import { getWeekLesson } from '../../../services/student/studentService';
+import { openSession, sendMessage as sendMentorMessage } from '../../../services/student/aiMentorService';
 import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
 import { useToast } from '../../../context/notifications/ToastContext';
 import styles from '../styles/LessonChat.module.css';
+
+// ⚠️ The URL still carries :topicId/:weekId (see AppRoutes.jsx), but the
+// backend's mentor endpoints key off a moduleId, not weekId directly —
+// so we first fetch the week's approved lesson (module) to get its id,
+// then open the mentor session for THAT module id.
+//
+// Also: there's no subject/week title data available to students (see
+// studentService.js's "NOT YET AVAILABLE" notes), so the breadcrumb below
+// just shows "Week {weekId}" instead of a real subject/week name until
+// your backend team adds a student-readable subjects/weeks endpoint.
 
 export default function LessonChat() {
   const { topicId, weekId } = useParams();
@@ -16,9 +26,7 @@ export default function LessonChat() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [topic, setTopic] = useState(null);
-  const [week, setWeek] = useState(null);
-  const [moduleProgress, setModuleProgress] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
@@ -31,9 +39,6 @@ export default function LessonChat() {
     return () => { isMountedRef.current = false; };
   }, []);
 
-  // Stop any reading in progress when switching to a different
-  // topic/week's lesson, so audio from the old lesson doesn't keep
-  // playing on the new one.
   useEffect(() => {
     return () => stop();
   }, [topicId, weekId, stop]);
@@ -43,20 +48,20 @@ export default function LessonChat() {
 
     async function loadLesson() {
       try {
-        const [{ topic: fetchedTopic, week: fetchedWeek }, moduleProg] = await Promise.all([
-          getTopicAndWeek(topicId, weekId),
-          getOverallModuleProgress(),
-        ]);
+        const module = await getWeekLesson(weekId);
         if (!isMounted) return;
 
-        setTopic(fetchedTopic);
-        setWeek(fetchedWeek);
-        setModuleProgress(moduleProg);
+        const conversation = await openSession(module.id);
+        if (!isMounted) return;
 
-        if (fetchedTopic && fetchedWeek) {
-          const history = await getChatHistory(fetchedTopic.title, fetchedWeek.label);
-          if (isMounted) setMessages(history);
-        }
+        setSessionId(conversation.sessionId);
+        setMessages(
+          (conversation.messages ?? []).map((m) => ({
+            id: m.id,
+            sender: m.sender === 'STUDENT' ? 'user' : 'ai', // adjust if MessageSender enum values differ
+            text: m.message,
+          }))
+        );
       } catch (err) {
         console.error(err);
         if (isMounted) setLoadError(true);
@@ -67,7 +72,7 @@ export default function LessonChat() {
 
     loadLesson();
     return () => { isMounted = false; };
-  }, [topicId, weekId]);
+  }, [weekId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,7 +81,7 @@ export default function LessonChat() {
   if (isLoading) {
     return (
       <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+        <Sidebar navItems={STUDENT_NAV_ITEMS} />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading lesson...</p>
         </div>
@@ -87,7 +92,7 @@ export default function LessonChat() {
   if (loadError) {
     return (
       <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+        <Sidebar navItems={STUDENT_NAV_ITEMS} />
         <div className={styles.contentArea}>
           <main className={styles.notFound}>
             <p>Couldn't load this lesson. Please refresh and try again.</p>
@@ -98,27 +103,12 @@ export default function LessonChat() {
     );
   }
 
-  // If the topic/week id in the URL doesn't match any data, bail out gracefully
-  if (!topic || !week) {
-    return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
-        <div className={styles.contentArea}>
-          <main className={styles.notFound}>
-            <p>We couldn't find that lesson.</p>
-            <Button onClick={() => navigate('/student/subjects')}>Back to Subjects</Button>
-          </main>
-        </div>
-      </div>
-    );
-  }
-
   async function handleSend(e) {
     e.preventDefault();
-    if (isAiTyping) return; // block sending another message while AI is still answering
+    if (isAiTyping) return;
 
     const text = draft.trim();
-    if (!text) return;
+    if (!text || !sessionId) return;
 
     const userMessage = { id: Date.now(), sender: 'user', text };
     setMessages((prev) => [...prev, userMessage]);
@@ -126,9 +116,9 @@ export default function LessonChat() {
     setIsAiTyping(true);
 
     try {
-      const reply = await sendMessageToMentor(text, weekId);
+      const result = await sendMentorMessage(sessionId, text);
       if (!isMountedRef.current) return;
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', text: reply }]);
+      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', text: result.haloMessage }]);
     } catch (err) {
       console.error(err);
       if (isMountedRef.current) {
@@ -141,7 +131,7 @@ export default function LessonChat() {
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} />
 
       <div className={styles.contentArea}>
         <header className={styles.topHeader}>
@@ -156,9 +146,7 @@ export default function LessonChat() {
           </div>
 
           <div className={styles.breadcrumb}>
-            <span className={styles.breadcrumbMuted}>Module 1</span>
-            <ChevronRight size={14} />
-            <span className={styles.breadcrumbActive}>{week.label}: {topic.title}</span>
+            <span className={styles.breadcrumbActive}>Week {weekId}</span>
           </div>
         </header>
 

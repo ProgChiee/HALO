@@ -235,7 +235,7 @@ export default function ForgotPassword() {
                 </div>
 
                 <div className={styles.field}>
-                  <label className={styles.label}>Password</label>
+                  <label className={styles.label}>Confirm Password</label>
                   <div className={styles.inputWrapper}>
                     <KeyRound size={18} className={styles.inputIcon} />
                     <input

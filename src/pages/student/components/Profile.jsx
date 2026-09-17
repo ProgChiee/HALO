@@ -1,40 +1,33 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User as UserIcon, Pencil, KeyRound } from 'lucide-react';
+import { User as UserIcon, KeyRound } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
-import Button from '../../../components/shared/Button';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
-import { useToast } from '../../../context/notifications/ToastContext';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { getProfileData, getCurrentTopicAndWeek, getOverallModuleProgress } from '../../../services/student/studentService';
+import { getProfileData } from '../../../services/student/studentService';
 import styles from '../styles/Profile.module.css';
 
-export default function Profile() {
-  const { showToast } = useToast();
-  const navigate = useNavigate();
+// ✅ Wired to the real backend — StudentProfileResponse has
+// { userId, name, email, role, status, studentId, section, yearLevel }.
+// No "program" field exists — was mock-only, removed. No update endpoint
+// exists yet either, so "Edit" actions stay out until the backend adds one.
 
+const YEAR_LEVEL_LABELS = {
+  FIRST_YEAR: '1st Year',
+  SECOND_YEAR: '2nd Year',
+};
+
+export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [currentLesson, setCurrentLesson] = useState(null);
-  const [moduleProgress, setModuleProgress] = useState(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-
     async function loadData() {
       try {
-        const [profileData, lesson, moduleProg] = await Promise.all([
-          getProfileData(),
-          getCurrentTopicAndWeek(),
-          getOverallModuleProgress(),
-        ]);
-        if (isMounted) {
-          setProfile(profileData);
-          setCurrentLesson(lesson);
-          setModuleProgress(moduleProg);
-        }
+        const data = await getProfileData();
+        if (isMounted) setProfile(data);
       } catch (err) {
         console.error(err);
         if (isMounted) setLoadError(true);
@@ -42,23 +35,9 @@ export default function Profile() {
         if (isMounted) setIsLoading(false);
       }
     }
-
     loadData();
     return () => { isMounted = false; };
   }, []);
-
-  function goToQuiz() {
-    const { topic, week } = currentLesson || {};
-    if (topic && week) navigate(`/student/quiz/${topic.id}/${week.id}`);
-  }
-
-  const hasCurrentLesson = Boolean(currentLesson?.topic && currentLesson?.week);
-
-  // TODO: replace with real navigation to an edit form/modal, or a PATCH
-  // call to your backend, once those flows exist.
-  function handleComingSoon(feature) {
-    showToast(`${feature} coming soon.`, 'info');
-  }
 
   if (isLoading) {
     return (
@@ -82,9 +61,12 @@ export default function Profile() {
     );
   }
 
+  const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
+  const yearLevelLabel = YEAR_LEVEL_LABELS[profile.yearLevel] ?? profile.yearLevel;
+
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -92,26 +74,20 @@ export default function Profile() {
             <UserIcon size={16} />
             Profile
           </div>
-          <Button onClick={goToQuiz} disabled={!hasCurrentLesson}>Start quiz</Button>
         </header>
 
         <main className={styles.main}>
           <div className={styles.profileHeader}>
-            <div className={styles.avatar}>{profile.avatarInitial}</div>
+            <div className={styles.avatar}>{avatarInitial}</div>
             <div>
-              <p className={styles.fullName}>{profile.fullName}</p>
-              <p className={styles.subMeta}>{profile.program} · {profile.yearLevel}</p>
+              <p className={styles.fullName}>{profile.name}</p>
+              <p className={styles.subMeta}>{profile.section} · {yearLevelLabel}</p>
             </div>
           </div>
 
           <div className={styles.infoCard}>
             <span className={styles.infoLabel}>Full name</span>
-            <div className={styles.infoValueRow}>
-              <span className={styles.infoValue}>{profile.fullName}</span>
-              <button className={styles.editLink} onClick={() => handleComingSoon('Editing your name')}>
-                Edit
-              </button>
-            </div>
+            <span className={styles.infoValue}>{profile.name}</span>
           </div>
 
           <div className={styles.infoCard}>
@@ -125,26 +101,16 @@ export default function Profile() {
           </div>
 
           <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Year Level</span>
-            <span className={styles.infoValue}>{profile.yearLevel}</span>
+            <span className={styles.infoLabel}>Section</span>
+            <span className={styles.infoValue}>{profile.section}</span>
           </div>
 
           <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Program</span>
-            <span className={styles.infoValue}>{profile.program}</span>
+            <span className={styles.infoLabel}>Year Level</span>
+            <span className={styles.infoValue}>{yearLevelLabel}</span>
           </div>
 
           <h2 className={styles.sectionTitle}>Account</h2>
-
-          <button
-            className={styles.actionRow}
-            onClick={() => handleComingSoon('Editing basic information')}
-          >
-            <span className={styles.actionIcon}>
-              <Pencil size={16} />
-            </span>
-            Edit Basic Information
-          </button>
 
           <button
             className={styles.actionRow}

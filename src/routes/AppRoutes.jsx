@@ -16,7 +16,8 @@ import StudentManagement from '../pages/admin/components/StudentManagement';
 import AdminProfile from '../pages/admin/components/AdminProfile';
 import Monitoring from '../pages/admin/components/Monitoring';
 import ProfessorDashboard from '../pages/professor/components/ProfessorDashboard';
-import SubjectManagement from '../pages/professor/components/SubjectManagement';
+import SubjectManagement from '../pages/admin/components/SubjectManagement';
+import ProfessorSubjectManagement from '../pages/professor/components/SubjectManagement';
 import LessonEditor from '../pages/professor/components/LessonEditor';
 import StudentProgress from '../pages/professor/components/StudentProgress';
 import ProfessorProfile from '../pages/professor/components/ProfessorProfile';
@@ -121,10 +122,19 @@ export default function AppRoutes() {
       />
 
       <Route
+        path="/admin/subjects"
+        element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <SubjectManagement />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/professor/subjects"
         element={
           <ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}>
-            <SubjectManagement />
+            <ProfessorSubjectManagement />
           </ProtectedRoute>
         }
       />

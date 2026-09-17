@@ -49,7 +49,7 @@ export default function StudentManagement() {
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) =>
-      s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [students, searchQuery]);
@@ -61,7 +61,7 @@ export default function StudentManagement() {
     try {
       await toggleStudentStatus(student.id);
       showToast(
-        student.status === 'active'
+        student.status === 'ACTIVE'
           ? 'Student deactivated.'
           : 'Student activated.',
         'success'
@@ -133,12 +133,12 @@ export default function StudentManagement() {
                 className={`${styles.tableRow} ${styles.tableRowClickable}`}
                 onClick={() => setViewingStudent(student)}
               >
-                <span className={styles.studentName}>{student.fullName}</span>
+                <span className={styles.studentName}>{student.name}</span>
                 <span className={styles.studentEmail}>{student.email}</span>
-                <span className={styles.studentYear}>{student.year}</span>
-                <span className={styles.studentProgress}>{student.progress}%</span>
-                <span className={`${styles.statusText} ${styles[`status_${student.status}`]}`}>
-                  {student.status === 'active' ? 'Active' : 'Inactive'}
+                <span className={styles.studentYear}>{student.yearLevel === 'FIRST_YEAR' ? '1st Year' : '2nd Year'}</span>
+                <span className={styles.studentProgress}>—</span>
+                <span className={`${styles.statusText} ${styles[`status_${student.status?.toLowerCase()}`]}`}>
+                  {student.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </span>
                 <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
@@ -149,10 +149,10 @@ export default function StudentManagement() {
                     <Eye size={15} />
                   </button>
                   <button
-                    className={`${styles.actionBtn} ${student.status === 'inactive' ? styles.actionBtnOff : ''}`}
+                    className={`${styles.actionBtn} ${student.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
                     onClick={() => handleToggleStatus(student)}
                     disabled={togglingId === student.id}
-                    aria-label={student.status === 'active' ? 'Deactivate' : 'Activate'}
+                    aria-label={student.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                   >
                     <Power size={15} />
                   </button>
@@ -172,9 +172,9 @@ export default function StudentManagement() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <div className={styles.profileHeaderRow}>
-                <div className={styles.profileAvatar}>{viewingStudent.fullName.charAt(0)}</div>
+                <div className={styles.profileAvatar}>{viewingStudent.name.charAt(0)}</div>
                 <div>
-                  <h3 className={styles.modalTitle}>{viewingStudent.fullName}</h3>
+                  <h3 className={styles.modalTitle}>{viewingStudent.name}</h3>
                   <p className={styles.profileEmail}>{viewingStudent.email}</p>
                 </div>
               </div>
@@ -186,16 +186,16 @@ export default function StudentManagement() {
             <div className={styles.detailList}>
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Year Level</span>
-                <span className={styles.detailValue}>{viewingStudent.year}</span>
+                <span className={styles.detailValue}>{viewingStudent.yearLevel === 'FIRST_YEAR' ? '1st Year' : '2nd Year'}</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Overall Progress</span>
-                <span className={styles.detailValue}>{viewingStudent.progress}%</span>
+                <span className={styles.detailValue}>—</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Status</span>
-                <span className={`${styles.detailValue} ${styles[`status_${viewingStudent.status}`]}`}>
-                  {viewingStudent.status === 'active' ? 'Active' : 'Inactive'}
+                <span className={`${styles.detailValue} ${styles[`status_${viewingStudent.status?.toLowerCase()}`]}`}>
+                  {viewingStudent.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                 </span>
               </div>
             </div>

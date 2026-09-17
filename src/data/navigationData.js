@@ -32,15 +32,18 @@ export const SUPERADMIN_NAV_ITEMS = [
 
 export const ADMIN_NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutGrid, path: '/admin', end: true },
+  { label: 'Subject Management', icon: BookOpen, path: '/admin/subjects' },
   { label: 'Professor Management', icon: GraduationCap, path: '/admin/professors' },
   { label: 'Student Management', icon: Users, path: '/admin/students' },
   { label: 'Monitoring', icon: Activity, path: '/admin/monitoring' },
   { label: 'Profile', icon: UserIcon, path: '/admin/profile' },
 ];
 
+// ✅ Professors now have their own subject/week management
+// (ProfessorAcademicController), so "Subject Management" is back.
 export const PROFESSOR_NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutGrid, path: '/professor', end: true },
-  { label: 'Subject Management', icon: BookOpen, path: '/professor/subjects' },
+  { label: 'Subjects', icon: BookOpen, path: '/professor/subjects' },
   { label: 'Student Progress', icon: TrendingUp, path: '/professor/progress' },
   { label: 'Profile', icon: UserIcon, path: '/professor/profile' },
 ];

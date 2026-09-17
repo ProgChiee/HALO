@@ -5,9 +5,24 @@ import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { getTopicAndWeek, markLessonComplete, getOverallModuleProgress } from '../../../services/student/studentService';
-import { getQuiz, submitQuiz } from '../../../services/student/quizService';
+import { getWeekLesson } from '../../../services/student/studentService';
+import { getAssessmentStatus, getAssessment, startAttempt, submitAttempt } from '../../../services/student/quizService';
 import styles from '../styles/Quiz.module.css';
+
+// ⚠️ Redesigned for the real attempt-based backend flow. Key differences
+// from the old mock quiz:
+// - Scoring happens SERVER-SIDE. The backend never sends correct answers
+//   to the frontend before submission — but submitAttempt() DOES return
+//   full per-question feedback (studentAnswer, correctAnswer, correct)
+//   once you've submitted, so the review screen below uses that.
+// - "Mark lesson complete" is NOT called explicitly here anymore — per
+//   studentService.js's notes, module completion (StudentModuleProgressResponse)
+//   is expected to be set automatically server-side when an attempt passes.
+//   Confirm this assumption with your backend team.
+// - Options come back as optionA/B/C/D strings (not an array), and
+//   answers are submitted by LETTER ("A"/"B"/"C"/"D"), not index.
+
+const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
 export default function Quiz() {
   const { topicId, weekId } = useParams();
@@ -16,14 +31,16 @@ export default function Quiz() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [topic, setTopic] = useState(null);
-  const [week, setWeek] = useState(null);
-  const [quiz, setQuiz] = useState(null);
-  const [moduleProgress, setModuleProgress] = useState(null);
+  const [moduleId, setModuleId] = useState(null);
+  const [status, setStatus] = useState(null); // AssessmentStatusResponse
+  const [assessment, setAssessment] = useState(null);
+  const [attemptId, setAttemptId] = useState(null);
+  const [result, setResult] = useState(null); // { attemptId, score, passed }
 
   const [stage, setStage] = useState('intro'); // 'intro' | 'active' | 'results'
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [selectedAnswers, setSelectedAnswers] = useState({}); // { [questionId]: 'A' | 'B' | 'C' | 'D' }
+  const [isStarting, setIsStarting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -33,17 +50,18 @@ export default function Quiz() {
       setIsLoading(true);
       setLoadError(false);
       try {
-        const [{ topic: fetchedTopic, week: fetchedWeek }, fetchedQuiz, moduleProg] = await Promise.all([
-          getTopicAndWeek(topicId, weekId),
-          getQuiz(topicId, weekId),
-          getOverallModuleProgress(),
+        const module = await getWeekLesson(weekId);
+        if (!isMounted) return;
+        setModuleId(module.id);
+
+        const [assessmentStatus, fetchedAssessment] = await Promise.all([
+          getAssessmentStatus(module.id),
+          getAssessment(module.id),
         ]);
-        if (isMounted) {
-          setTopic(fetchedTopic);
-          setWeek(fetchedWeek);
-          setQuiz(fetchedQuiz);
-          setModuleProgress(moduleProg);
-        }
+        if (!isMounted) return;
+
+        setStatus(assessmentStatus);
+        setAssessment(fetchedAssessment);
       } catch (err) {
         console.error(err);
         if (isMounted) setLoadError(true);
@@ -54,12 +72,12 @@ export default function Quiz() {
 
     loadQuiz();
     return () => { isMounted = false; };
-  }, [topicId, weekId]);
+  }, [weekId]);
 
   if (isLoading) {
     return (
       <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+        <Sidebar navItems={STUDENT_NAV_ITEMS} />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading quiz...</p>
         </div>
@@ -67,10 +85,10 @@ export default function Quiz() {
     );
   }
 
-  if (loadError || !quiz) {
+  if (loadError || !assessment) {
     return (
       <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+        <Sidebar navItems={STUDENT_NAV_ITEMS} />
         <div className={styles.contentArea}>
           <div className={styles.introCard}>
             <p className={styles.introDescription}>
@@ -83,47 +101,42 @@ export default function Quiz() {
     );
   }
 
-  const currentQuestion = quiz.questions[currentIndex];
-  const isLastQuestion = currentIndex === quiz.questions.length - 1;
+  const currentQuestion = assessment.questions[currentIndex];
+  const isLastQuestion = currentIndex === assessment.questions.length - 1;
   const hasAnsweredCurrent = selectedAnswers[currentQuestion?.id] !== undefined;
 
-  function handleStart() {
-    setStage('active');
-    setCurrentIndex(0);
-    setSelectedAnswers({});
+  async function handleStart() {
+    if (isStarting) return;
+    setIsStarting(true);
+    try {
+      const attempt = await startAttempt(moduleId);
+      setAttemptId(attempt.attemptId);
+      setStage('active');
+      setCurrentIndex(0);
+      setSelectedAnswers({});
+    } catch (err) {
+      console.error(err);
+      showToast("Couldn't start the quiz. Please try again.", 'error');
+    } finally {
+      setIsStarting(false);
+    }
   }
 
-  function handleSelectOption(optionIndex) {
-    setSelectedAnswers((prev) => ({ ...prev, [currentQuestion.id]: optionIndex }));
+  function handleSelectOption(letter) {
+    setSelectedAnswers((prev) => ({ ...prev, [currentQuestion.id]: letter }));
   }
 
   async function handleNext() {
     if (isLastQuestion) {
-      if (isSubmitting) return; // block double-submit (e.g. double-click on "Submit quiz")
-
+      if (isSubmitting) return;
       setIsSubmitting(true);
       try {
-        const score = quiz.questions.reduce(
-          (total, q) => total + (selectedAnswers[q.id] === q.correctIndex ? 1 : 0),
-          0
-        );
-        await submitQuiz(topicId, weekId, score, quiz.questions.length);
-
-        // Mark the week complete (unlocking the next one) only when the
-        // student passes — matches the 70% threshold shown on the
-        // results screen below. Without this, the Subjects page's
-        // done/now/locked progression never actually advances no matter
-        // how many quizzes are taken.
-        const passed = Math.round((score / quiz.questions.length) * 100) >= 70;
-        if (passed) {
-          await markLessonComplete(topicId, weekId);
-          // Refresh the Sidebar's module progress right away, so the
-          // student sees the updated percentage on this results screen
-          // instead of only after navigating to a different page.
-          const updatedProgress = await getOverallModuleProgress();
-          setModuleProgress(updatedProgress);
-        }
-
+        const answers = assessment.questions.map((q) => ({
+          questionId: q.id,
+          answer: selectedAnswers[q.id],
+        }));
+        const submitted = await submitAttempt(attemptId, answers);
+        setResult(submitted);
         showToast('Quiz submitted!', 'success');
         setStage('results');
       } catch (err) {
@@ -139,27 +152,21 @@ export default function Quiz() {
 
   function handleRetry() {
     setStage('intro');
+    setResult(null);
+    setAttemptId(null);
   }
-
-  const score = quiz.questions.reduce(
-    (total, q) => total + (selectedAnswers[q.id] === q.correctIndex ? 1 : 0),
-    0
-  );
-  const scorePercent = Math.round((score / quiz.questions.length) * 100);
 
   return (
     <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={moduleProgress} />
+      <Sidebar navItems={STUDENT_NAV_ITEMS} />
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
           <div className={styles.breadcrumb}>
             <ClipboardCheck size={16} />
-            {quiz.title}
+            {assessment.title}
           </div>
-          {topic && week && (
-            <span className={styles.lessonTag}>{week.label}: {topic.title}</span>
-          )}
+          <span className={styles.lessonTag}>Week {weekId}</span>
         </header>
 
         <main className={styles.main}>
@@ -168,13 +175,24 @@ export default function Quiz() {
               <span className={styles.introIcon}>
                 <ClipboardCheck size={28} />
               </span>
-              <h1 className={styles.introTitle}>{quiz.title}</h1>
-              <p className={styles.introMeta}>{quiz.questions.length} questions · Multiple choice</p>
-              <p className={styles.introDescription}>
-                Answer each question to the best of your ability. You can review your score
-                and correct answers once you finish.
+              <h1 className={styles.introTitle}>{assessment.title}</h1>
+              <p className={styles.introMeta}>
+                {assessment.questions.length} questions · Multiple choice · Pass with {assessment.passingScore}%
               </p>
-              <Button onClick={handleStart}>Start quiz</Button>
+
+              {status?.alreadyPassed ? (
+                <p className={styles.introDescription}>
+                  You've already passed this quiz.
+                </p>
+              ) : (
+                <p className={styles.introDescription}>
+                  Answer each question to the best of your ability. Your score is calculated after you submit.
+                </p>
+              )}
+
+              <Button onClick={handleStart} isLoading={isStarting} disabled={status && !status.canTakeAssessment}>
+                {status?.hasUnfinishedAttempt ? 'Resume quiz' : 'Start quiz'}
+              </Button>
             </div>
           )}
 
@@ -182,29 +200,31 @@ export default function Quiz() {
             <div className={styles.quizCard}>
               <div className={styles.progressRow}>
                 <span className={styles.progressText}>
-                  Question {currentIndex + 1} of {quiz.questions.length}
+                  Question {currentIndex + 1} of {assessment.questions.length}
                 </span>
                 <div className={styles.progressTrack}>
                   <div
                     className={styles.progressFill}
-                    style={{ width: `${((currentIndex + 1) / quiz.questions.length) * 100}%` }}
+                    style={{ width: `${((currentIndex + 1) / assessment.questions.length) * 100}%` }}
                   />
                 </div>
               </div>
 
-              <h2 className={styles.questionText}>{currentQuestion.question}</h2>
+              <h2 className={styles.questionText}>{currentQuestion.questionText}</h2>
 
               <div className={styles.optionsList}>
-                {currentQuestion.options.map((option, index) => {
-                  const isSelected = selectedAnswers[currentQuestion.id] === index;
+                {OPTION_KEYS.map((letter) => {
+                  const optionText = currentQuestion[`option${letter}`];
+                  if (!optionText) return null;
+                  const isSelected = selectedAnswers[currentQuestion.id] === letter;
                   return (
                     <button
-                      key={index}
+                      key={letter}
                       className={`${styles.optionRow} ${isSelected ? styles.optionRowSelected : ''}`}
-                      onClick={() => handleSelectOption(index)}
+                      onClick={() => handleSelectOption(letter)}
                     >
-                      <span className={styles.optionMarker}>{String.fromCharCode(65 + index)}</span>
-                      {option}
+                      <span className={styles.optionMarker}>{letter}</span>
+                      {optionText}
                     </button>
                   );
                 })}
@@ -222,38 +242,56 @@ export default function Quiz() {
             </div>
           )}
 
-          {stage === 'results' && (
+          {stage === 'results' && result && (
             <div className={styles.resultsCard}>
               <span className={styles.resultsIcon}>
-                {scorePercent >= 70 ? <CheckCircle2 size={32} /> : <XCircle size={32} />}
+                {result.passed ? <CheckCircle2 size={32} /> : <XCircle size={32} />}
               </span>
-              <h1 className={styles.resultsScore}>{score}/{quiz.questions.length}</h1>
-              <p className={styles.resultsPercent}>{scorePercent}% correct</p>
+              <h1 className={styles.resultsScore}>{result.score}%</h1>
               <p className={styles.resultsMessage}>
-                {scorePercent >= 70
+                {result.passed
                   ? "Great job! You've passed this quiz."
                   : "Don't worry — review the lesson and try again."}
               </p>
 
-              <div className={styles.reviewList}>
-                {quiz.questions.map((q, i) => {
-                  const isCorrect = selectedAnswers[q.id] === q.correctIndex;
-                  return (
-                    <div key={q.id} className={styles.reviewRow}>
-                      <span className={isCorrect ? styles.reviewIconCorrect : styles.reviewIconWrong}>
-                        {isCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                      </span>
-                      <span className={styles.reviewText}>Q{i + 1}: {q.question}</span>
+              {/* Per-question review — the backend's submitAttempt() DOES
+                  include this in result.feedback. */}
+              {result.feedback && result.feedback.length > 0 && (
+                <div className={styles.reviewList}>
+                  <h2 className={styles.reviewTitle}>Review your answers</h2>
+                  {result.feedback.map((item) => (
+                    <div
+                      key={item.questionId}
+                      className={`${styles.reviewItem} ${item.correct ? styles.reviewItemCorrect : styles.reviewItemIncorrect}`}
+                    >
+                      <p className={styles.reviewQuestion}>
+                        {item.questionNumber}. {item.questionText}
+                      </p>
+                      <p className={styles.reviewAnswer}>
+                        Your answer: <strong>{item.studentAnswer}</strong>
+                        {item.correct ? (
+                          <CheckCircle2 size={14} className={styles.reviewIconCorrect} />
+                        ) : (
+                          <XCircle size={14} className={styles.reviewIconIncorrect} />
+                        )}
+                      </p>
+                      {!item.correct && (
+                        <p className={styles.reviewCorrectAnswer}>
+                          Correct answer: <strong>{item.correctAnswer}</strong>
+                        </p>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <div className={styles.actionsRow}>
-                <Button variant="secondary" onClick={handleRetry}>
-                  <RotateCcw size={16} style={{ marginRight: 6 }} />
-                  Retry quiz
-                </Button>
+                {!result.passed && (
+                  <Button variant="secondary" onClick={handleRetry}>
+                    <RotateCcw size={16} style={{ marginRight: 6 }} />
+                    Retry quiz
+                  </Button>
+                )}
                 <Button onClick={() => navigate('/student')}>Back to Dashboard</Button>
               </div>
             </div>

@@ -4,10 +4,20 @@ import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/ToastContext';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getAdmins, addAdmin, deleteAdmin, toggleAdminStatus } from '../../../services/superadmin/superadminService';
+import { getAdmins, addAdmin, toggleAdminStatus } from '../../../services/superadmin/superadminService';
 import styles from '../styles/Admins.module.css';
 
 const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
+
+// ✅ getAdmins() returns AdminListResponse — { id, name, email, role,
+// status } — confirmed to include both id and status, so toggle works.
+// (Only the create-admin response is limited to name/email/role — not
+// used for display here.)
+//
+// ⚠️ Still no DELETE endpoint for admins — only status toggling
+// (ACTIVE/INACTIVE/BLOCKED). "Remove" stays disabled below; ask your
+// backend team for DELETE /api/super-admin/admin/{id} if a true removal
+// action is needed.
 
 export default function Admins() {
   const { showToast } = useToast();
@@ -16,11 +26,11 @@ export default function Admins() {
   const [loadError, setLoadError] = useState(false);
   const [admins, setAdmins] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
-  const [fullName, setFullName] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -28,7 +38,6 @@ export default function Admins() {
     loadAdmins();
   }, []);
 
-  // Used once on mount — shows the "Loading admins..." state.
   async function loadAdmins() {
     setIsLoading(true);
     setLoadError(false);
@@ -42,16 +51,15 @@ export default function Admins() {
     }
   }
 
-  // Used after actions (add, delete) — updates the table data in place
-  // without hiding it behind the loading state.
   async function refetchAdmins() {
     const data = await getAdmins();
     setAdmins(data);
   }
 
   function openAddModal() {
-    setFullName('');
+    setName('');
     setEmail('');
+    setPassword('');
     setFormError('');
     setShowAddModal(true);
   }
@@ -61,19 +69,22 @@ export default function Admins() {
     if (isSubmitting) return;
     setFormError('');
 
-    if (!fullName || !email) {
+    if (!name || !email || !password) {
       setFormError('Please fill in all fields.');
       return;
     }
-
     if (!email.toLowerCase().endsWith(INSTITUTIONAL_DOMAIN)) {
       setFormError(`Email must end with ${INSTITUTIONAL_DOMAIN}`);
+      return;
+    }
+    if (password.length < 8) {
+      setFormError('Password must be at least 8 characters.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await addAdmin({ fullName, email });
+      await addAdmin({ name, email, password });
       showToast('Admin account created.', 'success');
       setShowAddModal(false);
       await refetchAdmins();
@@ -85,23 +96,6 @@ export default function Admins() {
     }
   }
 
-  async function handleDelete(admin) {
-    if (!window.confirm(`Remove ${admin.fullName} as an Admin?`)) return;
-    if (deletingId === admin.id) return;
-
-    setDeletingId(admin.id);
-    try {
-      await deleteAdmin(admin.id);
-      showToast('Admin removed.', 'success');
-      await refetchAdmins();
-    } catch (err) {
-      console.error(err);
-      showToast('Something went wrong. Please try again.', 'error');
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
   async function handleToggleStatus(admin) {
     if (togglingId === admin.id) return;
 
@@ -109,7 +103,7 @@ export default function Admins() {
     try {
       await toggleAdminStatus(admin.id);
       showToast(
-        admin.status === 'active' ? 'Admin deactivated.' : 'Admin activated.',
+        admin.status === 'ACTIVE' ? 'Admin deactivated.' : 'Admin activated.',
         'success'
       );
       await refetchAdmins();
@@ -119,6 +113,11 @@ export default function Admins() {
     } finally {
       setTogglingId(null);
     }
+  }
+
+  function handleDelete(admin) {
+    // ⚠️ Disabled: no DELETE endpoint for admins yet — see note above.
+    showToast('Removing admins is not available yet — deactivate instead.', 'error');
   }
 
   return (
@@ -155,33 +154,32 @@ export default function Admins() {
               <div className={styles.tableHeaderRow}>
                 <span>Name</span>
                 <span>Email</span>
-                <span>Date added</span>
                 <span>Status</span>
-                <span></span>
+                <span>Actions</span>
               </div>
 
               {admins.map((admin) => (
                 <div key={admin.id} className={styles.tableRow}>
-                  <span className={styles.adminName}>{admin.fullName}</span>
+                  <span className={styles.adminName}>{admin.name}</span>
                   <span className={styles.adminEmail}>{admin.email}</span>
-                  <span className={styles.adminDate}>{admin.dateAdded}</span>
-                  <span className={`${styles.statusBadge} ${styles[`status_${admin.status}`]}`}>
-                    {admin.status === 'active' ? 'Active' : 'Inactive'}
+                  <span className={`${styles.statusText} ${styles[`status_${admin.status?.toLowerCase()}`]}`}>
+                    {admin.status === 'ACTIVE' ? 'Active' : admin.status === 'BLOCKED' ? 'Blocked' : 'Inactive'}
                   </span>
                   <div className={styles.actionsCell}>
                     <button
-                      className={`${styles.actionBtn} ${admin.status === 'inactive' ? styles.actionBtnOff : ''}`}
+                      className={`${styles.actionBtn} ${admin.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
                       onClick={() => handleToggleStatus(admin)}
                       disabled={togglingId === admin.id}
-                      aria-label={admin.status === 'active' ? 'Deactivate' : 'Activate'}
+                      aria-label={admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                     >
                       <Power size={15} />
                     </button>
                     <button
                       className={styles.deleteBtn}
                       onClick={() => handleDelete(admin)}
-                      disabled={deletingId === admin.id}
-                      aria-label={`Remove ${admin.fullName}`}
+                      disabled
+                      title="Not available yet — no delete endpoint on the backend"
+                      aria-label={`Remove ${admin.name} (not available yet)`}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -213,8 +211,8 @@ export default function Admins() {
                 <input
                   type="text"
                   className={styles.input}
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Juan Dela Cruz"
                 />
               </div>
@@ -227,6 +225,17 @@ export default function Admins() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={`name${INSTITUTIONAL_DOMAIN}`}
+                />
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.label}>Initial password</label>
+                <input
+                  type="password"
+                  className={styles.input}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
                 />
               </div>
 

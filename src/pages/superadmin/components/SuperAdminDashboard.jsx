@@ -1,25 +1,37 @@
 import { useState, useEffect } from 'react';
-import { LayoutGrid, Users, UsersRound, UserCheck, UserX, GraduationCap, Layers, Activity } from 'lucide-react';
+import { LayoutGrid, Users, UsersRound, UserCheck, UserX, GraduationCap, Activity } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getSuperAdminDashboardData } from '../../../services/superadmin/superadminService';
+import { getSuperAdminDashboardData, getActivityLogs } from '../../../services/superadmin/superadminService';
 import styles from '../styles/SuperAdminDashboard.module.css';
 
-// Maps the string icon names from the mock data to actual icon components
-const ICONS = { Users, UsersRound, UserCheck, UserX, GraduationCap, Layers };
+// ⚠️ Redesigned for the real backend. SuperAdminDashboardResponse is a
+// FLAT object — { totalUsers, totalStudents, totalProfessors, totalAdmins,
+// activeUsers, inactiveUsers } — not the old { stats, recentActivity }
+// shape (the old code would have crashed destructuring this). Stat cards
+// below are built from these fields directly. "Recent Activity" now comes
+// from the separate, already-confirmed getActivityLogs() call instead
+// (since the dashboard response itself has no activity feed).
 
 export default function SuperAdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [data, setData] = useState(null);
+  const [activity, setActivity] = useState([]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
       try {
-        const result = await getSuperAdminDashboardData();
-        if (isMounted) setData(result);
+        const [dashboard, logs] = await Promise.all([
+          getSuperAdminDashboardData(),
+          getActivityLogs(),
+        ]);
+        if (isMounted) {
+          setData(dashboard);
+          setActivity(logs.slice(0, 10)); // show the 10 most recent
+        }
       } catch (err) {
         console.error(err);
         if (isMounted) setLoadError(true);
@@ -48,7 +60,14 @@ export default function SuperAdminDashboard() {
     );
   }
 
-  const { stats, recentActivity } = data;
+  const statCards = [
+    { id: 'totalUsers', icon: UsersRound, value: data.totalUsers, label: 'Total Users' },
+    { id: 'activeUsers', icon: UserCheck, value: data.activeUsers, label: 'Active Users' },
+    { id: 'inactiveUsers', icon: UserX, value: data.inactiveUsers, label: 'Inactive Users' },
+    { id: 'totalAdmins', icon: Users, value: data.totalAdmins, label: 'Total Admins' },
+    { id: 'totalProfessors', icon: GraduationCap, value: data.totalProfessors, label: 'Total Professors' },
+    { id: 'totalStudents', icon: UserCheck, value: data.totalStudents, label: 'Total Students' },
+  ];
 
   return (
     <PageShell navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
@@ -64,8 +83,8 @@ export default function SuperAdminDashboard() {
         <p className={styles.subtext}>Here's what's happening across HALO today</p>
 
         <div className={styles.statsGrid}>
-          {stats.map((stat) => {
-            const Icon = ICONS[stat.icon];
+          {statCards.map((stat) => {
+            const Icon = stat.icon;
             return (
               <div key={stat.id} className={styles.statCard}>
                 <div className={styles.statIcon}>
@@ -83,16 +102,19 @@ export default function SuperAdminDashboard() {
           Recent Activity
         </h2>
         <div className={styles.activityList}>
-          {recentActivity.map((item) => (
+          {activity.map((item) => (
             <div key={item.id} className={styles.activityRow}>
               <div>
                 <p className={styles.activityText}>
-                  <span className={styles.activityActor}>{item.actor}</span> {item.action}
+                  <span className={styles.activityActor}>{item.userName}</span> {item.action}
                 </p>
               </div>
-              <span className={styles.activityTime}>{item.time}</span>
+              <span className={styles.activityTime}>{new Date(item.createdAt).toLocaleString()}</span>
             </div>
           ))}
+          {activity.length === 0 && (
+            <p className={styles.loadingText}>No recent activity yet.</p>
+          )}
         </div>
       </main>
     </PageShell>

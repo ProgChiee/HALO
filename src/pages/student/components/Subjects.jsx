@@ -1,52 +1,45 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Search,
-  ChevronDown,
-  ChevronUp,
-  CheckCircle2,
-  Play,
-  Lock,
-  Clock,
-  Calendar,
-  BookOpen,
-} from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, CheckCircle2, Play, Lock, BookOpen } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
-import Button from '../../../components/shared/Button';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { getSubjectsData, getCurrentTopicAndWeek, getOverallModuleProgress } from '../../../services/student/studentService';
+import { getSubjectsData, getSubjectWeeks } from '../../../services/student/studentService';
 import styles from '../styles/Subjects.module.css';
 
-const WEEK_STATUS_ICON = { done: CheckCircle2, now: Play, locked: Lock };
+// ⚠️ Redesigned for the real backend
+// (StudentLearningProgressionController). Structural differences from the
+// old mock version:
+//
+// - No "topics" layer — the backend goes straight from Subject → Weeks.
+//   The old Subject → Topics → Weeks nesting doesn't exist here.
+// - getSubjectsData() gives the subject list with a completedWeeks/totalWeeks
+//   count; the per-week list (with unlocked/completed status) is fetched
+//   separately per subject via getSubjectWeeks(subjectId) — lazily, only
+//   when a subject is expanded, since fetching every subject's weeks
+//   upfront isn't necessary.
+// - No overall "topics done" pill or "current lesson" shortcut exists yet
+//   (see studentService.js notes), so those were removed from the header.
 
 export default function Subjects() {
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [subjectsData, setSubjectsData] = useState(null);
-  const [currentLesson, setCurrentLesson] = useState(null);
-  const [moduleProgress, setModuleProgress] = useState(null);
+  const [subjects, setSubjects] = useState([]);
 
   const [activeYear, setActiveYear] = useState('All Years');
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedTopicId, setExpandedTopicId] = useState(null);
+  const [expandedSubjectId, setExpandedSubjectId] = useState(null);
+  const [weeksBySubject, setWeeksBySubject] = useState({}); // { [subjectId]: WeekAccessResponse[] }
+  const [weeksLoading, setWeeksLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadData() {
       try {
-        const [data, lesson, moduleProg] = await Promise.all([
-          getSubjectsData(),
-          getCurrentTopicAndWeek(),
-          getOverallModuleProgress(),
-        ]);
-        if (isMounted) {
-          setSubjectsData(data);
-          setCurrentLesson(lesson);
-          setModuleProgress(moduleProg);
-        }
+        const data = await getSubjectsData();
+        if (isMounted) setSubjects(data);
       } catch (err) {
         console.error(err);
         if (isMounted) setLoadError(true);
@@ -59,29 +52,36 @@ export default function Subjects() {
     return () => { isMounted = false; };
   }, []);
 
-  function toggleTopic(topicId) {
-    setExpandedTopicId((prev) => (prev === topicId ? null : topicId));
-  }
+  const toggleSubject = useCallback(async (subjectId) => {
+    if (expandedSubjectId === subjectId) {
+      setExpandedSubjectId(null);
+      return;
+    }
 
-  function goToQuiz() {
-    const { topic, week } = currentLesson || {};
-    if (topic && week) navigate(`/student/quiz/${topic.id}/${week.id}`);
-  }
+    setExpandedSubjectId(subjectId);
+    if (!weeksBySubject[subjectId]) {
+      setWeeksLoading(true);
+      try {
+        const weeks = await getSubjectWeeks(subjectId);
+        setWeeksBySubject((prev) => ({ ...prev, [subjectId]: weeks }));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setWeeksLoading(false);
+      }
+    }
+  }, [expandedSubjectId, weeksBySubject]);
 
-  const hasCurrentLesson = Boolean(currentLesson?.topic && currentLesson?.week);
+  const yearOptions = useMemo(() => {
+    const years = Array.from(new Set(subjects.map((s) => s.yearLevel))).sort();
+    return ['All Years', ...years];
+  }, [subjects]);
 
-  const filteredGroups = useMemo(() => {
-    if (!subjectsData) return [];
-    return subjectsData.subjectGroups
-      .filter((group) => activeYear === 'All Years' || group.year === activeYear)
-      .map((group) => ({
-        ...group,
-        topics: group.topics.filter((topic) =>
-          topic.title.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
-      }))
-      .filter((group) => group.topics.length > 0);
-  }, [subjectsData, activeYear, searchQuery]);
+  const filteredSubjects = useMemo(() => {
+    return subjects
+      .filter((s) => activeYear === 'All Years' || s.yearLevel === activeYear)
+      .filter((s) => s.subjectName.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [subjects, activeYear, searchQuery]);
 
   if (isLoading) {
     return (
@@ -91,7 +91,7 @@ export default function Subjects() {
     );
   }
 
-  if (loadError || !subjectsData) {
+  if (loadError) {
     return (
       <PageShell navItems={STUDENT_NAV_ITEMS}>
         <p className={styles.loadingText}>Couldn't load subjects. Please refresh and try again.</p>
@@ -99,26 +99,17 @@ export default function Subjects() {
     );
   }
 
-  const { yearFilters, overview } = subjectsData;
-
   return (
-    <PageShell navItems={STUDENT_NAV_ITEMS} progress={moduleProgress}>
-      <header className={styles.topbar}>
-        <span className={styles.overviewPill}>
-          {overview.topicsDone} of {overview.topicsTotal} topics done
-        </span>
-        <Button onClick={goToQuiz} disabled={!hasCurrentLesson}>Start quiz</Button>
-      </header>
-
+    <PageShell navItems={STUDENT_NAV_ITEMS}>
       <main className={styles.main}>
         <div className={styles.headerRow}>
           <div>
             <h1 className={styles.title}>Subjects</h1>
-            <p className={styles.subtitle}>Select a topic to begin your lesson with your AI Mentor.</p>
+            <p className={styles.subtitle}>Select a subject to see its weekly lessons.</p>
           </div>
 
           <div className={styles.yearTabs}>
-            {yearFilters.map((year) => (
+            {yearOptions.map((year) => (
               <button
                 key={year}
                 className={`${styles.yearTab} ${activeYear === year ? styles.yearTabActive : ''}`}
@@ -135,117 +126,82 @@ export default function Subjects() {
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Search topics"
+            placeholder="Search subjects"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        {filteredGroups.map((group) => (
-          <section key={group.id} className={styles.yearSection}>
-            <div className={styles.yearSectionHeader}>
-              <span className={styles.yearLabel}>{group.year}</span>
-              <div className={styles.yearLine} />
-            </div>
+        <div className={styles.subjectCard}>
+          <div className={styles.topicsList}>
+            {filteredSubjects.map((subject) => {
+              const isExpanded = expandedSubjectId === subject.subjectId;
+              const weeks = weeksBySubject[subject.subjectId];
+              const isFullyCompleted = subject.completedWeeks === subject.totalWeeks;
 
-            <div className={styles.subjectCard}>
-              <div className={styles.subjectCardHeader}>
-                <h2 className={styles.subjectName}>{group.subjectName}</h2>
-                <span className={styles.topicsCountPill}>{group.topics.length} topics</span>
-              </div>
+              return (
+                <div key={subject.subjectId} className={styles.topicWrapper}>
+                  <button
+                    className={`${styles.topicRow} ${isFullyCompleted ? styles.topicRowCompleted : ''} ${isExpanded ? styles.topicRowExpanded : ''}`}
+                    onClick={() => toggleSubject(subject.subjectId)}
+                  >
+                    <span className={styles.topicIcon}>
+                      {isFullyCompleted ? <CheckCircle2 size={18} /> : <BookOpen size={18} />}
+                    </span>
 
-              <div className={styles.topicsList}>
-                {group.topics.map((topic) => {
-                  const isExpanded = expandedTopicId === topic.id;
-                  const isCompleted = topic.status === 'completed';
-                  const isLocked = topic.status === 'locked';
+                    <span className={styles.topicInfo}>
+                      <span className={styles.topicTitle}>{subject.subjectName}</span>
+                      <span className={styles.topicMeta}>
+                        {subject.completedWeeks}/{subject.totalWeeks} weeks
+                        {isFullyCompleted && <span className={styles.completedLabel}> · Completed</span>}
+                      </span>
+                    </span>
 
-                  return (
-                    <div key={topic.id} className={styles.topicWrapper}>
-                      <button
-                        className={`${styles.topicRow} ${isCompleted ? styles.topicRowCompleted : ''} ${isExpanded ? styles.topicRowExpanded : ''}`}
-                        onClick={() => !isLocked && toggleTopic(topic.id)}
-                        disabled={isLocked}
-                      >
-                        <span className={styles.topicIcon}>
-                          {isCompleted ? (
-                            <CheckCircle2 size={18} />
-                          ) : isLocked ? (
-                            <Lock size={18} />
-                          ) : (
-                            <BookOpen size={18} />
-                          )}
-                        </span>
+                    {isExpanded ? <ChevronUp size={18} className={styles.chevron} /> : <ChevronDown size={18} className={styles.chevron} />}
+                  </button>
 
-                        <span className={styles.topicInfo}>
-                          <span className={styles.topicTitle}>{topic.title}</span>
-                          <span className={styles.topicMeta}>
-                            {topic.lessonsCount} lessons
-                            {isCompleted && <span className={styles.completedLabel}> · Completed</span>}
-                          </span>
-                        </span>
+                  {isExpanded && (
+                    <div className={styles.weeksPanel}>
+                      {weeksLoading && !weeks && <p className={styles.loadingText}>Loading weeks...</p>}
 
-                        {!isLocked && (
-                          isExpanded
-                            ? <ChevronUp size={18} className={styles.chevron} />
-                            : <ChevronDown size={18} className={styles.chevron} />
-                        )}
-                      </button>
+                      {weeks?.map((week) => {
+                        const status = week.completed ? 'done' : week.unlocked ? 'now' : 'locked';
+                        const WeekIcon = status === 'done' ? CheckCircle2 : status === 'now' ? Play : Lock;
 
-                      {isExpanded && (
-                        <div className={styles.weeksPanel}>
-                          <div className={styles.weeksPanelHeader}>
-                            <span className={styles.weeksPanelLabel}>
-                              <Calendar size={14} />
-                              WEEKLY MODULES
+                        return (
+                          <div
+                            key={week.weekId}
+                            role="button"
+                            tabIndex={status === 'locked' ? -1 : 0}
+                            className={`${styles.weekRow} ${styles[`weekRow_${status}`]} ${status === 'locked' ? styles.weekRowLocked : ''}`}
+                            onClick={() => {
+                              if (status !== 'locked') {
+                                navigate(`/student/lesson/${subject.subjectId}/${week.weekId}`);
+                              }
+                            }}
+                          >
+                            <span className={`${styles.weekIcon} ${styles[`weekIcon_${status}`]}`}>
+                              <WeekIcon size={16} />
                             </span>
-                            <span className={styles.currentWeekLabel}>
-                              Currently on week {topic.currentWeek}
+                            <span className={styles.weekLabel}>
+                              Week {week.weekNumber}: {week.title}
+                            </span>
+                            <span className={`${styles.weekBadge} ${styles[`weekBadge_${status}`]}`}>
+                              {status === 'done' ? 'Done' : status === 'now' ? 'Available' : 'Locked'}
                             </span>
                           </div>
-
-                          {topic.weeks.map((week) => {
-                            const WeekIcon = WEEK_STATUS_ICON[week.status];
-                            const isLockedWeek = week.status === 'locked';
-
-                            return (
-                              <div
-                                key={week.id}
-                                role="button"
-                                tabIndex={isLockedWeek ? -1 : 0}
-                                className={`${styles.weekRow} ${styles[`weekRow_${week.status}`]} ${isLockedWeek ? styles.weekRowLocked : ''}`}
-                                onClick={() => {
-                                  if (!isLockedWeek) {
-                                    navigate(`/student/lesson/${topic.id}/${week.id}`);
-                                  }
-                                }}
-                              >
-                                <span className={`${styles.weekIcon} ${styles[`weekIcon_${week.status}`]}`}>
-                                  <WeekIcon size={16} />
-                                </span>
-                                <span className={styles.weekLabel}>{week.label}</span>
-                                <span className={styles.weekDuration}>
-                                  <Clock size={14} />
-                                  {week.duration}
-                                </span>
-                                <span className={`${styles.weekBadge} ${styles[`weekBadge_${week.status}`]}`}>
-                                  {week.status === 'done' ? 'Done' : week.status === 'now' ? 'Now' : 'Locked'}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        ))}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-        {filteredGroups.length === 0 && (
-          <p className={styles.emptyState}>No topics match your search.</p>
+        {filteredSubjects.length === 0 && (
+          <p className={styles.emptyState}>No subjects match your search.</p>
         )}
       </main>
     </PageShell>
