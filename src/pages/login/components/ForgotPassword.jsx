@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
 import Button from '../../../components/shared/Button';
-import { useToast } from '../../../context/notifications/ToastContext';
+import { useToast } from '../../../context/notifications/useToast';
 import {
   sendPasswordResetCode,
   resendPasswordResetCode,
@@ -64,8 +64,7 @@ export default function ForgotPassword() {
       showToast('Verification code sent to your email.', 'success');
       setStep(2);
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
@@ -80,8 +79,7 @@ export default function ForgotPassword() {
       await resendPasswordResetCode(email);
       showToast('Verification code resent.', 'success');
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    } catch (err) {
-      console.error(err);
+    } catch {
       showToast("Couldn't resend the code. Please try again.", 'error');
     } finally {
       setIsResending(false);
@@ -114,8 +112,7 @@ export default function ForgotPassword() {
       await resetPassword(email, code, newPassword);
       showToast('Password reset successfully. Please sign in.', 'success');
       navigate('/login');
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);

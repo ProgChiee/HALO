@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Users, Plus, Trash2, X, Power } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
-import { useToast } from '../../../context/notifications/ToastContext';
+import { useToast } from '../../../context/notifications/useToast';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { getAdmins, addAdmin, toggleAdminStatus } from '../../../services/superadmin/superadminService';
+import { useRemoteData } from '../../../hooks/useRemoteData';
+import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/Admins.module.css';
 
 const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
@@ -22,9 +24,8 @@ const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
 export default function Admins() {
   const { showToast } = useToast();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [admins, setAdmins] = useState([]);
+  const { data: admins, setData: setAdmins, isLoading, error: loadError, reload: loadAdmins } = useRemoteData(getAdmins, []);
+  const toggleLock = useRef(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
 
@@ -34,26 +35,13 @@ export default function Admins() {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadAdmins();
-  }, []);
-
-  async function loadAdmins() {
-    setIsLoading(true);
-    setLoadError(false);
-    try {
-      await refetchAdmins();
-    } catch (err) {
-      console.error(err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
   async function refetchAdmins() {
+    try {
     const data = await getAdmins();
     setAdmins(data);
+    } catch {
+      showToast("Saved, but the list could not refresh. Reload the page.", 'error');
+    }
   }
 
   function openAddModal() {
@@ -97,25 +85,22 @@ export default function Admins() {
   }
 
   async function handleToggleStatus(admin) {
-    if (togglingId === admin.id) return;
-
+    if (toggleLock.current) return;
+    toggleLock.current = true;
     setTogglingId(admin.id);
     try {
-      await toggleAdminStatus(admin.id);
-      showToast(
-        admin.status === 'ACTIVE' ? 'Admin deactivated.' : 'Admin activated.',
-        'success'
-      );
-      await refetchAdmins();
-    } catch (err) {
-      console.error(err);
-      showToast('Something went wrong. Please try again.', 'error');
+      const updated = await toggleAdminStatus(admin.id);
+      setAdmins((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+      showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
+    } catch {
+      showToast("Couldn't update the account status. Please try again.", 'error');
     } finally {
+      toggleLock.current = false;
       setTogglingId(null);
     }
   }
 
-  function handleDelete(admin) {
+  function handleDelete() {
     // ⚠️ Disabled: no DELETE endpoint for admins yet — see note above.
     showToast('Removing admins is not available yet — deactivate instead.', 'error');
   }
@@ -169,7 +154,7 @@ export default function Admins() {
                     <button
                       className={`${styles.actionBtn} ${admin.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
                       onClick={() => handleToggleStatus(admin)}
-                      disabled={togglingId === admin.id}
+                      disabled={togglingId !== null}
                       aria-label={admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                     >
                       <Power size={15} />

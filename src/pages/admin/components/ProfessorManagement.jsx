@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { GraduationCap, Search, Plus, Eye, Pencil, Power, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
-import { useToast } from '../../../context/notifications/ToastContext';
-import { useAuth } from '../../../context/login/AuthContext';
+import { useToast } from '../../../context/notifications/useToast';
+import { useAuth } from '../../../context/login/useAuth';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import {
   getProfessors,
@@ -11,6 +11,8 @@ import {
   toggleProfessorStatus,
   updateProfessor,
 } from '../../../services/admin/adminService';
+import { useRemoteData } from '../../../hooks/useRemoteData';
+import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/ProfessorManagement.module.css';
 
 // ⚠️ Adjusted for the real backend's ProfessorResponse: { id, name, email,
@@ -33,9 +35,8 @@ export default function ProfessorManagement() {
   const { role } = useAuth();
   const isSuperAdmin = role === 'superadmin';
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [professors, setProfessors] = useState([]);
+  const { data: professors, setData: setProfessors, isLoading, error: loadError, reload: loadProfessors } = useRemoteData(getProfessors, []);
+  const toggleLock = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingProfessor, setViewingProfessor] = useState(null);
@@ -49,27 +50,14 @@ export default function ProfessorManagement() {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadProfessors();
-  }, []);
-
-  async function loadProfessors() {
-    setIsLoading(true);
-    setLoadError(false);
-    try {
-      await refetchProfessors();
-    } catch (err) {
-      console.error(err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
   async function refetchProfessors() {
+    try {
     const data = await getProfessors();
     setProfessors(data);
     return data;
+    } catch {
+      showToast("Saved, but the list could not refresh. Reload the page.", 'error');
+    }
   }
 
   const filteredProfessors = useMemo(() => {
@@ -117,24 +105,18 @@ export default function ProfessorManagement() {
   }
 
   async function handleToggleStatus(professor) {
-    if (togglingId === professor.id) return;
-
+    if (toggleLock.current) return;
+    toggleLock.current = true;
     setTogglingId(professor.id);
     try {
-      await toggleProfessorStatus(professor.id);
-      showToast(
-        professor.status === 'ACTIVE' ? 'Professor deactivated.' : 'Professor activated.',
-        'success'
-      );
-      const updated = await refetchProfessors();
-      const freshProfessor = updated.find((p) => p.id === professor.id);
-      setViewingProfessor((prev) =>
-        prev && prev.id === professor.id ? freshProfessor : prev
-      );
-    } catch (err) {
-      console.error(err);
-      showToast('Something went wrong. Please try again.', 'error');
+      const updated = await toggleProfessorStatus(professor.id);
+      setProfessors((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+      setViewingProfessor((previous) => previous?.id === updated.id ? updated : previous);
+      showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
+    } catch {
+      showToast("Couldn't update the account status. Please try again.", 'error');
     } finally {
+      toggleLock.current = false;
       setTogglingId(null);
     }
   }
@@ -234,7 +216,7 @@ export default function ProfessorManagement() {
                 <span className={styles.profEmail}>{prof.email}</span>
                 <span className={styles.profCount}>{prof.professorId}</span>
                 <span className={`${styles.statusText} ${styles[`status_${prof.status?.toLowerCase()}`]}`}>
-                  {prof.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                  {STATUS_LABELS[prof.status] ?? prof.status}
                 </span>
                 <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
@@ -254,7 +236,7 @@ export default function ProfessorManagement() {
                   <button
                     className={`${styles.actionBtn} ${prof.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
                     onClick={() => handleToggleStatus(prof)}
-                    disabled={togglingId === prof.id}
+                    disabled={togglingId !== null}
                     aria-label={prof.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                   >
                     <Power size={15} />
@@ -359,7 +341,7 @@ export default function ProfessorManagement() {
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Status</span>
                 <span className={`${styles.detailValue} ${styles[`status_${viewingProfessor.status?.toLowerCase()}`]}`}>
-                  {viewingProfessor.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                  {STATUS_LABELS[viewingProfessor.status] ?? viewingProfessor.status}
                 </span>
               </div>
             </div>

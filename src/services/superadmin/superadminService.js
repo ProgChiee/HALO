@@ -11,8 +11,8 @@
 
 import apiClient from '../apiClient';
 
-export async function getAdmins() {
-  const res = await apiClient.get('/super-admin/admins');
+export async function getAdmins(config = {}) {
+  const res = await apiClient.get('/super-admin/admins', config);
   return res.data;
 }
 
@@ -43,24 +43,28 @@ export async function toggleAdminStatus(id) {
 // DELETE /api/super-admin/admin/{id}; otherwise use toggleAdminStatus()
 // to deactivate instead of removing.
 
-export async function getSuperAdminDashboardData() {
-  const res = await apiClient.get('/super-admin/dashboard');
+export async function getSuperAdminDashboardData(config = {}) {
+  const res = await apiClient.get('/super-admin/dashboard', config);
   return res.data;
 }
 
-export async function getUserReports() {
-  const res = await apiClient.get('/super-admin/reports/users');
+export async function getUserReports(config = {}) {
+  const res = await apiClient.get('/super-admin/reports/users', config);
   return res.data;
 }
 
-export async function getActivityLogs() {
-  const res = await apiClient.get('/super-admin/activity-logs');
+export async function getActivityLogs(config = {}) {
+  const res = await apiClient.get('/super-admin/activity-logs', config);
   return res.data;
 }
 
 // ✅ Confirmed working — added to SuperAdminController.
 // Returns: { userId, name, email, role, status }
-export async function getSuperAdminProfile() {
-  const res = await apiClient.get('/super-admin/profile');
+export async function getSuperAdminProfile(config = {}) {
+  const res = await apiClient.get('/super-admin/profile', config);
+  return res.data;
+}
+export async function getAdminMonitoring(config = {}) {
+  const res = await apiClient.get('/super-admin/admins/monitoring', config);
   return res.data;
 }

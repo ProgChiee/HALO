@@ -74,7 +74,7 @@ export default function Progress() {
   }
 
   const totalWeeks = subjects.reduce((sum, s) => sum + s.totalWeeks, 0);
-  const overall = totalWeeks > 0 ? Math.round((completedModules.length / totalWeeks) * 100) : 0;
+  const overall = totalWeeks > 0 ? Math.round((subjects.reduce((sum, subject) => sum + subject.completedWeeks, 0) / totalWeeks) * 100) : 0;
 
   return (
     <div className={styles.layout}>

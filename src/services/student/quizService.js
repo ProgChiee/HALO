@@ -10,14 +10,14 @@ import apiClient from '../apiClient';
 // assessment exists yet, whether the student already passed, has an
 // unfinished attempt to resume, etc.
 // Returns: { moduleId, assessmentExists, assessmentAvailable, hasUnfinishedAttempt, alreadyPassed, canTakeAssessment }
-export async function getAssessmentStatus(moduleId) {
-  const res = await apiClient.get(`/student/assessment/status/${moduleId}`);
+export async function getAssessmentStatus(moduleId, config = {}) {
+  const res = await apiClient.get(`/student/assessment/status/${moduleId}`, config);
   return res.data;
 }
 
 // Returns: { id, title, passingScore, questions: [{ id, questionNumber, questionText, optionA, optionB, optionC, optionD }] }
-export async function getAssessment(moduleId) {
-  const res = await apiClient.get(`/student/assessment/${moduleId}`);
+export async function getAssessment(moduleId, config = {}) {
+  const res = await apiClient.get(`/student/assessment/${moduleId}`, config);
   return res.data;
 }
 
@@ -27,13 +27,8 @@ export async function startAttempt(moduleId) {
   return res.data;
 }
 
-// answers: [{ questionId, answer }] — answer is the selected option letter
-// as a string, e.g. "A" | "B" | "C" | "D" (matches optionA/B/C/D on the
-// question — confirm the exact expected format with your backend team).
-// Returns: { attemptId, score, passed, feedback: [{ questionId,
-// questionNumber, questionText, studentAnswer, correctAnswer, correct }] }
-// — per-question feedback IS included, so a full "review your answers"
-// screen is possible after all.
+// StudentAnswerRequest wraps { answers: [{ questionId: number, answer: 'A'|'B'|'C'|'D' }] }.
+// submit fills attemptId, score and passed only; GET result fills feedback.
 export async function submitAttempt(attemptId, answers) {
   const res = await apiClient.post(`/student/assessment/submit/${attemptId}`, { answers });
   return res.data;
@@ -45,8 +40,7 @@ export async function getAttemptHistory(moduleId) {
   return res.data;
 }
 
-// Same shape as submitAttempt's response — includes the full per-question
-// feedback list too.
+// AssessmentService.getAttemptResult populates the per-question feedback list.
 export async function getAttemptResult(attemptId) {
   const res = await apiClient.get(`/student/assessment/result/${attemptId}`);
   return res.data;

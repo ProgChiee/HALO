@@ -4,6 +4,7 @@ import Sidebar from '../../../components/shared/Sidebar';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { getSuperAdminProfile } from '../../../services/superadmin/superadminService';
+import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/SuperAdminProfile.module.css';
 
 // ✅ Wired to the real backend — UserProfileResponse only has
@@ -91,7 +92,7 @@ export default function SuperAdminProfile() {
 
           <div className={styles.infoCard}>
             <span className={styles.infoLabel}>Status</span>
-            <span className={styles.infoValue}>{profile.status === 'ACTIVE' ? 'Active' : 'Inactive'}</span>
+            <span className={styles.infoValue}>{STATUS_LABELS[profile.status] ?? profile.status}</span>
           </div>
 
           <h2 className={styles.sectionTitle}>Account</h2>

@@ -478,3 +478,4 @@
   background: var(--gradient-cta);
   border-radius: var(--radius-pill);
 }
+.activityActor { font-weight: 600; }

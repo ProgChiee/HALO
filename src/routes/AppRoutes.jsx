@@ -1,36 +1,51 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import { ROLES } from '../utils/roles';
 
-import Login from '../pages/login/components/Login';
-import Register from '../pages/login/components/Register';
-import ForgotPassword from '../pages/login/components/ForgotPassword';
-import Unauthorized from '../pages/login/components/Unauthorized';
+const Login = lazy(() => import('../pages/login/components/Login'));
+const Register = lazy(() => import('../pages/login/components/Register'));
+const ForgotPassword = lazy(() => import('../pages/login/components/ForgotPassword'));
+const Unauthorized = lazy(() => import('../pages/login/components/Unauthorized'));
 
-import SuperAdminDashboard from '../pages/superadmin/components/SuperAdminDashboard';
-import Admins from '../pages/superadmin/components/Admins';
-import SuperAdminProfile from '../pages/superadmin/components/SuperAdminProfile';
-import AdminDashboard from '../pages/admin/components/AdminDashboard';
-import ProfessorManagement from '../pages/admin/components/ProfessorManagement';
-import StudentManagement from '../pages/admin/components/StudentManagement';
-import AdminProfile from '../pages/admin/components/AdminProfile';
-import Monitoring from '../pages/admin/components/Monitoring';
-import ProfessorDashboard from '../pages/professor/components/ProfessorDashboard';
-import SubjectManagement from '../pages/admin/components/SubjectManagement';
-import ProfessorSubjectManagement from '../pages/professor/components/SubjectManagement';
-import LessonEditor from '../pages/professor/components/LessonEditor';
-import StudentProgress from '../pages/professor/components/StudentProgress';
-import ProfessorProfile from '../pages/professor/components/ProfessorProfile';
-import StudentDashboard from '../pages/student/components/StudentDashboard';
-import Subjects from '../pages/student/components/Subjects';
-import LessonChat from '../pages/student/components/LessonChat';
-import Progress from '../pages/student/components/Progress';
-import Badges from '../pages/student/components/Badges';
-import Profile from '../pages/student/components/Profile';
-import Quiz from '../pages/student/components/Quiz';
+const SuperAdminDashboard = lazy(() => import('../pages/superadmin/components/SuperAdminDashboard'));
+const Admins = lazy(() => import('../pages/superadmin/components/Admins'));
+const SuperAdminProfile = lazy(() => import('../pages/superadmin/components/SuperAdminProfile'));
+const AdminDashboard = lazy(() => import('../pages/admin/components/AdminDashboard'));
+const ProfessorManagement = lazy(() => import('../pages/admin/components/ProfessorManagement'));
+const StudentManagement = lazy(() => import('../pages/admin/components/StudentManagement'));
+const AdminProfile = lazy(() => import('../pages/admin/components/AdminProfile'));
+const Monitoring = lazy(() => import('../pages/admin/components/Monitoring'));
+const ProfessorDashboard = lazy(() => import('../pages/professor/components/ProfessorDashboard'));
+const SubjectManagement = lazy(() => import('../pages/admin/components/SubjectManagement'));
+const ProfessorSubjectManagement = lazy(() => import('../pages/professor/components/SubjectManagement'));
+const LessonEditor = lazy(() => import('../pages/professor/components/LessonEditor'));
+const StudentProgress = lazy(() => import('../pages/professor/components/StudentProgress'));
+const ProfessorProfile = lazy(() => import('../pages/professor/components/ProfessorProfile'));
+const StudentDashboard = lazy(() => import('../pages/student/components/StudentDashboard'));
+const Subjects = lazy(() => import('../pages/student/components/Subjects'));
+const LessonChat = lazy(() => import('../pages/student/components/LessonChat'));
+const Progress = lazy(() => import('../pages/student/components/Progress'));
+const Badges = lazy(() => import('../pages/student/components/Badges'));
+const Profile = lazy(() => import('../pages/student/components/Profile'));
+const Quiz = lazy(() => import('../pages/student/components/Quiz'));
+
+function LessonChatRoute() {
+  const { topicId, weekId } = useParams();
+  return <LessonChat key={topicId + ':' + weekId} />;
+}
+function QuizRoute() {
+  const { topicId, weekId } = useParams();
+  return <Quiz key={topicId + ':' + weekId} />;
+}
+function LessonEditorRoute() {
+  const { subjectId, weekId } = useParams();
+  return <LessonEditor key={subjectId + ':' + weekId} />;
+}
 
 export default function AppRoutes() {
   return (
+    <Suspense fallback={<p role="status">Loading page...</p>}>
     <Routes>
       {/* Root path redirects straight to the login screen */}
       <Route path="/" element={<Navigate to="/login" replace />} />
@@ -79,7 +94,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/professors"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <ProfessorManagement />
           </ProtectedRoute>
         }
@@ -88,7 +103,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/students"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <StudentManagement />
           </ProtectedRoute>
         }
@@ -97,7 +112,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/monitoring"
         element={
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <Monitoring />
           </ProtectedRoute>
         }
@@ -143,7 +158,7 @@ export default function AppRoutes() {
         path="/professor/subjects/:subjectId/week/:weekId"
         element={
           <ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}>
-            <LessonEditor />
+            <LessonEditorRoute />
           </ProtectedRoute>
         }
       />
@@ -188,7 +203,7 @@ export default function AppRoutes() {
         path="/student/lesson/:topicId/:weekId"
         element={
           <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
-            <LessonChat />
+            <LessonChatRoute />
           </ProtectedRoute>
         }
       />
@@ -224,13 +239,20 @@ export default function AppRoutes() {
         path="/student/quiz/:topicId/:weekId"
         element={
           <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
-            <Quiz />
+            <QuizRoute />
           </ProtectedRoute>
         }
       />
 
+      <Route path="/superadmin/monitoring" element={
+        <ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}>
+          <Monitoring />
+        </ProtectedRoute>
+      } />
+
       {/* Catch-all: any unmatched path redirects to login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
+    </Suspense>
   );
 }

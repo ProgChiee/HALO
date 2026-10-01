@@ -1,31 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ClipboardCheck, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
-import { useToast } from '../../../context/notifications/ToastContext';
+import { useToast } from '../../../context/notifications/useToast';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getWeekLesson } from '../../../services/student/studentService';
-import { getAssessmentStatus, getAssessment, startAttempt, submitAttempt } from '../../../services/student/quizService';
+import { getAssessmentStatus, getAssessment, startAttempt, submitAttempt, getAttemptResult } from '../../../services/student/quizService';
+import { buildAssessmentAnswers } from '../../../utils/backendContract';
 import styles from '../styles/Quiz.module.css';
 
-// ⚠️ Redesigned for the real attempt-based backend flow. Key differences
-// from the old mock quiz:
-// - Scoring happens SERVER-SIDE. The backend never sends correct answers
-//   to the frontend before submission — but submitAttempt() DOES return
-//   full per-question feedback (studentAnswer, correctAnswer, correct)
-//   once you've submitted, so the review screen below uses that.
-// - "Mark lesson complete" is NOT called explicitly here anymore — per
-//   studentService.js's notes, module completion (StudentModuleProgressResponse)
-//   is expected to be set automatically server-side when an attempt passes.
-//   Confirm this assumption with your backend team.
-// - Options come back as optionA/B/C/D strings (not an array), and
-//   answers are submitted by LETTER ("A"/"B"/"C"/"D"), not index.
-
+// The server scores A/B/C/D answers and completes module progress on a passing attempt.
 const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
 export default function Quiz() {
-  const { topicId, weekId } = useParams();
+  const { weekId } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -42,26 +31,35 @@ export default function Quiz() {
   const [selectedAnswers, setSelectedAnswers] = useState({}); // { [questionId]: 'A' | 'B' | 'C' | 'D' }
   const [isStarting, setIsStarting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const actionLock = useRef(false);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController();
+    const config = { signal: controller.signal };
 
     async function loadQuiz() {
       setIsLoading(true);
       setLoadError(false);
       try {
-        const module = await getWeekLesson(weekId);
+        const module = await getWeekLesson(weekId, config);
         if (!isMounted) return;
         setModuleId(module.id);
 
-        const [assessmentStatus, fetchedAssessment] = await Promise.all([
-          getAssessmentStatus(module.id),
-          getAssessment(module.id),
-        ]);
+        const assessmentStatus = await getAssessmentStatus(module.id, config);
         if (!isMounted) return;
-
         setStatus(assessmentStatus);
-        setAssessment(fetchedAssessment);
+        if (assessmentStatus.assessmentExists && assessmentStatus.assessmentAvailable) {
+          const fetchedAssessment = await getAssessment(module.id, config);
+          if (!isMounted) return;
+          setAssessment(fetchedAssessment);
+        }
       } catch (err) {
         console.error(err);
         if (isMounted) setLoadError(true);
@@ -71,7 +69,7 @@ export default function Quiz() {
     }
 
     loadQuiz();
-    return () => { isMounted = false; };
+    return () => { isMounted = false; controller.abort(); };
   }, [weekId]);
 
   if (isLoading) {
@@ -85,7 +83,7 @@ export default function Quiz() {
     );
   }
 
-  if (loadError || !assessment) {
+  if (loadError) {
     return (
       <div className={styles.layout}>
         <Sidebar navItems={STUDENT_NAV_ITEMS} />
@@ -101,49 +99,81 @@ export default function Quiz() {
     );
   }
 
+  if (!assessment?.questions?.length) {
+    return <div className={styles.layout}>
+      <Sidebar navItems={STUDENT_NAV_ITEMS} />
+      <main className={styles.contentArea}>
+        <p className={styles.loadingText}>This quiz is not available yet.</p>
+        <Button onClick={() => navigate('/student/subjects')}>Back to Subjects</Button>
+      </main>
+    </div>;
+  }
+
   const currentQuestion = assessment.questions[currentIndex];
   const isLastQuestion = currentIndex === assessment.questions.length - 1;
   const hasAnsweredCurrent = selectedAnswers[currentQuestion?.id] !== undefined;
 
   async function handleStart() {
-    if (isStarting) return;
+    if (actionLock.current || !status?.canTakeAssessment) return;
+    actionLock.current = true;
     setIsStarting(true);
     try {
+      const latestStatus = await getAssessmentStatus(moduleId);
+      if (!mounted.current) return;
+      setStatus(latestStatus);
+      if (!latestStatus.canTakeAssessment) return;
       const attempt = await startAttempt(moduleId);
+      if (!mounted.current) return;
       setAttemptId(attempt.attemptId);
       setStage('active');
       setCurrentIndex(0);
       setSelectedAnswers({});
     } catch (err) {
       console.error(err);
-      showToast("Couldn't start the quiz. Please try again.", 'error');
+      if (mounted.current) showToast("Couldn't start the quiz. Please try again.", 'error');
     } finally {
-      setIsStarting(false);
+      actionLock.current = false;
+      if (mounted.current) setIsStarting(false);
     }
   }
 
   function handleSelectOption(letter) {
+    if (actionLock.current) return;
     setSelectedAnswers((prev) => ({ ...prev, [currentQuestion.id]: letter }));
   }
 
   async function handleNext() {
+    if (actionLock.current || !hasAnsweredCurrent) return;
     if (isLastQuestion) {
-      if (isSubmitting) return;
+      actionLock.current = true;
       setIsSubmitting(true);
       try {
-        const answers = assessment.questions.map((q) => ({
-          questionId: q.id,
-          answer: selectedAnswers[q.id],
-        }));
+        const answers = buildAssessmentAnswers(assessment.questions, selectedAnswers);
         const submitted = await submitAttempt(attemptId, answers);
+        if (!mounted.current) return;
         setResult(submitted);
         showToast('Quiz submitted!', 'success');
         setStage('results');
+        // The submit controller fills score/passed only. Detailed feedback
+        // comes from the separate result endpoint.
+        try {
+          const review = await getAttemptResult(submitted.attemptId);
+          if (mounted.current) setResult(review);
+        } catch {
+          if (mounted.current) showToast('Score saved, but the answer review could not load.', 'error');
+        }
+        try {
+          const latestStatus = await getAssessmentStatus(moduleId);
+          if (mounted.current) setStatus(latestStatus);
+        } catch {
+          // The submitted result remains authoritative; start rechecks eligibility.
+        }
       } catch (err) {
         console.error(err);
-        showToast("Couldn't submit your quiz. Please try again.", 'error');
+        if (mounted.current) showToast("Couldn't submit your quiz. Please try again.", 'error');
       } finally {
-        setIsSubmitting(false);
+        actionLock.current = false;
+        if (mounted.current) setIsSubmitting(false);
       }
     } else {
       setCurrentIndex((i) => i + 1);
@@ -190,8 +220,11 @@ export default function Quiz() {
                 </p>
               )}
 
-              <Button onClick={handleStart} isLoading={isStarting} disabled={status && !status.canTakeAssessment}>
-                {status?.hasUnfinishedAttempt ? 'Resume quiz' : 'Start quiz'}
+              {status?.hasUnfinishedAttempt && <p className={styles.introDescription}>
+                Your unfinished attempt will be reused. Answers are saved only when you submit.
+              </p>}
+              <Button onClick={handleStart} isLoading={isStarting} disabled={!status?.canTakeAssessment}>
+                {status?.hasUnfinishedAttempt ? 'Continue attempt' : 'Start quiz'}
               </Button>
             </div>
           )}
@@ -221,7 +254,7 @@ export default function Quiz() {
                     <button
                       key={letter}
                       className={`${styles.optionRow} ${isSelected ? styles.optionRowSelected : ''}`}
-                      onClick={() => handleSelectOption(letter)}
+                      disabled={isSubmitting} onClick={() => handleSelectOption(letter)}
                     >
                       <span className={styles.optionMarker}>{letter}</span>
                       {optionText}
@@ -254,8 +287,7 @@ export default function Quiz() {
                   : "Don't worry — review the lesson and try again."}
               </p>
 
-              {/* Per-question review — the backend's submitAttempt() DOES
-                  include this in result.feedback. */}
+              {/* Per-question feedback is loaded from the result endpoint. */}
               {result.feedback && result.feedback.length > 0 && (
                 <div className={styles.reviewList}>
                   <h2 className={styles.reviewTitle}>Review your answers</h2>
@@ -287,7 +319,7 @@ export default function Quiz() {
 
               <div className={styles.actionsRow}>
                 {!result.passed && (
-                  <Button variant="secondary" onClick={handleRetry}>
+                  <Button variant="secondary" disabled={isSubmitting} onClick={handleRetry}>
                     <RotateCcw size={16} style={{ marginRight: 6 }} />
                     Retry quiz
                   </Button>

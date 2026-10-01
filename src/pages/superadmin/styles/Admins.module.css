@@ -233,3 +233,4 @@
   color: var(--color-error);
   font-size: var(--text-sm);
 }
+.statusText { font-size: var(--text-sm); font-weight: 600; }

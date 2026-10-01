@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronDown, ChevronUp, CheckCircle2, Play, Lock, BookOpen } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getSubjectsData, getSubjectWeeks } from '../../../services/student/studentService';
+import { useSubjectWeeks } from '../../../hooks/useSubjectWeeks';
 import styles from '../styles/Subjects.module.css';
 
 // ⚠️ Redesigned for the real backend
@@ -30,8 +31,7 @@ export default function Subjects() {
   const [activeYear, setActiveYear] = useState('All Years');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSubjectId, setExpandedSubjectId] = useState(null);
-  const [weeksBySubject, setWeeksBySubject] = useState({}); // { [subjectId]: WeekAccessResponse[] }
-  const [weeksLoading, setWeeksLoading] = useState(false);
+  const { weeksBySubject, weeksLoading, weekErrors, loadWeeks } = useSubjectWeeks(getSubjectWeeks);
 
   useEffect(() => {
     let isMounted = true;
@@ -52,25 +52,15 @@ export default function Subjects() {
     return () => { isMounted = false; };
   }, []);
 
-  const toggleSubject = useCallback(async (subjectId) => {
+  async function toggleSubject(subjectId) {
     if (expandedSubjectId === subjectId) {
       setExpandedSubjectId(null);
       return;
     }
 
     setExpandedSubjectId(subjectId);
-    if (!weeksBySubject[subjectId]) {
-      setWeeksLoading(true);
-      try {
-        const weeks = await getSubjectWeeks(subjectId);
-        setWeeksBySubject((prev) => ({ ...prev, [subjectId]: weeks }));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setWeeksLoading(false);
-      }
-    }
-  }, [expandedSubjectId, weeksBySubject]);
+    if (!weeksBySubject[subjectId]) await loadWeeks(subjectId);
+  }
 
   const yearOptions = useMemo(() => {
     const years = Array.from(new Set(subjects.map((s) => s.yearLevel))).sort();
@@ -137,7 +127,7 @@ export default function Subjects() {
             {filteredSubjects.map((subject) => {
               const isExpanded = expandedSubjectId === subject.subjectId;
               const weeks = weeksBySubject[subject.subjectId];
-              const isFullyCompleted = subject.completedWeeks === subject.totalWeeks;
+              const isFullyCompleted = subject.totalWeeks > 0 && subject.completedWeeks === subject.totalWeeks;
 
               return (
                 <div key={subject.subjectId} className={styles.topicWrapper}>
@@ -162,17 +152,18 @@ export default function Subjects() {
 
                   {isExpanded && (
                     <div className={styles.weeksPanel}>
-                      {weeksLoading && !weeks && <p className={styles.loadingText}>Loading weeks...</p>}
+                      {weeksLoading[subject.subjectId] && !weeks && <p className={styles.loadingText}>Loading weeks...</p>}
 
+                      {weekErrors[subject.subjectId] && <p className={styles.loadingText}>Couldn't load weeks. Collapse and reopen to retry.</p>}
                       {weeks?.map((week) => {
-                        const status = week.completed ? 'done' : week.unlocked ? 'now' : 'locked';
+                        const status = !week.lessonAvailable || !week.unlocked ? 'locked' : week.completed ? 'done' : 'now';
                         const WeekIcon = status === 'done' ? CheckCircle2 : status === 'now' ? Play : Lock;
 
                         return (
-                          <div
+                          <button
                             key={week.weekId}
-                            role="button"
-                            tabIndex={status === 'locked' ? -1 : 0}
+                            type="button"
+                            disabled={status === 'locked'}
                             className={`${styles.weekRow} ${styles[`weekRow_${status}`]} ${status === 'locked' ? styles.weekRowLocked : ''}`}
                             onClick={() => {
                               if (status !== 'locked') {
@@ -187,9 +178,9 @@ export default function Subjects() {
                               Week {week.weekNumber}: {week.title}
                             </span>
                             <span className={`${styles.weekBadge} ${styles[`weekBadge_${status}`]}`}>
-                              {status === 'done' ? 'Done' : status === 'now' ? 'Available' : 'Locked'}
+                              {!week.lessonAvailable ? 'Not published' : status === 'done' ? 'Done' : status === 'now' ? 'Available' : 'Locked'}
                             </span>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>

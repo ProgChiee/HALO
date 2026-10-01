@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
-import { useToast } from '../../../context/notifications/ToastContext';
+import { useToast } from '../../../context/notifications/useToast';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import {
   getSubjects,
@@ -13,16 +13,11 @@ import {
   getWeeks,
   addWeek,
 } from '../../../services/professor/professorService';
+import { useSubjectWeeks } from '../../../hooks/useSubjectWeeks';
+import { useRemoteData } from '../../../hooks/useRemoteData';
 import styles from '../styles/SubjectManagement.module.css';
 
-// ✅ Professors now have their own full subject/week CRUD
-// (ProfessorAcademicController, /api/professor/subjects & /weeks) — same
-// shared subjects table as Admin's version, just a separate endpoint.
-// This page mirrors admin/components/SubjectManagement.jsx, with one
-// addition: each week has an "Author Lesson" link straight into
-// LessonEditor.jsx, since that's the actual reason a professor needs to
-// browse subjects/weeks in the first place.
-
+// Subject/week CRUD is restricted to professors in the supplied backend.
 const YEAR_LEVELS = [
   { value: 'FIRST_YEAR', label: '1st Year' },
   { value: 'SECOND_YEAR', label: '2nd Year' },
@@ -32,12 +27,9 @@ export default function SubjectManagement() {
   const { showToast } = useToast();
   const navigate = useNavigate();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [subjects, setSubjects] = useState([]);
+  const { data: subjects, setData: setSubjects, isLoading, error: loadError, reload: loadSubjects } = useRemoteData(getSubjects, []);
   const [expandedId, setExpandedId] = useState(null);
-  const [weeksBySubject, setWeeksBySubject] = useState({});
-  const [weeksLoading, setWeeksLoading] = useState(false);
+  const { weeksBySubject, weeksLoading, weekErrors, loadWeeks } = useSubjectWeeks(getWeeks);
 
   const [subjectModal, setSubjectModal] = useState(null); // null | 'create' | { editing: subject }
   const [subjectCode, setSubjectCode] = useState('');
@@ -54,44 +46,22 @@ export default function SubjectManagement() {
   const [weekNumber, setWeekNumber] = useState('');
   const [weekTitle, setWeekTitle] = useState('');
 
-  useEffect(() => {
-    loadSubjects();
-  }, []);
-
-  async function loadSubjects() {
-    setIsLoading(true);
-    setLoadError(false);
+  async function refetchSubjects() {
     try {
-      await refetchSubjects();
-    } catch (err) {
-      console.error(err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
+      setSubjects(await getSubjects());
+    } catch {
+      showToast('Saved, but the subject list could not refresh. Reload the page.', 'error');
     }
   }
 
-  async function refetchSubjects() {
-    const data = await getSubjects();
-    setSubjects(data);
-  }
-
-  const toggleExpand = useCallback(async (subjectId) => {
+  async function toggleExpand(subjectId) {
     if (expandedId === subjectId) {
       setExpandedId(null);
       return;
     }
     setExpandedId(subjectId);
-    setWeeksLoading(true);
-    try {
-      const weeks = await getWeeks(subjectId);
-      setWeeksBySubject((prev) => ({ ...prev, [subjectId]: weeks }));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setWeeksLoading(false);
-    }
-  }, [expandedId]);
+    await loadWeeks(subjectId);
+  }
 
   function openCreateSubject() {
     setSubjectModal('create');
@@ -170,8 +140,8 @@ export default function SubjectManagement() {
     if (isSubmitting) return;
     setFormError('');
 
-    if (!weekNumber || !weekTitle.trim()) {
-      setFormError('Please enter both a week number and a title.');
+    if (!Number.isInteger(Number(weekNumber)) || Number(weekNumber) < 1 || !weekTitle.trim()) {
+      setFormError('Please enter a positive whole week number and a title.');
       return;
     }
 
@@ -180,8 +150,9 @@ export default function SubjectManagement() {
       await addWeek(addingWeekTo.id, { weekNumber: Number(weekNumber), title: weekTitle.trim() });
       showToast('Module added.', 'success');
       setAddingWeekTo(null);
-      const weeks = await getWeeks(addingWeekTo.id);
-      setWeeksBySubject((prev) => ({ ...prev, [addingWeekTo.id]: weeks }));
+      if (!await loadWeeks(addingWeekTo.id, true)) {
+        showToast('Module added, but the week list could not refresh.', 'error');
+      }
       setExpandedId(addingWeekTo.id);
     } catch (err) {
       console.error(err);
@@ -253,7 +224,8 @@ export default function SubjectManagement() {
 
                   {isExpanded && (
                     <div className={styles.weeksPanel}>
-                      {weeksLoading && !weeks && <p className={styles.noWeeksText}>Loading modules...</p>}
+                      {weeksLoading[subject.id] && !weeks && <p className={styles.noWeeksText}>Loading modules...</p>}
+                      {weekErrors[subject.id] && <p className={styles.noWeeksText}>Couldn't load weeks. Collapse and reopen to retry.</p>}
                       {weeks?.length === 0 && <p className={styles.noWeeksText}>No modules yet.</p>}
 
                       {weeks?.map((week) => (

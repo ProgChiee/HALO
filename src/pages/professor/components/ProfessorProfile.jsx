@@ -4,6 +4,7 @@ import Sidebar from '../../../components/shared/Sidebar';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { getProfessorProfile } from '../../../services/professor/professorService';
+import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/ProfessorProfile.module.css';
 
 // ✅ Wired to the real backend — ProfessorProfileResponse has
@@ -99,7 +100,7 @@ export default function ProfessorProfile() {
 
           <div className={styles.infoCard}>
             <span className={styles.infoLabel}>Status</span>
-            <span className={styles.infoValue}>{profile.status === 'ACTIVE' ? 'Active' : 'Inactive'}</span>
+            <span className={styles.infoValue}>{STATUS_LABELS[profile.status] ?? profile.status}</span>
           </div>
 
           <h2 className={styles.sectionTitle}>Account</h2>

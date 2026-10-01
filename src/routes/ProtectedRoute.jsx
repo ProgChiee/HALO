@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/login/AuthContext';
+import { useAuth } from '../context/login/useAuth';
 
 /**
  * Usage:

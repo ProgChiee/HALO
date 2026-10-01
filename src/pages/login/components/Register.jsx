@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Grip, User, Mail, KeyRound, Eye, EyeOff, Hash, Users2 } from 'lucide-react';
 import Button from '../../../components/shared/Button';
-import { useToast } from '../../../context/notifications/ToastContext';
+import { useToast } from '../../../context/notifications/useToast';
 import { register as registerService } from '../../../services/authService';
 import bgImage from '../../../assets/login/BG.jpeg';
 import styles from '../styles/Register.module.css';
@@ -34,6 +34,7 @@ export default function Register() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (isLoading) return;
     setError('');
 
     if (!fullName || !email || !password || !confirmPassword || !studentId || !section) {
@@ -62,8 +63,7 @@ export default function Register() {
       await registerService(fullName, email, password, studentId, section, yearLevel);
       showToast('Account created! Please sign in.', 'success');
       navigate('/login');
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);

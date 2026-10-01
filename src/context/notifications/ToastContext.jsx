@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import Toast from '../../components/shared/Toast';
 
-const ToastContext = createContext(null);
+import { ToastContext } from './useToast';
 
 /**
  * Wrap the app with <ToastProvider> (already done in App.jsx).
@@ -19,9 +19,10 @@ export function ToastProvider({ children }) {
   // Clear any still-pending auto-dismiss timers when the provider unmounts,
   // so they don't fire setState after the app tree is gone.
   useEffect(() => {
+    const timeouts = timeoutsRef.current;
     return () => {
-      timeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
-      timeoutsRef.current.clear();
+      timeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+      timeouts.clear();
     };
   }, []);
 
@@ -44,8 +45,10 @@ export function ToastProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
+  const value = useMemo(() => ({ showToast }), [showToast]);
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={value}>
       {children}
 
       <div
@@ -70,10 +73,4 @@ export function ToastProvider({ children }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast() {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be used within a ToastProvider');
-  return ctx;
 }

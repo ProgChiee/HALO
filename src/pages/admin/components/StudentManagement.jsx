@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Users, Search, Eye, Power, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
-import { useToast } from '../../../context/notifications/ToastContext';
-import { useAuth } from '../../../context/login/AuthContext';
+import { useToast } from '../../../context/notifications/useToast';
+import { useAuth } from '../../../context/login/useAuth';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { getStudents, toggleStudentStatus } from '../../../services/admin/adminService';
+import { useRemoteData } from '../../../hooks/useRemoteData';
+import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/StudentManagement.module.css';
 
 export default function StudentManagement() {
@@ -12,40 +14,12 @@ export default function StudentManagement() {
   const { role } = useAuth();
   const isSuperAdmin = role === 'superadmin';
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [students, setStudents] = useState([]);
+  const { data: students, setData: setStudents, isLoading, error: loadError, reload: loadStudents } = useRemoteData(getStudents, []);
+  const toggleLock = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingStudent, setViewingStudent] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
-  useEffect(() => {
-    loadStudents();
-  }, []);
-
-  // Used once on mount — shows the "Loading students..." state.
-  async function loadStudents() {
-    setIsLoading(true);
-    setLoadError(false);
-    try {
-      await refetchStudents();
-    } catch (err) {
-      console.error(err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // Used after actions (e.g. toggling status) — updates the table data
-  // in place without hiding it behind the loading state. Returns the
-  // fresh data so callers can sync other pieces of state (e.g. an open
-  // view modal) with the real result instead of guessing.
-  async function refetchStudents() {
-    const data = await getStudents();
-    setStudents(data);
-    return data;
-  }
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) =>
@@ -55,26 +29,18 @@ export default function StudentManagement() {
   }, [students, searchQuery]);
 
   async function handleToggleStatus(student) {
-    if (togglingId === student.id) return; // block double-click / double-fire
-
+    if (toggleLock.current) return;
+    toggleLock.current = true;
     setTogglingId(student.id);
     try {
-      await toggleStudentStatus(student.id);
-      showToast(
-        student.status === 'ACTIVE'
-          ? 'Student deactivated.'
-          : 'Student activated.',
-        'success'
-      );
-      const updated = await refetchStudents();
-      const freshStudent = updated.find((s) => s.id === student.id);
-      setViewingStudent((prev) =>
-        prev && prev.id === student.id ? freshStudent : prev
-      );
-    } catch (err) {
-      console.error(err);
-      showToast('Something went wrong. Please try again.', 'error');
+      const updated = await toggleStudentStatus(student.id);
+      setStudents((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+      setViewingStudent((previous) => previous?.id === updated.id ? updated : previous);
+      showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
+    } catch {
+      showToast("Couldn't update the account status. Please try again.", 'error');
     } finally {
+      toggleLock.current = false;
       setTogglingId(null);
     }
   }
@@ -138,7 +104,7 @@ export default function StudentManagement() {
                 <span className={styles.studentYear}>{student.yearLevel === 'FIRST_YEAR' ? '1st Year' : '2nd Year'}</span>
                 <span className={styles.studentProgress}>—</span>
                 <span className={`${styles.statusText} ${styles[`status_${student.status?.toLowerCase()}`]}`}>
-                  {student.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                  {STATUS_LABELS[student.status] ?? student.status}
                 </span>
                 <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
@@ -151,7 +117,7 @@ export default function StudentManagement() {
                   <button
                     className={`${styles.actionBtn} ${student.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
                     onClick={() => handleToggleStatus(student)}
-                    disabled={togglingId === student.id}
+                    disabled={togglingId !== null}
                     aria-label={student.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                   >
                     <Power size={15} />
@@ -195,7 +161,7 @@ export default function StudentManagement() {
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Status</span>
                 <span className={`${styles.detailValue} ${styles[`status_${viewingStudent.status?.toLowerCase()}`]}`}>
-                  {viewingStudent.status === 'ACTIVE' ? 'Active' : 'Inactive'}
+                  {STATUS_LABELS[viewingStudent.status] ?? viewingStudent.status}
                 </span>
               </div>
             </div>

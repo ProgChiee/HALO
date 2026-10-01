@@ -377,3 +377,5 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+button.weekRow { width: 100%; text-align: left; font: inherit; color: inherit; border: 0; }
+button.weekRow:disabled { cursor: not-allowed; }

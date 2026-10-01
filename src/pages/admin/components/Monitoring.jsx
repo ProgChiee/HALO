@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Activity, Search, Bot, MessageSquare, Users, TrendingUp, GraduationCap, AlertTriangle, LogIn, ShieldAlert } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Activity, Search, Bot, MessageSquare, Users, TrendingUp, GraduationCap, AlertTriangle } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -11,18 +11,19 @@ import {
   Cell,
 } from 'recharts';
 import PageShell from '../../../components/shared/PageShell';
-import { useAuth } from '../../../context/login/AuthContext';
+import { useAuth } from '../../../context/login/useAuth';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { MONITORING_CATEGORIES } from '../../../data/admin/monitoringData';
-import { getActivityLog, getProfessorMonitoring, getStudentMonitoring, getSessionMonitoringData } from '../../../services/admin/adminService';
-import { useToast } from '../../../context/notifications/ToastContext';
+import { getActivityLog, getProfessorMonitoring, getStudentMonitoring } from '../../../services/admin/adminService';
+import { useToast } from '../../../context/notifications/useToast';
+import { getActivityLogs, getAdminMonitoring } from '../../../services/superadmin/superadminService';
+import { useRemoteData } from '../../../hooks/useRemoteData';
 import styles from '../styles/Monitoring.module.css';
 
 const TABS = [
   { id: 'activity', label: 'Activity Log' },
   { id: 'ai-usage', label: 'Professor Activity' },
   { id: 'quiz-performance', label: 'Student Performance' },
-  { id: 'login-sessions', label: 'Login Activity' },
 ];
 
 // recharts renders raw SVG, which doesn't reliably resolve CSS custom
@@ -46,9 +47,8 @@ function UsageChartTooltip({ active, payload }) {
 
   return (
     <div className={styles.chartTooltip}>
-      <p className={styles.chartTooltipTitle}>{item.subject}</p>
-      <p className={styles.chartTooltipRow}>{item.queries} queries</p>
-      <p className={styles.chartTooltipRow}>{item.activeStudents} active students</p>
+      <p className={styles.chartTooltipTitle}>{item.name}</p>
+      <p className={styles.chartTooltipRow}>{item.moduleActivities ?? 0} module activities</p>
     </div>
   );
 }
@@ -59,9 +59,8 @@ function QuizChartTooltip({ active, payload }) {
 
   return (
     <div className={styles.chartTooltip}>
-      <p className={styles.chartTooltipTitle}>{item.subject}</p>
-      <p className={styles.chartTooltipRow}>{item.avgScore}% average score</p>
-      <p className={styles.chartTooltipRow}>{item.attempts} attempts</p>
+      <p className={styles.chartTooltipTitle}>{item.name}</p>
+      <p className={styles.chartTooltipRow}>{item.latestAssessmentScore}% latest score</p>
     </div>
   );
 }
@@ -70,6 +69,7 @@ export default function Monitoring() {
   const [activeTab, setActiveTab] = useState('activity');
   const { role } = useAuth();
   const isSuperAdmin = role === 'superadmin';
+  const tabs = isSuperAdmin ? [TABS[0], { id: 'admin-activity', label: 'Admin Activity' }] : TABS;
 
   return (
     <PageShell
@@ -86,7 +86,7 @@ export default function Monitoring() {
       </header>
 
       <div className={styles.tabRow}>
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             className={`${styles.tabBtn} ${activeTab === tab.id ? styles.tabBtnActive : ''}`}
@@ -97,10 +97,10 @@ export default function Monitoring() {
         ))}
       </div>
 
-      {activeTab === 'activity' && <ActivityLogTab />}
-      {activeTab === 'ai-usage' && <AiUsageTab />}
-      {activeTab === 'quiz-performance' && <QuizPerformanceTab />}
-      {activeTab === 'login-sessions' && <LoginSessionsTab />}
+      {activeTab === 'activity' && <ActivityLogTab loader={isSuperAdmin ? getActivityLogs : getActivityLog} />}
+      {!isSuperAdmin && activeTab === 'ai-usage' && <AiUsageTab />}
+      {!isSuperAdmin && activeTab === 'quiz-performance' && <QuizPerformanceTab />}
+      {activeTab === 'admin-activity' && isSuperAdmin && <AdminActivityTab />}
     </PageShell>
   );
 }
@@ -108,45 +108,22 @@ export default function Monitoring() {
 // ---------------------------------------------------------------------------
 // Tab 1: Activity Log
 // ---------------------------------------------------------------------------
-function ActivityLogTab() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [logs, setLogs] = useState([]);
-  const [loadError, setLoadError] = useState(false);
+function ActivityLogTab({ loader }) {
+  const { data: logs, isLoading, error: loadError, reload: loadLogs } = useRemoteData(loader, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const { showToast } = useToast();
 
-  useEffect(() => {
-    loadLogs();
-  }, []);
-
-  async function loadLogs() {
-    setIsLoading(true);
-    setLoadError(false);
-    try {
-      const data = await getActivityLog();
-      setLogs(data);
-    } catch (err) {
-      console.error(err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
   async function handleRetry() {
-    await loadLogs();
-    if (!loadError) {
-      showToast('Activity log refreshed.', 'success');
-    }
+    if (await loadLogs()) showToast('Activity log refreshed.', 'success');
   }
 
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       const matchesCategory = activeCategory === 'all' || log.activityType === activeCategory;
       const matchesSearch =
-        log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.userName.toLowerCase().includes(searchQuery.toLowerCase());
+        (log.action ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (log.userName ?? '').toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [logs, searchQuery, activeCategory]);
@@ -237,27 +214,7 @@ function ActivityLogTab() {
 // Tab 2: AI Usage
 // ---------------------------------------------------------------------------
 function AiUsageTab() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [professors, setProfessors] = useState([]);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    setIsLoading(true);
-    setLoadError(false);
-    try {
-      const result = await getProfessorMonitoring();
-      setProfessors(result);
-    } catch (err) {
-      console.error(err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data: professors, isLoading, error: loadError, reload: loadData } = useRemoteData(getProfessorMonitoring, []);
 
   const sortedByActivity = useMemo(() => {
     return [...professors].sort((a, b) => (b.moduleActivities ?? 0) - (a.moduleActivities ?? 0));
@@ -316,10 +273,10 @@ function AiUsageTab() {
 
       <div className={styles.bottomGrid}>
         <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Module Activities by Professor</h2>
-          <ResponsiveContainer width="100%" height={Math.max(sortedByActivity.length * 42, 200)}>
+          <h2 className={styles.panelTitle}>Module Activities by Professor (top 25)</h2>
+          <ResponsiveContainer width="100%" height={Math.max(Math.min(sortedByActivity.length, 25) * 42, 200)}>
             <BarChart
-              data={sortedByActivity}
+              data={sortedByActivity.slice(0, 25)}
               layout="vertical"
               margin={{ top: 0, right: 24, bottom: 0, left: 0 }}
               barCategoryGap={10}
@@ -344,7 +301,7 @@ function AiUsageTab() {
               />
               <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<UsageChartTooltip />} />
               <Bar dataKey="moduleActivities" radius={[0, 4, 4, 0]} maxBarSize={18}>
-                {sortedByActivity.map((entry, index) => (
+                {sortedByActivity.slice(0, 25).map((entry, index) => (
                   <Cell
                     key={entry.userId}
                     fill={index === 0 ? CHART_COLORS.bar : CHART_COLORS.barMuted}
@@ -381,27 +338,7 @@ function AiUsageTab() {
 // Tab 3: Quiz Performance
 // ---------------------------------------------------------------------------
 function QuizPerformanceTab() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [students, setStudents] = useState([]);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    setIsLoading(true);
-    setLoadError(false);
-    try {
-      const result = await getStudentMonitoring();
-      setStudents(result);
-    } catch (err) {
-      console.error(err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data: students, isLoading, error: loadError, reload: loadData } = useRemoteData(getStudentMonitoring, []);
 
   // Only students with at least one scored assessment show up in the chart
   const scoredStudents = useMemo(
@@ -470,10 +407,10 @@ function QuizPerformanceTab() {
 
       <div className={styles.bottomGrid}>
         <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Latest Score by Student</h2>
-          <ResponsiveContainer width="100%" height={Math.max(sortedByScore.length * 42, 200)}>
+          <h2 className={styles.panelTitle}>Latest Score by Student (top 25)</h2>
+          <ResponsiveContainer width="100%" height={Math.max(Math.min(sortedByScore.length, 25) * 42, 200)}>
             <BarChart
-              data={sortedByScore}
+              data={sortedByScore.slice(0, 25)}
               layout="vertical"
               margin={{ top: 0, right: 24, bottom: 0, left: 0 }}
               barCategoryGap={10}
@@ -500,7 +437,7 @@ function QuizPerformanceTab() {
               />
               <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<QuizChartTooltip />} />
               <Bar dataKey="latestAssessmentScore" radius={[0, 4, 4, 0]} maxBarSize={18}>
-                {sortedByScore.map((entry) => (
+                {sortedByScore.slice(0, 25).map((entry) => (
                   <Cell key={entry.userId} fill={barColorFor(entry.latestAssessmentScore)} />
                 ))}
               </Bar>
@@ -541,109 +478,24 @@ function QuizPerformanceTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Tab 4: Login / Session Monitoring
-// ---------------------------------------------------------------------------
-function LoginSessionsTab() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    setIsLoading(true);
-    setLoadError(false);
-    try {
-      const result = await getSessionMonitoringData();
-      setData(result);
-    } catch (err) {
-      console.error(err);
-      setLoadError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  if (isLoading) {
-    return <div className={styles.main}><p className={styles.loadingText}>Loading login activity...</p></div>;
-  }
-
-  if (loadError || !data) {
-    return (
-      <div className={styles.main}>
-        <div className={styles.errorState}>
-          <p>Couldn't load login activity. Please check your connection and try again.</p>
-          <button className={styles.retryBtn} onClick={loadData}>Retry</button>
+function AdminActivityTab() {
+  const { data: admins, isLoading, error, reload } = useRemoteData(getAdminMonitoring, []);
+  if (isLoading) return <p className={styles.loadingText}>Loading admin activity...</p>;
+  if (error) return <div className={styles.errorState}>
+    <p>Couldn't load admin activity.</p>
+    <button className={styles.retryBtn} onClick={reload}>Retry</button>
+  </div>;
+  return <main className={styles.main}>
+    <h2 className={styles.panelTitle}>Admin Account Activity</h2>
+    <div className={styles.logCard}>
+      {admins.map((admin) => <div key={admin.adminId} className={styles.logRow}>
+        <div className={styles.logContent}>
+          <p className={styles.logText}>{admin.name}: {admin.accountActivities ?? 0} account activities</p>
+          <p className={styles.logTime}>{admin.lastActivity ? new Date(admin.lastActivity).toLocaleString() : 'No activity yet'}</p>
         </div>
-      </div>
-    );
-  }
-
-  const { summary, byRole, activity } = data;
-  const maxRoleCount = Math.max(...byRole.map((r) => r.count), 1);
-
-  return (
-    <main className={styles.main}>
-      <div className={styles.statsGrid}>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}><LogIn size={18} /></div>
-          <p className={styles.statValue}>{summary.activeSessionsNow}</p>
-          <p className={styles.statLabel}>Active sessions now</p>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}><Users size={18} /></div>
-          <p className={styles.statValue}>{summary.loginsToday}</p>
-          <p className={styles.statLabel}>Logins today</p>
-        </div>
-        <div className={`${styles.statCard} ${summary.failedAttemptsToday > 0 ? styles.statCardAlert : ''}`}>
-          <div className={styles.statIcon}><ShieldAlert size={18} /></div>
-          <p className={styles.statValue}>{summary.failedAttemptsToday}</p>
-          <p className={styles.statLabel}>Failed attempts today</p>
-        </div>
-      </div>
-
-      <div className={styles.bottomGrid}>
-        <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Active Sessions by Role</h2>
-          <div className={styles.usageList}>
-            {byRole.map((r) => (
-              <div key={r.role} className={styles.usageRow}>
-                <div className={styles.usageHeader}>
-                  <span className={styles.usageName}>{r.role}</span>
-                  <span className={styles.usageCount}>{r.count}</span>
-                </div>
-                <div className={styles.usageBarTrack}>
-                  <div
-                    className={styles.usageBarFill}
-                    style={{ width: `${(r.count / maxRoleCount) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Recent Login Activity</h2>
-          <div className={styles.logCard}>
-            {activity.map((entry) => (
-              <div key={entry.id} className={styles.logRow}>
-                <span className={`${styles.logDot} ${styles[`logDot_${entry.status}`]}`} />
-                <div className={styles.logContent}>
-                  <p className={styles.logText}>
-                    {entry.name}
-                    {entry.status === 'failed' ? ' — failed login attempt' : ' logged in'}
-                  </p>
-                  <p className={styles.logTime}>{entry.time}</p>
-                </div>
-                {entry.role !== '—' && <span className={styles.logCategoryTag}>{entry.role}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </main>
-  );
+        <span className={styles.logCategoryTag}>{admin.status}</span>
+      </div>)}
+      {!admins.length && <p className={styles.emptyState}>No admin activity yet.</p>}
+    </div>
+  </main>;
 }

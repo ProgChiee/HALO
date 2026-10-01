@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Bot, Send, ChevronRight, Volume2, VolumeX } from 'lucide-react';
+import { Bot, Send, Volume2, VolumeX } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getWeekLesson } from '../../../services/student/studentService';
 import { openSession, sendMessage as sendMentorMessage } from '../../../services/student/aiMentorService';
 import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
-import { useToast } from '../../../context/notifications/ToastContext';
+import { useToast } from '../../../context/notifications/useToast';
 import styles from '../styles/LessonChat.module.css';
 
 // ⚠️ The URL still carries :topicId/:weekId (see AppRoutes.jsx), but the
@@ -32,10 +32,12 @@ export default function LessonChat() {
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const isMountedRef = useRef(true);
+  const sendLock = useRef(false);
   const { speak, stop, speakingId, isSupported: ttsSupported } = useTextToSpeech();
   const { showToast } = useToast();
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => { isMountedRef.current = false; };
   }, []);
 
@@ -105,12 +107,13 @@ export default function LessonChat() {
 
   async function handleSend(e) {
     e.preventDefault();
-    if (isAiTyping) return;
+    if (sendLock.current) return;
 
     const text = draft.trim();
     if (!text || !sessionId) return;
 
-    const userMessage = { id: Date.now(), sender: 'user', text };
+    sendLock.current = true;
+    const userMessage = { id: crypto.randomUUID(), sender: 'user', text };
     setMessages((prev) => [...prev, userMessage]);
     setDraft('');
     setIsAiTyping(true);
@@ -118,13 +121,16 @@ export default function LessonChat() {
     try {
       const result = await sendMentorMessage(sessionId, text);
       if (!isMountedRef.current) return;
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', text: result.haloMessage }]);
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: 'ai', text: result.haloMessage }]);
     } catch (err) {
       console.error(err);
       if (isMountedRef.current) {
+        setMessages((prev) => prev.filter((message) => message.id !== userMessage.id));
+        setDraft(text);
         showToast("AI Mentor couldn't respond. Please try again.", 'error');
       }
     } finally {
+      sendLock.current = false;
       if (isMountedRef.current) setIsAiTyping(false);
     }
   }

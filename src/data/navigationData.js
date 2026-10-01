@@ -24,15 +24,12 @@ export const STUDENT_NAV_ITEMS = [
 export const SUPERADMIN_NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutGrid, path: '/superadmin', end: true },
   { label: 'Admins', icon: Users, path: '/superadmin/admins' },
-  { label: 'Professor Management', icon: GraduationCap, path: '/admin/professors' },
-  { label: 'Student Management', icon: Users, path: '/admin/students' },
-  { label: 'Monitoring', icon: Activity, path: '/admin/monitoring' },
+  { label: 'Monitoring', icon: Activity, path: '/superadmin/monitoring' },
   { label: 'Profile', icon: UserIcon, path: '/superadmin/profile' },
 ];
 
 export const ADMIN_NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutGrid, path: '/admin', end: true },
-  { label: 'Subject Management', icon: BookOpen, path: '/admin/subjects' },
   { label: 'Professor Management', icon: GraduationCap, path: '/admin/professors' },
   { label: 'Student Management', icon: Users, path: '/admin/students' },
   { label: 'Monitoring', icon: Activity, path: '/admin/monitoring' },

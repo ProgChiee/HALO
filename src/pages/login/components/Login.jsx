@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '../../../context/login/AuthContext';
-import { useToast } from '../../../context/notifications/ToastContext';
+import { useAuth } from '../../../context/login/useAuth';
+import { useToast } from '../../../context/notifications/useToast';
 import { login as loginService } from '../../../services/authService';
+import { parseLoginResponse } from '../../../utils/backendContract';
 import { ROLE_HOME } from '../../../utils/roles';
 import Button from '../../../components/shared/Button';
 import bgImage from '../../../assets/login/BG.jpeg';
@@ -34,22 +35,12 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Backend's LoginResponse is flat: { name, email, token, role }
-      const { name, email: userEmail, token, role } = await loginService(email, password);
-
-      // Backend roles are 'STUDENT' | 'ADMIN' | 'PROFESSOR' | 'SUPER_ADMIN'
-      // (uppercase, underscored). The rest of the app (ROLES, ROLE_HOME,
-      // ProtectedRoute's allowedRoles) expects lowercase, no underscore
-      // ('student', 'admin', 'professor', 'superadmin') — normalize once
-      // here at the boundary so nothing downstream needs to change.
-      const normalizedRole = role.toLowerCase().replace('_', '');
-      const user = { name, email: userEmail, role: normalizedRole };
-
+      const response = await loginService(email.trim(), password);
+      const { user, token } = parseLoginResponse(response);
       login(user, token, rememberMe);
       showToast('Welcome back!', 'success');
-      navigate(ROLE_HOME[normalizedRole] ?? '/login');
-    } catch (err) {
-      console.error(err);
+      navigate(ROLE_HOME[user.role] ?? '/login');
+    } catch {
       setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);

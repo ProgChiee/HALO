@@ -1,0 +1,820 @@
+{
+  "source": "HALO.zip / HALO/src/main/java/com/ptc/halo; professor GET-by-week verified against updated local AiLearningModuleController.java on 2026-09-29",
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/admin/create-professor",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/professors",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/professors/{id}",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/professors/{id}",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/professors/{id}/status",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/students",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/students/{id}",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/students/{id}/status",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/students/{id}",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/activity-logs",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/profile",
+      "controller": "AdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/dashboard",
+      "controller": "AdminDashboardController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/dashboard/recent-activity",
+      "controller": "AdminDashboardController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/professors/monitoring",
+      "controller": "AdminProfessorMonitoringController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/students/monitoring",
+      "controller": "AdminStudentMonitoringController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/professor/ai-learning-modules",
+      "controller": "AiLearningModuleController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/professor/ai-learning-modules/{id}/generate",
+      "controller": "AiLearningModuleController.java"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/professor/ai-learning-modules/{id}/approve",
+      "controller": "AiLearningModuleController.java"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/professor/ai-learning-modules/{id}/decline",
+      "controller": "AiLearningModuleController.java"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/professor/ai-learning-modules/files/{fileId}",
+      "controller": "AiLearningModuleController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/professor/ai-learning-modules/{moduleId}/files",
+      "controller": "AiLearningModuleController.java"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/professor/ai-learning-modules/{id}",
+      "controller": "AiLearningModuleController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/register/student",
+      "controller": "AuthController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "controller": "AuthController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/forgot-password",
+      "controller": "AuthController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/forgot-password/resend",
+      "controller": "AuthController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/reset-password",
+      "controller": "AuthController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/change-password",
+      "controller": "AuthController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/professor/subjects",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/subjects",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/subjects/{id}",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/professor/subjects/{id}",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/professor/subjects/{id}",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/professor/subjects/{subjectId}/weeks",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/subjects/{subjectId}/weeks",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/weeks/{id}",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/professor/weeks/{id}",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/professor/weeks/{id}",
+      "controller": "ProfessorAcademicController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/dashboard",
+      "controller": "ProfessorDashboardController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/profile",
+      "controller": "ProfessorProfileController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/students",
+      "controller": "ProfessorStudentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/students/{userId}/progress",
+      "controller": "ProfessorStudentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/students/{userId}/subjects",
+      "controller": "ProfessorStudentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/students/{userId}/assessments",
+      "controller": "ProfessorStudentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/students/{userId}/badges",
+      "controller": "ProfessorStudentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/ai-learning-modules/week/{weekId}",
+      "controller": "StudentAiLearningController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/student/assessment/generate/{moduleId}",
+      "controller": "StudentAssessmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/assessment/{moduleId}",
+      "controller": "StudentAssessmentController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/student/assessment/start/{moduleId}",
+      "controller": "StudentAssessmentController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/student/assessment/submit/{attemptId}",
+      "controller": "StudentAssessmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/assessment/attempts/{moduleId}",
+      "controller": "StudentAssessmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/assessment/result/{attemptId}",
+      "controller": "StudentAssessmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/assessment/status/{moduleId}",
+      "controller": "StudentAssessmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/badges",
+      "controller": "StudentBadgeController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/dashboard",
+      "controller": "StudentDashboardController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/subjects/{subjectId}/weeks",
+      "controller": "StudentLearningProgressionController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/subjects",
+      "controller": "StudentLearningProgressionController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/student/mentor/message/{sessionId}",
+      "controller": "StudentMentorController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/mentor/session/{sessionId}",
+      "controller": "StudentMentorController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/student/mentor/open/{moduleId}",
+      "controller": "StudentMentorController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/profile",
+      "controller": "StudentProfileController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/progress",
+      "controller": "StudentProgressController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/super-admin/create-admin",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/super-admin/admins",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/super-admin/admin/{id}",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/super-admin/admin/{id}",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/super-admin/admin/{id}/status",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/super-admin/dashboard",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/super-admin/reports/users",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/super-admin/admins/monitoring",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/super-admin/activity-logs",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/super-admin/profile",
+      "controller": "SuperAdminController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/ai-learning-modules/week/{weekId}",
+      "controller": "AiLearningModuleController.java"
+    }
+  ],
+  "dtos": {
+    "AdminRequest": {
+      "name": "String",
+      "email": "String",
+      "password": "String"
+    },
+    "AiLearningModuleRequest": {
+      "uploadedPdf": "String",
+      "lessonText": "String",
+      "youtubeLink": "String",
+      "aiNotes": "String"
+    },
+    "AiLearningModuleUpdateRequest": {
+      "lessonText": "String",
+      "youtubeLink": "String",
+      "aiNotes": "String"
+    },
+    "AiLessonGenerationRequest": {
+      "aiLearningModuleId": "Long"
+    },
+    "ChangePasswordRequest": {
+      "currentPassword": "String",
+      "newPassword": "String"
+    },
+    "ForgotPasswordRequest": {
+      "email": "String"
+    },
+    "LessonGenerationRequest": {
+      "week": "Integer",
+      "lessonText": "String",
+      "aiNotes": "String"
+    },
+    "LoginRequest": {
+      "email": "String",
+      "password": "String"
+    },
+    "MentorMessageRequest": {
+      "message": "String"
+    },
+    "ProfessorRequest": {
+      "name": "String",
+      "email": "String",
+      "password": "String",
+      "professorId": "String"
+    },
+    "ProfessorUpdateRequest": {
+      "name": "String",
+      "email": "String",
+      "professorId": "String"
+    },
+    "ResendPasswordOtpRequest": {
+      "email": "String"
+    },
+    "ResetPasswordRequest": {
+      "email": "String",
+      "otp": "String",
+      "newPassword": "String"
+    },
+    "StatusRequest": {
+      "status": "Status"
+    },
+    "StudentAnswerRequest": {
+      "answers": "List<AnswerItem>",
+      "questionId": "Long",
+      "answer": "String"
+    },
+    "StudentRequest": {
+      "name": "String",
+      "email": "String",
+      "password": "String",
+      "status": "Status",
+      "studentId": "String",
+      "section": "String",
+      "yearLevel": "YearLevel"
+    },
+    "StudentUpdateRequest": {
+      "name": "String",
+      "studentId": "String",
+      "section": "String",
+      "yearLevel": "YearLevel"
+    },
+    "SubjectRequest": {
+      "subjectCode": "String",
+      "subjectName": "String",
+      "description": "String",
+      "yearLevel": "YearLevel"
+    },
+    "SubjectUpdateRequest": {
+      "subjectCode": "String",
+      "subjectName": "String",
+      "description": "String",
+      "yearLevel": "YearLevel"
+    },
+    "UpdateAdminRequest": {
+      "name": "String",
+      "email": "String"
+    },
+    "WeekRequest": {
+      "weekNumber": "Integer",
+      "title": "String"
+    },
+    "WeekUpdateRequest": {
+      "weekNumber": "Integer",
+      "title": "String"
+    },
+    "ActivityLogResponse": {
+      "id": "Long",
+      "userName": "String",
+      "userEmail": "String",
+      "userRole": "Role",
+      "activityType": "ActivityType",
+      "action": "String",
+      "createdAt": "LocalDateTime"
+    },
+    "AdminDashboardResponse": {
+      "totalStudents": "Long",
+      "totalProfessors": "Long",
+      "activeUsers": "Long",
+      "inactiveUsers": "Long",
+      "totalSubjects": "Long",
+      "totalModules": "Long"
+    },
+    "AdminListResponse": {
+      "id": "Long",
+      "name": "String",
+      "email": "String",
+      "role": "Role",
+      "status": "Status"
+    },
+    "AdminProfessorMonitoringResponse": {
+      "userId": "Long",
+      "professorId": "String",
+      "name": "String",
+      "email": "String",
+      "status": "Status",
+      "moduleActivities": "Long",
+      "lastActivity": "LocalDateTime"
+    },
+    "AdminRecentActivityResponse": {
+      "id": "Long",
+      "userName": "String",
+      "email": "String",
+      "role": "Role",
+      "activityType": "ActivityType",
+      "action": "String",
+      "createdAt": "LocalDateTime"
+    },
+    "AdminResponse": {
+      "name": "String",
+      "email": "String",
+      "role": "Role"
+    },
+    "AdminStudentMonitoringResponse": {
+      "userId": "Long",
+      "studentId": "String",
+      "name": "String",
+      "email": "String",
+      "section": "String",
+      "yearLevel": "YearLevel",
+      "status": "Status",
+      "completedModules": "Long",
+      "passedAssessments": "Long",
+      "totalBadges": "Long",
+      "latestAssessmentScore": "Integer"
+    },
+    "AiGenerationResponse": {
+      "valid": "boolean",
+      "reason": "String",
+      "objectives": "String",
+      "knowledge": "String",
+      "examples": "String",
+      "summary": "String"
+    },
+    "AiLearningFileResponse": {
+      "id": "Long",
+      "originalFileName": "String",
+      "storedFileName": "String",
+      "fileType": "String",
+      "filePath": "String"
+    },
+    "AiLearningModuleResponse": {
+      "id": "Long",
+      "weekId": "Long",
+      "files": "List<AiLearningFileResponse>",
+      "youtubeLink": "String",
+      "aiNotes": "String",
+      "lessonText": "String",
+      "generatedObjectives": "String",
+      "generatedKnowledge": "String",
+      "generatedExamples": "String",
+      "generatedSummary": "String",
+      "status": "LessonStatus",
+      "aiGenerationStatus": "AiGenerationStatus"
+    },
+    "AssessmentAnswerFeedbackResponse": {
+      "questionId": "Long",
+      "questionNumber": "Integer",
+      "questionText": "String",
+      "studentAnswer": "String",
+      "correctAnswer": "String",
+      "correct": "Boolean"
+    },
+    "AssessmentAttemptHistoryResponse": {
+      "attemptId": "Long",
+      "score": "Integer",
+      "passed": "Boolean",
+      "startedAt": "LocalDateTime",
+      "submittedAt": "LocalDateTime"
+    },
+    "AssessmentAttemptResponse": {
+      "attemptId": "Long",
+      "assessmentId": "Long",
+      "startedAt": "LocalDateTime"
+    },
+    "AssessmentQuestionResponse": {
+      "id": "Long",
+      "questionNumber": "Integer",
+      "questionText": "String",
+      "optionA": "String",
+      "optionB": "String",
+      "optionC": "String",
+      "optionD": "String"
+    },
+    "AssessmentResponse": {
+      "id": "Long",
+      "title": "String",
+      "passingScore": "Integer",
+      "questions": "List<AssessmentQuestionResponse>"
+    },
+    "AssessmentResultResponse": {
+      "attemptId": "Long",
+      "score": "Integer",
+      "passed": "Boolean",
+      "feedback": "List<AssessmentAnswerFeedbackResponse>"
+    },
+    "AssessmentStatusResponse": {
+      "moduleId": "Long",
+      "assessmentExists": "Boolean",
+      "assessmentAvailable": "Boolean",
+      "hasUnfinishedAttempt": "Boolean",
+      "alreadyPassed": "Boolean",
+      "canTakeAssessment": "Boolean"
+    },
+    "GeneratedAssessment": {
+      "questions": "List<GeneratedAssessmentQuestion>"
+    },
+    "GeneratedAssessmentQuestion": {
+      "questionNumber": "Integer",
+      "question": "String",
+      "optionA": "String",
+      "optionB": "String",
+      "optionC": "String",
+      "optionD": "String",
+      "correctAnswer": "String"
+    },
+    "LoginResponse": {
+      "name": "String",
+      "email": "String",
+      "token": "String",
+      "role": "Role"
+    },
+    "MentorConversationResponse": {
+      "sessionId": "Long",
+      "moduleId": "Long",
+      "messages": "List<MentorMessageResponse>"
+    },
+    "MentorMessageResponse": {
+      "id": "Long",
+      "sender": "MessageSender",
+      "message": "String",
+      "createdAt": "LocalDateTime"
+    },
+    "MentorSessionResponse": {
+      "sessionId": "Long",
+      "moduleId": "Long",
+      "haloMessage": "String"
+    },
+    "ProfessorDashboardResponse": {
+      "totalStudents": "Long",
+      "totalSubjects": "Long",
+      "totalModules": "Long",
+      "approvedModules": "Long",
+      "totalAssessments": "Long",
+      "totalPassedAttempts": "Long"
+    },
+    "ProfessorProfileResponse": {
+      "userId": "Long",
+      "name": "String",
+      "email": "String",
+      "role": "Role",
+      "status": "Status",
+      "professorId": "String"
+    },
+    "ProfessorResponse": {
+      "id": "Long",
+      "name": "String",
+      "email": "String",
+      "professorId": "String",
+      "status": "Status"
+    },
+    "ProfessorsResponse": {
+      "name": "String",
+      "email": "String",
+      "role": "Role",
+      "professorId": "String"
+    },
+    "ProfessorStudentAssessmentResponse": {
+      "attemptId": "Long",
+      "subjectName": "String",
+      "weekNumber": "Integer",
+      "assessmentTitle": "String",
+      "score": "Integer",
+      "passed": "Boolean",
+      "startedAt": "LocalDateTime",
+      "submittedAt": "LocalDateTime"
+    },
+    "ProfessorStudentBadgeResponse": {
+      "id": "Long",
+      "badgeType": "BadgeType",
+      "badgeName": "String",
+      "description": "String",
+      "earnedAt": "LocalDateTime"
+    },
+    "ProfessorStudentProgressResponse": {
+      "userId": "Long",
+      "studentId": "String",
+      "name": "String",
+      "email": "String",
+      "section": "String",
+      "completedModules": "Long",
+      "passedAssessments": "Long",
+      "totalBadges": "Long"
+    },
+    "ProfessorStudentResponse": {
+      "userId": "Long",
+      "studentId": "String",
+      "name": "String",
+      "email": "String",
+      "section": "String",
+      "yearLevel": "YearLevel"
+    },
+    "StudentBadgeResponse": {
+      "id": "Long",
+      "badgeType": "BadgeType",
+      "badgeName": "String",
+      "description": "String",
+      "earnedAt": "LocalDateTime"
+    },
+    "StudentDashboardResponse": {
+      "completedModules": "Long",
+      "totalBadges": "Long",
+      "passedAssessments": "Long",
+      "latestAssessmentScore": "Integer"
+    },
+    "StudentListResponse": {
+      "id": "Long",
+      "name": "String",
+      "email": "String",
+      "studentId": "String",
+      "section": "String",
+      "yearLevel": "YearLevel",
+      "status": "Status"
+    },
+    "StudentModuleProgressResponse": {
+      "moduleId": "Long",
+      "weekId": "Long",
+      "completed": "Boolean",
+      "completedAt": "LocalDateTime"
+    },
+    "StudentProfileResponse": {
+      "userId": "Long",
+      "name": "String",
+      "email": "String",
+      "role": "Role",
+      "status": "Status",
+      "studentId": "String",
+      "section": "String",
+      "yearLevel": "YearLevel"
+    },
+    "StudentResponse": {
+      "name": "String",
+      "email": "String",
+      "status": "Status",
+      "studentId": "String",
+      "section": "String",
+      "yearLevel": "YearLevel"
+    },
+    "StudentSubjectResponse": {
+      "subjectId": "Long",
+      "subjectCode": "String",
+      "subjectName": "String",
+      "yearLevel": "YearLevel",
+      "totalWeeks": "Integer",
+      "completedWeeks": "Integer",
+      "progressPercentage": "Integer"
+    },
+    "StudentWeekAccessResponse": {
+      "weekId": "Long",
+      "weekNumber": "Integer",
+      "title": "String",
+      "moduleId": "Long",
+      "unlocked": "Boolean",
+      "completed": "Boolean",
+      "lessonAvailable": "Boolean"
+    },
+    "SubjectResponse": {
+      "id": "Long",
+      "subjectCode": "String",
+      "subjectName": "String",
+      "description": "String",
+      "yearLevel": "YearLevel"
+    },
+    "SuperAdminAdminMonitoringResponse": {
+      "adminId": "Long",
+      "name": "String",
+      "email": "String",
+      "status": "Status",
+      "accountActivities": "Long",
+      "lastActivity": "LocalDateTime"
+    },
+    "SuperAdminDashboardResponse": {
+      "totalUsers": "long",
+      "totalStudents": "long",
+      "totalProfessors": "long",
+      "totalAdmins": "long",
+      "activeUsers": "long",
+      "inactiveUsers": "long"
+    },
+    "UserProfileResponse": {
+      "userId": "Long",
+      "name": "String",
+      "email": "String",
+      "role": "Role",
+      "status": "Status"
+    },
+    "UserReportResponse": {
+      "totalUsers": "long",
+      "totalStudents": "long",
+      "totalProfessors": "long",
+      "totalAdmins": "long",
+      "activeUsers": "long",
+      "inactiveUsers": "long"
+    },
+    "WeekResponse": {
+      "id": "Long",
+      "weekNumber": "Integer",
+      "title": "String",
+      "subjectId": "Long"
+    }
+  }
+}

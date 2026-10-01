@@ -3,24 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
-import { useAuth } from '../../../context/login/AuthContext';
+import { useAuth } from '../../../context/login/useAuth';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getDashboardData, getSubjectsData, getSubjectWeeks } from '../../../services/student/studentService';
+import { findAvailableWeek } from '../../../utils/backendContract';
 import styles from '../styles/StudentDashboard.module.css';
 
-// ✅ Redesigned for the real backend shapes (StudentDashboardController +
-// StudentLearningProgressionController).
-//
-// 1. getDashboardData() returns a flat summary — { completedModules,
-//    totalBadges, passedAssessments, latestAssessmentScore }.
-//
-// 2. There's still no dedicated "current week" shortcut endpoint, but
-//    "Continue Where You Left Off" now finds the actual next lesson
-//    itself: it takes the first not-yet-completed subject, then fetches
-//    that subject's weeks and picks the first one that's unlocked but not
-//    completed — and deep-links straight into it, instead of just
-//    pointing at the Subjects list.
-
+// Find the first published, unlocked, incomplete week across subjects.
 export default function StudentDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -45,15 +34,19 @@ export default function StudentDashboard() {
         setSummary(dashboardSummary);
         setSubjects(subjectList);
 
-        // Find the actual next lesson: first incomplete subject, then its
-        // first unlocked-but-not-completed week.
-        const incompleteSubject = subjectList.find((s) => s.progressPercentage < 100);
-        if (incompleteSubject) {
-          const weeks = await getSubjectWeeks(incompleteSubject.subjectId);
-          if (!isMounted) return;
-          const upNextWeek = weeks.find((w) => w.unlocked && !w.completed);
-          if (upNextWeek) {
-            setNextLesson({ subject: incompleteSubject, week: upNextWeek });
+        for (const subject of subjectList) {
+          if (subject.progressPercentage >= 100) continue;
+          try {
+            const weeks = await getSubjectWeeks(subject.subjectId);
+            if (!isMounted) return;
+            const week = findAvailableWeek(weeks);
+            if (week) {
+              setNextLesson({ subject, week });
+              break;
+            }
+          } catch {
+            // The summary is still useful when an optional next-lesson lookup fails.
+            if (!isMounted) return;
           }
         }
       } catch (err) {

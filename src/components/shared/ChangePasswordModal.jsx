@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import Button from './Button';
-import { useToast } from '../../context/notifications/ToastContext';
+import { useToast } from '../../context/notifications/useToast';
 import { changePassword } from '../../services/authService';
 import styles from './ChangePasswordModal.module.css';
 
@@ -74,8 +74,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
       await changePassword(currentPassword, newPassword);
       showToast('Password changed successfully.', 'success');
       resetAndClose();
-    } catch (err) {
-      console.error(err);
+    } catch {
       setFormError('Something went wrong. Please check your current password and try again.');
     } finally {
       setIsSaving(false);

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LayoutGrid, Users, BookOpen, FileText, CheckCircle2, ClipboardCheck, Award } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
-import { useAuth } from '../../../context/login/AuthContext';
+import { useAuth } from '../../../context/login/useAuth';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { getProfessorDashboardData } from '../../../services/professor/professorService';
 import styles from '../styles/ProfessorDashboard.module.css';

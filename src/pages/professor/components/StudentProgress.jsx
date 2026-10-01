@@ -1,53 +1,26 @@
-import { useState, useEffect } from 'react';
 import { TrendingUp, CheckCircle2, Award, Users } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { getStudents, getStudentProgress } from '../../../services/professor/professorService';
+import { useRemoteData } from '../../../hooks/useRemoteData';
+import { mapWithConcurrency } from '../../../utils/asyncPool';
 import styles from '../styles/StudentProgress.module.css';
 
-// ⚠️ Redesigned for the real backend. Two differences from the old mock:
-//
-// 1. No single "give me everyone's progress" endpoint exists — we fetch
-//    the student list, then fetch each student's progress individually
-//    (N+1 requests). Fine for a small class; if this list grows large,
-//    ask your backend team for a bulk endpoint instead
-//    (e.g. GET /professor/students/progress returning all of them at once).
-//
-// 2. The backend's ProfessorStudentProgressResponse only has
-//    completedModules, passedAssessments, and totalBadges — there's no
-//    quiz average score, pass/fail counts, or an overall progress %
-//    the old mock UI showed. Those fields don't exist yet; the table
-//    below only shows what the backend actually provides.
+async function loadStudentRows(config) {
+  const students = await getStudents(config);
+  return mapWithConcurrency(students, 5, async (student) => {
+    try {
+      const progress = await getStudentProgress(student.userId, config);
+      return { ...student, ...progress };
+    } catch (error) {
+      if (config.signal.aborted) throw error;
+      return { ...student, progressUnavailable: true };
+    }
+  }, config.signal);
+}
 
 export default function StudentProgress() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [rows, setRows] = useState([]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadData() {
-      try {
-        const students = await getStudents();
-        const withProgress = await Promise.all(
-          students.map(async (student) => {
-            const progress = await getStudentProgress(student.userId);
-            return { ...student, ...progress };
-          })
-        );
-        if (isMounted) setRows(withProgress);
-      } catch (err) {
-        console.error(err);
-        if (isMounted) setLoadError(true);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadData();
-    return () => { isMounted = false; };
-  }, []);
+  const { data: rows, isLoading, error: loadError, reload } = useRemoteData(loadStudentRows, []);
 
   if (isLoading) {
     return (
@@ -98,6 +71,10 @@ export default function StudentProgress() {
         </div>
 
         <div className={styles.tableCard}>
+          {rows.some((row) => row.progressUnavailable) && <p className={styles.emptyState}>
+            Some progress records could not load. Totals include loaded records only.
+            <button onClick={reload}>Retry</button>
+          </p>}
           <div className={styles.tableHeaderRow}>
             <span>Student</span>
             <span>Section</span>
@@ -110,9 +87,9 @@ export default function StudentProgress() {
             <div key={student.userId} className={styles.tableRow}>
               <span className={styles.studentName}>{student.name}</span>
               <span>{student.section}</span>
-              <span className={styles.completedModules}>{student.completedModules}</span>
-              <span>{student.passedAssessments}</span>
-              <span>{student.totalBadges}</span>
+              <span className={styles.completedModules}>{student.completedModules ?? 'Unavailable'}</span>
+              <span>{student.passedAssessments ?? 'Unavailable'}</span>
+              <span>{student.totalBadges ?? 'Unavailable'}</span>
             </div>
           ))}
 

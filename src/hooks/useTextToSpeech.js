@@ -21,11 +21,14 @@ export function useTextToSpeech() {
   // event can arrive AFTER B has already started, and would otherwise
   // incorrectly reset speakingId to null while B is still playing.
   const currentIdRef = useRef(null);
+  const generationRef = useRef(null);
 
   // Stop any speech in progress when the component using this hook
   // unmounts (e.g. student navigates to a different lesson/page).
   useEffect(() => {
     return () => {
+      generationRef.current = null;
+      currentIdRef.current = null;
       if (isSupported) window.speechSynthesis.cancel();
     };
   }, [isSupported]);
@@ -33,6 +36,9 @@ export function useTextToSpeech() {
   const speak = useCallback(
     (id, text) => {
       if (!isSupported || !text) return;
+
+      const generation = Symbol();
+      generationRef.current = generation;
 
       // Clicking the button for the message that's currently speaking
       // stops it (toggle off).
@@ -54,10 +60,10 @@ export function useTextToSpeech() {
       utterance.onend = () => {
         // Ignore this event if a newer speak() call has already taken
         // over (guards against the stale-callback race described above).
-        if (currentIdRef.current === id) setSpeakingId(null);
+        if (generationRef.current === generation && currentIdRef.current === id) setSpeakingId(null);
       };
       utterance.onerror = () => {
-        if (currentIdRef.current === id) setSpeakingId(null);
+        if (generationRef.current === generation && currentIdRef.current === id) setSpeakingId(null);
       };
 
       setSpeakingId(id);
@@ -67,6 +73,7 @@ export function useTextToSpeech() {
   );
 
   const stop = useCallback(() => {
+    generationRef.current = null;
     currentIdRef.current = null;
     if (isSupported) window.speechSynthesis.cancel();
     setSpeakingId(null);
