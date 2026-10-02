@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './useAuth';
-import { clearSession, readSession } from '../../utils/session';
+import { clearSession, readSession, writeSession } from '../../utils/session';
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(() => readSession());
@@ -16,12 +16,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback((user, token, rememberMe = true) => {
-    if (!token) throw new Error('A token is required to sign in');
-    clearSession();
-    const storage = rememberMe ? localStorage : sessionStorage;
-    storage.setItem('halo_user', JSON.stringify(user));
-    storage.setItem('halo_token', token);
-    setSession({ user, token });
+    setSession(writeSession(user, token, rememberMe));
   }, []);
 
   const logout = useCallback(() => {

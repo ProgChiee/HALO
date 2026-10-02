@@ -39,9 +39,11 @@ export default function Login() {
       const { user, token } = parseLoginResponse(response);
       login(user, token, rememberMe);
       showToast('Welcome back!', 'success');
-      navigate(ROLE_HOME[user.role] ?? '/login');
-    } catch {
-      setError('Something went wrong. Please try again.');
+      navigate(ROLE_HOME[user.role], { replace: true });
+    } catch (err) {
+      setError(err.response?.status === 401 || err.response?.status === 403
+        ? 'Login failed. Check your credentials and account status.'
+        : 'Unable to sign in. Check that the backend is available and try again.');
     } finally {
       setIsLoading(false);
     }

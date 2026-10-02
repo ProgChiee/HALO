@@ -157,3 +157,53 @@ test('mentor open uses POST with bearer token, actual module ID and cancellation
   await assert.rejects(mentor.openSession(undefined), /valid module ID/);
   await assert.rejects(mentor.openSession(0), /valid module ID/);
 });
+
+
+test('protected routes render only for their own role', async () => {
+  const React = await import('react');
+  const { renderToString } = await import('react-dom/server');
+  const { MemoryRouter } = await import('react-router-dom');
+  const { AuthContext } = await server.ssrLoadModule('/src/context/login/useAuth.js');
+  const { default: Guard } = await server.ssrLoadModule('/src/routes/ProtectedRoute.jsx');
+  for (const role of ['student', 'professor', 'admin', 'superadmin']) {
+    for (const allowed of ['student', 'professor', 'admin', 'superadmin']) {
+      const html = renderToString(React.createElement(MemoryRouter, null,
+        React.createElement(AuthContext.Provider, { value: { isAuthenticated: true, role, isLoading: false } },
+          React.createElement(Guard, { allowedRoles: [allowed] }, 'protected-content'))));
+      assert.equal(html.includes('protected-content'), role === allowed, role + ' accessing ' + allowed);
+    }
+  }
+});
+
+test('student requests preserve backend data and propagate errors without demo fallback', async () => {
+  const student = await server.ssrLoadModule('/src/services/student/studentService.js');
+  const original = api.defaults.adapter;
+  try {
+    assert.deepEqual(await student.getSubjectsData(), responseData);
+    assert.equal(captured.url, '/student/subjects');
+    await student.getSubjectWeeks(81);
+    assert.equal(captured.url, '/student/subjects/81/weeks');
+    await student.getWeekLesson(92);
+    assert.equal(captured.url, '/student/ai-learning-modules/week/92');
+    const signal = new AbortController().signal;
+    await mentor.sendMessage(73, 'Explain this module', { signal });
+    assert.equal(captured.signal, signal);
+    api.defaults.adapter = async () => { throw new Error('Backend unavailable'); };
+    await assert.rejects(student.getSubjectsData(), /Backend unavailable/);
+    await assert.rejects(mentor.sendMessage(73, 'Question'), /Backend unavailable/);
+  } finally { api.defaults.adapter = original; }
+});
+
+
+test('lesson and mentor requests have finite timeouts and authenticated transport', async () => {
+  const student = await server.ssrLoadModule('/src/services/student/studentService.js');
+  localStorage.setItem('halo_user', JSON.stringify({ name: 'Student', email: 's@example.test', role: 'student' }));
+  localStorage.setItem('halo_token', 'timeout-test-token');
+  await student.getWeekLesson(7);
+  assert.equal(captured.timeout, 15000);
+  assert.equal(captured.headers.Authorization, 'Bearer timeout-test-token');
+  await mentor.openSession(92);
+  assert.equal(captured.timeout, 90000);
+  await mentor.sendMessage(45, 'Explain');
+  assert.equal(captured.timeout, 90000);
+});

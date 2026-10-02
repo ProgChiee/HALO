@@ -38,7 +38,7 @@ export async function sendPasswordResetCode(email) {
 // ✅ Confirmed working — same OTP flow as sendPasswordResetCode, for the
 // "resend code" action.
 export async function resendPasswordResetCode(email) {
-  const res = await apiClient.post('/auth/forgot-password/resend', { email });
+  const res = await apiClient.post('/auth/forgot-password/resend', { email }, { skipAuth: true });
   return res.data;
 }
 

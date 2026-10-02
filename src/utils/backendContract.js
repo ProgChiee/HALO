@@ -8,13 +8,13 @@ export const STATUS_LABELS = Object.freeze({
 });
 
 export function parseLoginResponse(response) {
-  const role = ROLE_FROM_API[response?.role];
+  const role = Object.hasOwn(ROLE_FROM_API, response?.role) ? ROLE_FROM_API[response.role] : null;
   if (!role || typeof response.token !== 'string' || !response.token.trim()
     || typeof response.name !== 'string' || typeof response.email !== 'string') {
     throw new Error('Invalid login response');
   }
   return {
-    user: { name: response.name, email: response.email, role },
+    user: { name: response.name, email: response.email, role, backendRole: response.role },
     token: response.token,
   };
 }

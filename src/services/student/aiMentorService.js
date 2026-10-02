@@ -6,12 +6,12 @@ export async function openSession(moduleId, config = {}) {
     throw new Error('The lesson response did not include a valid module ID.');
   }
   // POST creates/resumes a session. GET is not part of this controller contract.
-  const res = await apiClient.post(`/student/mentor/open/${moduleId}`, null, config);
+  const res = await apiClient.post(`/student/mentor/open/${moduleId}`, null, { timeout: 90000, ...config });
   return res.data;
 }
 
-export async function sendMessage(sessionId, message) {
-  const res = await apiClient.post(`/student/mentor/message/${sessionId}`, { message });
+export async function sendMessage(sessionId, message, config = {}) {
+  const res = await apiClient.post(`/student/mentor/message/${sessionId}`, { message }, { timeout: 90000, ...config });
   return res.data;
 }
 

@@ -8,16 +8,22 @@ import { getWeekLesson } from '../../../services/student/studentService';
 import { openSession, sendMessage as sendMentorMessage } from '../../../services/student/aiMentorService';
 import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
 import { useToast } from '../../../context/notifications/useToast';
+import { loadLessonChat } from '../../../utils/lessonLoader';
 import { lessonErrorMessage } from '../../../utils/lessonErrors';
 import styles from '../styles/LessonChat.module.css';
 
 // Route weekId resolves to the approved module ID before opening its mentor session.
 export default function LessonChat() {
   const { topicId, weekId } = useParams();
+  return <ModuleLessonChat key={String(topicId) + ':' + String(weekId)} topicId={topicId} weekId={weekId} />;
+}
+
+function ModuleLessonChat({ topicId, weekId }) {
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [mentorLoading, setMentorLoading] = useState(false);
   const [lesson, setLesson] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [sessionId, setSessionId] = useState(null);
@@ -25,55 +31,41 @@ export default function LessonChat() {
   const [draft, setDraft] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef(null);
-  const isMountedRef = useRef(true);
+  const requestScope = useRef(null);
   const sendLock = useRef(false);
   const { speak, stop, speakingId, isSupported: ttsSupported } = useTextToSpeech();
   const { showToast } = useToast();
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
-  }, []);
 
   useEffect(() => {
     return () => stop();
   }, [topicId, weekId, stop]);
 
   useEffect(() => {
-    let isMounted = true;
     const controller = new AbortController();
-
-    async function loadLesson() {
-      try {
-        const module = await getWeekLesson(weekId, { signal: controller.signal });
-        if (!isMounted) return;
-
-        if (String(module.weekId) !== String(weekId)) throw new Error('Lesson/week mismatch');
+    requestScope.current = controller;
+    sendLock.current = false;
+    loadLessonChat({
+      weekId, signal: controller.signal, getLesson: getWeekLesson, openMentor: openSession,
+      onLesson: (module) => {
         setLesson(module);
-        const conversation = await openSession(module.id, { signal: controller.signal });
-        if (String(conversation.moduleId) !== String(module.id) || !conversation.sessionId) {
-          throw new Error('Mentor/module mismatch');
-        }
-        if (!isMounted) return;
-
+        setIsLoading(false);
+        setMentorLoading(true);
+      },
+      onMentor: (conversation) => {
         setSessionId(conversation.sessionId);
-        setMessages(
-          (conversation.messages ?? []).map((m) => ({
-            id: m.id,
-            sender: m.sender === 'STUDENT' ? 'user' : 'ai', // adjust if MessageSender enum values differ
-            text: m.message,
-          }))
-        );
-      } catch (err) {
-        if (isMounted) setLoadError(lessonErrorMessage(err));
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadLesson();
-    return () => { isMounted = false; controller.abort(); };
-  }, [weekId, reloadKey]);
+        setMentorLoading(false);
+        setMessages(conversation.messages.map((m) => ({
+          id: m.id, sender: m.sender === 'STUDENT' ? 'user' : 'ai', text: m.message,
+        })));
+      },
+      onError: (error, stage) => {
+        setLoadError(lessonErrorMessage(error, stage));
+        setIsLoading(false);
+        setMentorLoading(false);
+      },
+    });
+    return () => { controller.abort(); };
+  }, [topicId, weekId, reloadKey]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -93,6 +85,8 @@ export default function LessonChat() {
   function retryLesson() {
     setIsLoading(true);
     setLoadError('');
+    setMentorLoading(false);
+    setIsAiTyping(false);
     setLesson(null);
     setSessionId(null);
     setMessages([]);
@@ -121,6 +115,8 @@ export default function LessonChat() {
     const text = draft.trim();
     if (!text || !sessionId) return;
 
+    const scope = requestScope.current;
+    if (!scope || scope.signal.aborted) return;
     sendLock.current = true;
     const userMessage = { id: crypto.randomUUID(), sender: 'user', text };
     setMessages((prev) => [...prev, userMessage]);
@@ -128,18 +124,19 @@ export default function LessonChat() {
     setIsAiTyping(true);
 
     try {
-      const result = await sendMentorMessage(sessionId, text);
-      if (!isMountedRef.current) return;
+      const result = await sendMentorMessage(sessionId, text, { signal: scope.signal });
+      if (scope.signal.aborted || requestScope.current !== scope) return;
+      if (typeof result?.haloMessage !== 'string' || !result.haloMessage.trim()) throw Object.assign(new Error('Empty reply'), { code: 'MENTOR_EMPTY_RESPONSE' });
       setMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: 'ai', text: result.haloMessage }]);
     } catch (err) {
-      if (isMountedRef.current) {
+      if (!scope.signal.aborted && requestScope.current === scope) {
         setMessages((prev) => prev.filter((message) => message.id !== userMessage.id));
         setDraft(text);
-        showToast(lessonErrorMessage(err), 'error');
+        showToast(lessonErrorMessage(err, 'mentor'), 'error');
       }
     } finally {
-      sendLock.current = false;
-      if (isMountedRef.current) setIsAiTyping(false);
+      if (requestScope.current === scope) sendLock.current = false;
+      if (!scope.signal.aborted && requestScope.current === scope) setIsAiTyping(false);
     }
   }
 
@@ -155,7 +152,7 @@ export default function LessonChat() {
             </span>
             <div>
               <p className={styles.mentorName}>AI Mentor</p>
-              <p className={styles.mentorStatus}>Ready to help</p>
+              <p className={styles.mentorStatus}>{mentorLoading ? 'Connecting AI Mentor...' : sessionId ? 'Ready to help' : 'AI Mentor unavailable'}</p>
             </div>
           </div>
 
@@ -200,7 +197,7 @@ export default function LessonChat() {
               className={`${styles.messageBlock} ${msg.sender === 'user' ? styles.messageBlockUser : ''}`}
             >
               <p className={styles.messageSender}>{msg.sender === 'ai' ? 'AI Mentor' : 'You'}</p>
-              <div className={`${styles.bubble} ${msg.sender === 'user' ? styles.bubbleUser : styles.bubbleAi}`}>
+              <div style={{ whiteSpace: 'pre-wrap' }} className={`${styles.bubble} ${msg.sender === 'user' ? styles.bubbleUser : styles.bubbleAi}`}>
                 {msg.text}
               </div>
 

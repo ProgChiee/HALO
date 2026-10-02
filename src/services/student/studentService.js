@@ -12,7 +12,7 @@ export async function getBadgesData(config = {}) {
 }
 
 export async function getWeekLesson(weekId, config = {}) {
-  const res = await apiClient.get(`/student/ai-learning-modules/week/${weekId}`, config);
+  const res = await apiClient.get(`/student/ai-learning-modules/week/${weekId}`, { timeout: 15000, ...config });
   return res.data;
 }
 
