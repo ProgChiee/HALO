@@ -101,3 +101,70 @@ support if those features are intended.
 SecurityConfig allows localhost/127.0.0.1 browser origins only. A deployed frontend
 on another origin requires a backend CORS update. Bearer-token storage remains the
 backend's existing JWT design; client-side role checks do not replace server authorization.
+
+## Student LessonChat update (2026-10-02)
+
+The mentor flow now uses shared year-level subject eligibility and APPROVED/COMPLETED
+checks across lesson reads and mentor operations. POST opens a session without
+a new Gemini request; generated lesson sections are displayed directly.
+See [full changes, error contract and verification](lessonchat-fix/README.md) and
+[complete source files](lessonchat-fix/FULL-CODE.md). Backend files were applied to
+`C:/Users/User/Desktop/HALO`; restart IntelliJ to load them.
+
+## Actual workspace generation review (2026-10-02)
+
+The actual backend has moved to `C:/Users/User/Desktop/halo-frontend/halo-frontend/HALO`.
+The frontend is `C:/Users/User/Desktop/halo-frontend/halo-frontend/src`; no separate
+frontend directory was found. IntelliJ should run this HALO project, with its
+working directory set to HALO so relative uploaded-file paths resolve correctly.
+The earlier ZIP and docs/lessonchat-fix are historical snapshots, not the source
+of truth for the current generation service.
+
+Inspected generation service, status enums, module entity/repository/controller,
+request/response DTOs, student lesson/mentor controllers and services, progression,
+student profile eligibility, JWT filter and SecurityConfig. Student authorization
+files already match the previously applied fix, so they were not duplicated or
+replaced. Endpoints, DTO fields, entities and repository methods are unchanged.
+
+Files changed in this review:
+- HALO/src/main/java/com/ptc/halo/service/AiGenerationService.java: sets lesson status
+  PENDING instead of null; rejects regeneration of APPROVED lessons; requires a
+  boolean valid field and all four nonempty textual sections; technical/file/API/
+  JSON failures save FAILED and return handled HTTP 502; raw AI replies are not logged.
+  Existing professor-guidance fallback is preserved. Repository saves remain outside
+  an encompassing service transaction so throwing the HTTP error does not roll back
+  the saved FAILED state under the current controller flow.
+- src/pages/professor/components/LessonEditor.jsx: reloads persisted module state
+  after generation errors, removing stale generated previews; blocks actions when
+  this refresh fails until the user retries loading.
+- HALO/src/test/java/com/ptc/halo/AiGenerationServiceTest.java: 11 new regression
+  tests for success, technical failures, validation, fallback and manual rejection.
+- docs/backend-alignment.md: records current paths, changes and verification.
+
+Status compatibility: AiGenerationStatus already contains PENDING, COMPLETED,
+DECLINED and FAILED. DECLINED is retained for explicit semantic rejection only
+(no usable educational content), preserving existing data/API compatibility.
+Technical failures use FAILED. Manual professor rejection changes only
+LessonStatus to DECLINED; successful generation remains COMPLETED. Generation
+alone never publishes a lesson. No database migration or enum removal is required.
+
+Verification: Maven offline test-compile succeeded (Java 17), including all imports
+and new tests. Existing deprecation warnings remain. The 11 generation checks plus
+17 student access/mentor checks passed using the cached JUnit/Mockito and Spring
+TestContext runner (28 total), as the normal Maven Surefire dependencies were not
+fully available in the prior run. Frontend lint, 17 tests and production build passed.
+No real Gemini call or live database/student login was performed.
+
+Restart and test in IntelliJ:
+1. Open this workspace's HALO/pom.xml, use Java 17 and HALO as working directory.
+2. Stop any old backend instance on 8081; rebuild and run HaloApplication.
+3. Refresh the frontend. Generate a draft: expect COMPLETED and Pending Review.
+4. In development, trigger an invalid/missing uploaded file or provider failure:
+   expect a handled 502, persisted FAILED, cleared preview and Retry Generation.
+5. Restore valid inputs, regenerate and approve; an eligible active student should
+   read all four sections and open the mentor using POST with module.id.
+6. Declining a generated draft should leave AI COMPLETED and set lesson DECLINED.
+
+Subject eligibility remains based on matching student-profile and subject year
+level; this codebase has no separate per-subject enrollment table. Spring Security
+and the existing previous-week progression checks remain enforced.

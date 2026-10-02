@@ -161,6 +161,18 @@ export default function LessonEditor() {
       }
     } catch (error) {
       if (!mounted.current) return;
+      // Generation clears saved content before calling Gemini. Refresh even on
+      // failure so an old preview cannot still be approved in the editor.
+      if (action === 'generate') {
+        try {
+          const latest = await getLearningModuleByWeek(weekId);
+          if (!mounted.current) return;
+          setModule(latest);
+        } catch {
+          if (!mounted.current) return;
+          setLoadError('Could not refresh the generation result. Retry loading before editing or publishing.');
+        }
+      }
       const status = error.response?.status;
       if (status === 409 && action === 'save' && !module) {
         setLoadError('This week already has a module. Retry loading to open the existing lesson.');

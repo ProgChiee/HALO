@@ -165,7 +165,7 @@ export default function LessonChat() {
         </header>
 
         <div className={styles.tabsRow}>
-          <p className={styles.tabsSubtitle}>Ask about this module's uploaded materials</p>
+          <p className={styles.tabsSubtitle}>Chat with your AI Mentor</p>
           <div className={styles.tabsRowActions}>
             <Button onClick={() => navigate(`/student/quiz/${topicId}/${weekId}`)}>Start quiz</Button>
           </div>
