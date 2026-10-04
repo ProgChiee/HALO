@@ -1,3 +1,4 @@
+import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useEffect } from 'react';
 import { LayoutGrid, Users, BookOpen, FileText, CheckCircle2, ClipboardCheck, Award } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
@@ -25,7 +26,7 @@ export default function ProfessorDashboard() {
         const result = await getProfessorDashboardData();
         if (isMounted) setData(result);
       } catch (err) {
-        console.error(err);
+        logProfessorError('load-dashboard', err);
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -59,7 +60,7 @@ export default function ProfessorDashboard() {
   }
 
   const statCards = [
-    { id: 'totalStudents', icon: Users, value: data.totalStudents, label: 'Students' },
+    { id: 'totalStudents', icon: Users, value: data.totalStudents, label: 'Institution-wide Student Accounts' },
     { id: 'totalSubjects', icon: BookOpen, value: data.totalSubjects, label: 'Subjects' },
     { id: 'totalModules', icon: FileText, value: data.totalModules, label: 'Total Modules' },
     { id: 'approvedModules', icon: CheckCircle2, value: data.approvedModules, label: 'Approved Modules' },

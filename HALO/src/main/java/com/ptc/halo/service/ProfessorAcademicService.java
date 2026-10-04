@@ -13,6 +13,7 @@ import com.ptc.halo.enums.ActivityType;
 import com.ptc.halo.repository.SubjectRepository;
 import com.ptc.halo.repository.WeekRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import com.ptc.halo.repository.ProfessorRepository;
@@ -42,6 +43,7 @@ public class ProfessorAcademicService {
     // SUBJECTS
     // =========================
 
+    @Transactional
     public SubjectResponse createSubject(
             SubjectRequest request,
             UserEntity professor) {
@@ -104,6 +106,7 @@ public class ProfessorAcademicService {
     }
 
 
+    @Transactional
     public SubjectResponse updateSubject(
             Long id,
             SubjectUpdateRequest request,
@@ -130,6 +133,7 @@ public class ProfessorAcademicService {
     }
 
 
+    @Transactional
     public void deleteSubject(
             Long id,
             UserEntity professor) {
@@ -139,7 +143,17 @@ public class ProfessorAcademicService {
         String subjectName =
                 subject.getSubjectName();
 
-        subjectRepository.delete(subject);
+        if (weekRepository.existsBySubject_Id(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "SUBJECT_HAS_CONTENT");
+        }
+        try {
+            subjectRepository.delete(subject);
+            subjectRepository.flush();
+        } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+            // A concurrent dependent insert may race the existence check.
+            // Keep the FK and roll back the whole transaction.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "SUBJECT_HAS_CONTENT");
+        }
 
         activityLogService.createLog(
                 professor,
@@ -153,6 +167,7 @@ public class ProfessorAcademicService {
     // WEEKS
     // =========================
 
+    @Transactional
     public WeekResponse createWeek(
             Long subjectId,
             WeekRequest request,
@@ -160,6 +175,9 @@ public class ProfessorAcademicService {
 
         SubjectEntity subject = requireSubject(subjectId, professor);
 
+        if (weekRepository.existsBySubject_IdAndWeekNumber(subjectId, request.getWeekNumber())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "WEEK_NUMBER_ALREADY_EXISTS");
+        }
         WeekEntity week = new WeekEntity();
 
         week.setWeekNumber(request.getWeekNumber());
@@ -167,7 +185,7 @@ public class ProfessorAcademicService {
         week.setSubject(subject);
 
         WeekEntity savedWeek =
-                weekRepository.save(week);
+                saveWeek(week);
 
         activityLogService.createLog(
                 professor,
@@ -203,6 +221,7 @@ public class ProfessorAcademicService {
     }
 
 
+    @Transactional
     public WeekResponse updateWeek(
             Long id,
             WeekUpdateRequest request,
@@ -210,11 +229,14 @@ public class ProfessorAcademicService {
 
         WeekEntity week = requireWeek(id, professor);
 
+        if (weekRepository.existsBySubject_IdAndWeekNumberAndIdNot(week.getSubject().getId(), request.getWeekNumber(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "WEEK_NUMBER_ALREADY_EXISTS");
+        }
         week.setWeekNumber(request.getWeekNumber());
         week.setTitle(request.getTitle());
 
         WeekEntity updatedWeek =
-                weekRepository.save(week);
+                saveWeek(week);
 
         activityLogService.createLog(
                 professor,
@@ -229,6 +251,7 @@ public class ProfessorAcademicService {
     }
 
 
+    @Transactional
     public void deleteWeek(
             Long id,
             UserEntity professor) {
@@ -257,6 +280,22 @@ public class ProfessorAcademicService {
     // =========================
     // RESPONSE MAPPERS
     // =========================
+
+    private WeekEntity saveWeek(WeekEntity week) {
+        try {
+            return weekRepository.saveAndFlush(week);
+        } catch (org.springframework.dao.DataIntegrityViolationException error) {
+            // Translate only our named uniqueness constraint, never unrelated SQL failures.
+            for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+                if (cause instanceof org.hibernate.exception.ConstraintViolationException violation
+                        && violation.getConstraintName() != null
+                        && violation.getConstraintName().toLowerCase(java.util.Locale.ROOT).contains("uk_week_subject_number")) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "WEEK_NUMBER_ALREADY_EXISTS");
+                }
+            }
+            throw error;
+        }
+    }
 
     private SubjectEntity requireSubject(Long id, UserEntity professor) {
         return subjectRepository.findByIdAndProfessor_User_Id(id, professor.getId())

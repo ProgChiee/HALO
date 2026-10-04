@@ -22,6 +22,8 @@ import com.ptc.halo.service.FileUploadService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +31,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,6 +48,7 @@ public class AiLearningModuleController {
     private final AssessmentService assessmentService;
     private final ActivityLogService activityLogService;
     private final UserRepository userRepository;
+    private final com.ptc.halo.component.ModuleMaterialIndex materialIndex;
 
     public AiLearningModuleController(
             AiLearningModuleRepository aiLearningModuleRepository,
@@ -56,7 +58,7 @@ public class AiLearningModuleController {
             AiLearningFileRepository aiLearningFileRepository,
             AssessmentService assessmentService,
             ActivityLogService activityLogService,
-            UserRepository userRepository
+            UserRepository userRepository, com.ptc.halo.component.ModuleMaterialIndex materialIndex
     ) {
         this.aiLearningModuleRepository = aiLearningModuleRepository;
         this.weekRepository = weekRepository;
@@ -66,6 +68,12 @@ public class AiLearningModuleController {
         this.assessmentService = assessmentService;
         this.activityLogService = activityLogService;
         this.userRepository = userRepository;
+        this.materialIndex = materialIndex;
+    }
+
+    @InitBinder
+    public void trimText(org.springframework.web.bind.WebDataBinder binder) {
+        binder.registerCustomEditor(String.class, new org.springframework.beans.propertyeditors.StringTrimmerEditor(false));
     }
 
     // Returns the existing module, including drafts.
@@ -73,7 +81,7 @@ public class AiLearningModuleController {
     @GetMapping("/week/{weekId}")
     @Transactional(readOnly = true)
     public ResponseEntity<AiLearningModuleResponse> getModuleByWeek(
-            @PathVariable("weekId") Long weekId, Authentication authentication
+            @PathVariable("weekId") @Positive Long weekId, Authentication authentication
     ) {
         requireWeek(weekId, getCurrentUser(authentication));
 
@@ -89,12 +97,16 @@ public class AiLearningModuleController {
     @PostMapping(consumes = "multipart/form-data")
     @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<AiLearningModuleResponse> createModule(
-            @RequestParam("weekId") Long weekId,
+            @RequestParam("weekId") @Positive Long weekId,
             @RequestParam(value = "lessonText", required = false)
+            @jakarta.validation.constraints.Size(max = 100000)
             String lessonText,
             @RequestParam(value = "youtubeLink", required = false)
+            @jakarta.validation.constraints.Size(max = 255)
+            @org.hibernate.validator.constraints.URL(regexp = "https?://.+", message = "must be a valid HTTP(S) URL")
             String youtubeLink,
             @RequestParam(value = "aiNotes", required = false)
+            @jakarta.validation.constraints.Size(max = 10000)
             String aiNotes,
             @RequestParam(value = "files", required = false)
             List<MultipartFile> files,
@@ -113,47 +125,28 @@ public class AiLearningModuleController {
             );
         }
 
+        var validatedFiles = fileUploadService.validateFiles(files);
+
         boolean hasFiles = files != null
                 && files.stream().anyMatch(file ->
                 file != null && !file.isEmpty()
         );
 
         if (!hasText(lessonText) && !hasText(youtubeLink) && !hasFiles) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Add lesson text, a YouTube link, or a file."
-            );
+            throw new ProfessorInputException("sources", "Add lesson text, a valid link, or a file.");
         }
 
         AiLearningModuleEntity module = new AiLearningModuleEntity();
 
         module.setWeek(week);
-        module.setLessonText(lessonText);
-        module.setYoutubeLink(youtubeLink);
-        module.setAiNotes(aiNotes);
+        module.setLessonText(lessonText == null ? null : lessonText.strip());
+        module.setYoutubeLink(youtubeLink == null ? null : youtubeLink.strip());
+        module.setAiNotes(aiNotes == null ? null : aiNotes.strip());
         module.setStatus(LessonStatus.PENDING);
         module.setAiGenerationStatus(AiGenerationStatus.PENDING);
 
-        if (files != null) {
-            for (MultipartFile file : files) {
-                if (file == null || file.isEmpty()) {
-                    continue;
-                }
-
-                String filePath = fileUploadService.uploadFile(file);
-
-                AiLearningFileEntity learningFile =
-                        new AiLearningFileEntity();
-
-                learningFile.setOriginalFileName(file.getOriginalFilename());
-                learningFile.setStoredFileName(
-                        Paths.get(filePath).getFileName().toString()
-                );
-                learningFile.setFileType(file.getContentType());
-                learningFile.setFilePath(filePath);
-
-                module.addFile(learningFile);
-            }
+        for (var file : validatedFiles) {
+            module.addFile(fileUploadService.uploadValidated(file, module));
         }
 
         // Flush here so database conflicts are raised before returning.
@@ -171,7 +164,7 @@ public class AiLearningModuleController {
 
     @PostMapping("/{id}/generate")
     public ResponseEntity<AiLearningModuleResponse> generateLesson(
-            @PathVariable("id") Long id,
+            @PathVariable("id") @Positive Long id,
             Authentication authentication
     ) {
         UserEntity professor = getCurrentUser(authentication);
@@ -196,7 +189,7 @@ public class AiLearningModuleController {
     @PutMapping("/{id}/approve")
     @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<AiLearningModuleResponse> approveLesson(
-            @PathVariable("id") Long id,
+            @PathVariable("id") @Positive Long id,
             Authentication authentication
     ) {
         UserEntity professor = getCurrentUser(authentication);
@@ -216,6 +209,11 @@ public class AiLearningModuleController {
             );
         }
 
+        if (module.getFiles() == null || module.getFiles().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "MODULE_MATERIALS_REQUIRED");
+        }
+        // Same module-only readiness checks as Mentor, before approval or assessment writes.
+        materialIndex.getOrBuild(module);
         module.setStatus(LessonStatus.APPROVED);
 
         AiLearningModuleEntity savedModule =
@@ -236,7 +234,7 @@ public class AiLearningModuleController {
     @PutMapping("/{id}/decline")
     @Transactional
     public ResponseEntity<AiLearningModuleResponse> declineLesson(
-            @PathVariable("id") Long id,
+            @PathVariable("id") @Positive Long id,
             Authentication authentication
     ) {
         UserEntity professor = getCurrentUser(authentication);
@@ -271,7 +269,7 @@ public class AiLearningModuleController {
     )
     @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<AiLearningModuleResponse> uploadFile(
-            @PathVariable("moduleId") Long moduleId,
+            @PathVariable("moduleId") @Positive Long moduleId,
             @RequestParam("file") MultipartFile file,
             Authentication authentication
     ) throws Exception {
@@ -279,13 +277,6 @@ public class AiLearningModuleController {
         AiLearningModuleEntity module = findModule(moduleId, professor);
 
         requireEditable(module);
-
-        if (file.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Choose a non-empty file."
-            );
-        }
 
         AiLearningFileEntity fileEntity =
                 fileUploadService.uploadFile(file, module);
@@ -295,7 +286,10 @@ public class AiLearningModuleController {
 
         // Materials changed: regenerate before approving.
         invalidateGeneratedLesson(module);
-        aiLearningModuleRepository.save(module);
+        // Force a versioned row update even if the module was already pending.
+        // Concurrent uploads based on the same attachment count cannot both commit.
+        module.setGenerationToken(java.util.UUID.randomUUID().toString());
+        aiLearningModuleRepository.saveAndFlush(module);
 
         activityLogService.createLog(
                 professor,
@@ -309,7 +303,7 @@ public class AiLearningModuleController {
     @DeleteMapping("/files/{fileId}")
     @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<String> deleteFile(
-            @PathVariable("fileId") Long fileId,
+            @PathVariable("fileId") @Positive Long fileId,
             Authentication authentication
     ) throws Exception {
         UserEntity professor = getCurrentUser(authentication);
@@ -339,8 +333,8 @@ public class AiLearningModuleController {
     @PutMapping("/{id}")
     @Transactional
     public ResponseEntity<AiLearningModuleResponse> updateModule(
-            @PathVariable("id") Long id,
-            @RequestBody AiLearningModuleUpdateRequest request,
+            @PathVariable("id") @Positive Long id,
+            @Valid @RequestBody AiLearningModuleUpdateRequest request,
             Authentication authentication
     ) {
         UserEntity professor = getCurrentUser(authentication);
@@ -348,6 +342,9 @@ public class AiLearningModuleController {
 
         requireEditable(module);
 
+        if (!hasText(request.getLessonText()) && !hasText(request.getYoutubeLink()) && module.getFiles().isEmpty()) {
+            throw new ProfessorInputException("sources", "Keep lesson text, a valid link, or an attached file.");
+        }
         module.setLessonText(request.getLessonText());
         module.setYoutubeLink(request.getYoutubeLink());
         module.setAiNotes(request.getAiNotes());
@@ -369,7 +366,7 @@ public class AiLearningModuleController {
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public ResponseEntity<AiLearningModuleResponse> getModuleById(
-            @PathVariable("id") Long id, Authentication authentication) {
+            @PathVariable("id") @Positive Long id, Authentication authentication) {
         return ResponseEntity.ok(convertToResponse(findModule(id, getCurrentUser(authentication))));
     }
 
@@ -397,6 +394,7 @@ public class AiLearningModuleController {
     }
 
     private void invalidateGeneratedLesson(AiLearningModuleEntity module) {
+        module.setGenerationToken(null);
         module.setStatus(LessonStatus.PENDING);
         module.setAiGenerationStatus(AiGenerationStatus.PENDING);
         module.setGeneratedObjectives(null);
@@ -470,6 +468,13 @@ public class AiLearningModuleController {
 
     // Return explicit JSON errors instead of forwarding these failures
     // to the generic error page.
+    // MVC method-validation exceptions also extend ResponseStatusException;
+    // handle them explicitly before this controller's business-error handler.
+    @ExceptionHandler(org.springframework.web.method.annotation.HandlerMethodValidationException.class)
+    public ResponseEntity<?> validation(org.springframework.web.method.annotation.HandlerMethodValidationException error) {
+        return new ProfessorValidationHandler().parameters(error);
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> handleRequestError(
             ResponseStatusException exception
@@ -479,12 +484,43 @@ public class AiLearningModuleController {
                     "status", 404, "code", "RESOURCE_NOT_FOUND",
                     "message", "The requested resource is unavailable."));
         }
+        if (exception.getStatusCode().value() == 409 && "STALE_MODULE_OPERATION".equals(exception.getReason())) return staleModule();
+        String materialCode = exception.getReason();
+        var uploadMessages = Map.of(
+                "UPLOAD_FILE_UNSUPPORTED", "Only readable PDF, PNG, and JPEG files are supported.",
+                "UPLOAD_FILE_UNREADABLE", "The file is empty, corrupt, protected, or unreadable. Upload a readable lesson file.",
+                "UPLOAD_FILE_TOO_LARGE", "Each lesson file must be no larger than 3 MB.",
+                "UPLOAD_FILENAME_REQUIRED", "A filename is required.",
+                "MODULE_FILE_LIMIT_EXCEEDED", "A module can contain at most 10 lesson files.");
+        if (uploadMessages.containsKey(materialCode == null ? "" : materialCode)) {
+            int status = exception.getStatusCode().value();
+            return ResponseEntity.status(status).body(Map.of("status", status, "code", materialCode, "message", uploadMessages.get(materialCode)));
+        }
+        if ("MODULE_MATERIALS_REQUIRED".equals(materialCode)) {
+            return ResponseEntity.status(409).body(Map.of("status", 409, "code", materialCode,
+                    "message", "Upload at least one original lesson file before publishing."));
+        }
+        if (java.util.Set.of("MODULE_MATERIAL_UNREADABLE", "MODULE_MATERIAL_UNSUPPORTED", "MODULE_MATERIAL_MISMATCH", "MODULE_MATERIALS_TOO_LARGE").contains(materialCode == null ? "" : materialCode)) {
+            return ResponseEntity.status(409).body(Map.of("status", 409, "code", materialCode,
+                    "message", "The original lesson files are not ready for Mentor. Replace unreadable, unsupported, or oversized files and try again."));
+        }
+        if ("MODULE_INDEX_UNAVAILABLE".equals(materialCode)) {
+            return ResponseEntity.status(502).body(Map.of("status", 502, "code", materialCode,
+                    "message", "Lesson material preparation is unavailable. Please try publishing again later."));
+        }
         String message = exception.getReason() != null
                 ? exception.getReason()
                 : "The request could not be completed.";
 
         return ResponseEntity.status(exception.getStatusCode())
                 .body(Map.of("message", message));
+    }
+
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> staleModule() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "status", 409, "code", "STALE_MODULE_OPERATION",
+                "message", "This module changed while the operation was running. Reload it before trying again."));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

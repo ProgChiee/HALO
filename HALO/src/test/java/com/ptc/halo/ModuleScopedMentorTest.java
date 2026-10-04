@@ -40,7 +40,7 @@ class ModuleScopedMentorTest {
         when(chat.prompt().system(startsWith("You are HALO"))).thenReturn(replySpec);
         when(gateSpec.user(anyString())).thenReturn(gateSpec);
         when(replySpec.user(anyString())).thenReturn(replySpec);
-        index = new ModuleMaterialIndex(chat, mapper, directory.resolve("index"));
+        index = new ModuleMaterialIndex(chat, mapper, new com.ptc.halo.service.LessonStoragePaths(directory.toString()));
         module = mock(AiLearningModuleEntity.class); when(module.getId()).thenReturn(15L);
         when(module.getStatus()).thenReturn(LessonStatus.APPROVED);
         files = new ArrayList<>(); when(module.getFiles()).thenReturn(files);
@@ -167,9 +167,9 @@ class ModuleScopedMentorTest {
         files.add(pdf(1, "Hotel classification and front office operations.", module));
         clearInvocations(chat);
         var built = index.getOrBuild(module);
-        var restarted = new ModuleMaterialIndex(chat, mapper, directory.resolve("index"));
+        var restarted = new ModuleMaterialIndex(chat, mapper, new com.ptc.halo.service.LessonStoragePaths(directory.toString()));
         assertEquals(built, restarted.getOrBuild(module));
-        Files.writeString(directory.resolve("index/15.json"), "broken-cache");
+        Files.writeString(directory.resolve(".module-index/15.json"), "broken-cache");
         assertEquals(built, restarted.getOrBuild(module));
         verifyNoInteractions(chat);
     }
@@ -181,7 +181,7 @@ class ModuleScopedMentorTest {
         assertEquals("MODULE_MATERIAL_UNREADABLE", assertThrows(ResponseStatusException.class, () -> index.getOrBuild(module)).getReason());
         pdf(1, "", module);
         assertThrows(ResponseStatusException.class, () -> index.getOrBuild(module));
-        assertFalse(Files.exists(directory.resolve("index/15.json")));
+        assertFalse(Files.exists(directory.resolve(".module-index/15.json")));
     }
     @Test void realUploadedTextPdfIndexesWithoutProvider() throws Exception {
         String root = System.getProperty("halo.test.uploads");
@@ -207,7 +207,7 @@ class ModuleScopedMentorTest {
         when(file.getFilePath()).thenReturn(selected.toAbsolutePath().toString());
         when(file.getFileType()).thenReturn("application/pdf"); files.add(file);
         clearInvocations(chat);
-        var result = index.getOrBuild(module);
+        var result = new ModuleMaterialIndex(chat, mapper, new com.ptc.halo.service.LessonStoragePaths(Path.of(root).toAbsolutePath().toString())).getOrBuild(module);
         assertFalse(result.chunks().isEmpty()); verifyNoInteractions(chat);
         System.out.println("REAL_UPLOADED_PDF_INDEX_VERIFIED chunks=" + result.chunks().size());
     }

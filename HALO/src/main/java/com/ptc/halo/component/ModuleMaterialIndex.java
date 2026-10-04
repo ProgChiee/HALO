@@ -29,14 +29,15 @@ public class ModuleMaterialIndex {
     private final ObjectMapper mapper;
     private final Object[] locks = new Object[32];
     private final Path cacheDirectory;
+    private final com.ptc.halo.service.LessonStoragePaths storage;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public ModuleMaterialIndex(ChatClient.Builder builder, ObjectMapper mapper) {
-        this(builder.build(), mapper, Path.of("uploads", "module-index"));
+    public ModuleMaterialIndex(ChatClient.Builder builder, ObjectMapper mapper, com.ptc.halo.service.LessonStoragePaths storage) {
+        this(builder.build(), mapper, storage);
     }
     // Explicit constructor for isolated extraction/index tests.
-    public ModuleMaterialIndex(ChatClient chat, ObjectMapper mapper, Path cacheDirectory) {
-        this.chat = chat; this.mapper = mapper; this.cacheDirectory = cacheDirectory;
+    public ModuleMaterialIndex(ChatClient chat, ObjectMapper mapper, com.ptc.halo.service.LessonStoragePaths storage) {
+        this.chat = chat; this.mapper = mapper; this.storage = storage; this.cacheDirectory = storage.resolve(".module-index");
         Arrays.setAll(locks, i -> new Object());
     }
 
@@ -54,7 +55,7 @@ public class ModuleMaterialIndex {
                     if (file.getModule() == null || !Objects.equals(module.getId(), file.getModule().getId())) {
                         throw problem("MODULE_MATERIAL_MISMATCH");
                     }
-                    Path filePath = Path.of(file.getFilePath()).toAbsolutePath().normalize();
+                    Path filePath = storage.resolve(file.getFilePath());
                     log.info("module_index_file moduleId={} fileId={} filename={} absoluteRecord={} exists={} readable={}", module.getId(), file.getId(), safeName(file.getOriginalFileName()), Path.of(file.getFilePath()).isAbsolute(), Files.isRegularFile(filePath), Files.isReadable(filePath));
                     if (!Files.isRegularFile(filePath) || !Files.isReadable(filePath)) throw problem("MODULE_MATERIAL_UNREADABLE");
                     if (Files.size(filePath) > 3L * 1024 * 1024) throw problem("MODULE_MATERIALS_TOO_LARGE");
@@ -65,7 +66,7 @@ public class ModuleMaterialIndex {
                     digest.update(bytes);
                 }
                 String fingerprint = HexFormat.of().formatHex(digest.digest());
-                Path cache = cacheDirectory.resolve(module.getId() + ".json");
+                Path cache = storage.resolve(".module-index/" + module.getId() + ".json");
                 if (Files.isRegularFile(cache)) {
                     try {
                         Index existing = mapper.readValue(cache.toFile(), Index.class);

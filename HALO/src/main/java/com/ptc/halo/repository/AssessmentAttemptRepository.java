@@ -8,6 +8,8 @@ import java.util.Optional;
 
 public interface AssessmentAttemptRepository
         extends JpaRepository<AssessmentAttemptEntity, Long> {
+    long countByPassedTrueAndAssessment_Module_Week_Subject_Professor_User_Id(Long professorId);
+
 
     long countByStudentIdAndPassedTrueAndAssessment_Module_Week_Subject_Professor_User_Id(Long studentId, Long professorId);
 

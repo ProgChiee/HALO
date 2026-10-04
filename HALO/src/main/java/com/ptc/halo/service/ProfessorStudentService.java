@@ -96,6 +96,12 @@ public class ProfessorStudentService {
 
         return responses;
     }
+    public org.springframework.data.domain.Page<ProfessorStudentSummary> getProgressSummaries(UserEntity professor, int page, int size) {
+        requireProfessor(professor);
+        if (page < 0 || size < 1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION");
+        return userRepository.findProfessorProgressSummaries(professor.getId(),
+                org.springframework.data.domain.PageRequest.of(page, Math.min(size, 100)));
+    }
     public ProfessorStudentProgressResponse
     getStudentProgress(Long userId, UserEntity professor) {
         requireProfessor(professor);

@@ -9,8 +9,12 @@ import com.ptc.halo.repository.AssessmentRepository;
 import com.ptc.halo.repository.SubjectRepository;
 import com.ptc.halo.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.ptc.halo.entity.UserEntity;
+import org.springframework.security.access.AccessDeniedException;
 
 @Service
+@Transactional(readOnly = true)
 public class ProfessorDashboardService {
 
     private final UserRepository userRepository;
@@ -52,7 +56,11 @@ public class ProfessorDashboardService {
 
 
     public ProfessorDashboardResponse
-    getDashboard() {
+    getDashboard(UserEntity professor) {
+        if (professor == null || professor.getId() == null || professor.getRole() != Role.PROFESSOR) {
+            throw new AccessDeniedException("Professor access required");
+        }
+        // Account directory metric is intentionally institution-wide, not a teaching roster.
 
         long totalStudents =
                 userRepository
@@ -60,27 +68,27 @@ public class ProfessorDashboardService {
 
 
         long totalSubjects =
-                subjectRepository.count();
+                subjectRepository.countByProfessor_User_Id(professor.getId());
 
 
         long totalModules =
-                aiLearningModuleRepository.count();
+                aiLearningModuleRepository.countByWeek_Subject_Professor_User_Id(professor.getId());
 
 
         long approvedModules =
                 aiLearningModuleRepository
-                        .countByStatus(
-                                LessonStatus.APPROVED
+                        .countByWeek_Subject_Professor_User_IdAndStatus(
+                                professor.getId(), LessonStatus.APPROVED
                         );
 
 
         long totalAssessments =
-                assessmentRepository.count();
+                assessmentRepository.countByModule_Week_Subject_Professor_User_Id(professor.getId());
 
 
         long totalPassedAttempts =
                 assessmentAttemptRepository
-                        .countByPassedTrue();
+                        .countByPassedTrueAndAssessment_Module_Week_Subject_Professor_User_Id(professor.getId());
 
 
         ProfessorDashboardResponse response =

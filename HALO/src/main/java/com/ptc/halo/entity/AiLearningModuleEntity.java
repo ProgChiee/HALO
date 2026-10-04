@@ -15,6 +15,17 @@ public class AiLearningModuleEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
+    @Column(length = 36)
+    private String generationToken;
+
+    public Long getVersion() { return version; }
+    public String getGenerationToken() { return generationToken; }
+    public void setGenerationToken(String generationToken) { this.generationToken = generationToken; }
+
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "week_id", nullable = false)

@@ -9,6 +9,8 @@ import java.util.Optional;
 
 public interface SubjectRepository
         extends JpaRepository<SubjectEntity, Long> {
+    long countByProfessor_User_Id(Long professorId);
+
     List<SubjectEntity> findByProfessor_User_Id(Long userId);
     Optional<SubjectEntity> findByIdAndProfessor_User_Id(Long id, Long userId);
 

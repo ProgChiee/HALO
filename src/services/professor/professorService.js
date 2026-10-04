@@ -76,7 +76,7 @@ export async function generateLesson(moduleId) {
 }
 
 export async function approveLesson(moduleId) {
-  const res = await apiClient.put(`/professor/ai-learning-modules/${moduleId}/approve`);
+  const res = await apiClient.put(`/professor/ai-learning-modules/${moduleId}/approve`, undefined, { timeout: 180000 });
   return res.data;
 }
 
@@ -130,4 +130,11 @@ export async function getStudentSubjects(userId) {
 export async function getProfessorProfile(config = {}) {
   const res = await apiClient.get('/professor/profile', config);
   return res.data;
+}
+
+export async function getStudentProgressSummaries(page = 0, size = 20, config = {}) {
+  const { data } = await apiClient.get('/professor/students/progress-summaries', {
+    ...config, params: { page, size },
+  });
+  return data;
 }

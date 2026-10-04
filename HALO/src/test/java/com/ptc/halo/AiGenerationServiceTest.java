@@ -29,7 +29,11 @@ class AiGenerationServiceTest {
     @BeforeEach void setup() {
         ChatClient.Builder builder = mock(ChatClient.Builder.class);
         when(builder.build()).thenReturn(client);
-        service = new AiGenerationService(builder, repository, new ObjectMapper(), mock(com.ptc.halo.component.ModuleMaterialIndex.class));
+        var state = mock(com.ptc.halo.service.ModuleGenerationState.class);
+        when(state.begin(15L)).thenAnswer(i -> new com.ptc.halo.service.ModuleGenerationState(repository).begin(15L));
+        when(state.finish(eq(15L), any())).thenAnswer(i -> repository.save(i.getArgument(1)));
+        when(repository.saveAndFlush(module)).thenAnswer(i -> { savedStatuses.add(module.getAiGenerationStatus()); return module; });
+        service = new AiGenerationService(builder, repository, new ObjectMapper(), mock(com.ptc.halo.component.ModuleMaterialIndex.class), state, mock(com.ptc.halo.service.LessonStoragePaths.class));
         when(repository.findWithFilesById(15L)).thenReturn(Optional.of(module));
         when(repository.save(module)).thenAnswer(invocation -> {
             savedStatuses.add(module.getAiGenerationStatus()); return module;

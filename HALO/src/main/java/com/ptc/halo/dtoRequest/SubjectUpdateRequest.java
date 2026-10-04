@@ -2,14 +2,22 @@ package com.ptc.halo.dtoRequest;
 
 import com.ptc.halo.enums.YearLevel;
 
+import jakarta.validation.constraints.*;
+
 public class SubjectUpdateRequest {
 
+    @NotBlank
+    @Size(max = 255)
     private String subjectCode;
 
+    @NotBlank
+    @Size(max = 255)
     private String subjectName;
 
+    @Size(max = 10000)
     private String description;
 
+    @NotNull
     private YearLevel yearLevel;
 
 
@@ -23,7 +31,7 @@ public class SubjectUpdateRequest {
 
 
     public void setSubjectCode(String subjectCode) {
-        this.subjectCode = subjectCode;
+        this.subjectCode = subjectCode == null ? null : subjectCode.strip();
     }
 
 
@@ -33,7 +41,7 @@ public class SubjectUpdateRequest {
 
 
     public void setSubjectName(String subjectName) {
-        this.subjectName = subjectName;
+        this.subjectName = subjectName == null ? null : subjectName.strip();
     }
 
 
@@ -43,7 +51,7 @@ public class SubjectUpdateRequest {
 
 
     public void setDescription(String description) {
-        this.description = description;
+        this.description = description == null ? null : description.strip();
     }
 
 

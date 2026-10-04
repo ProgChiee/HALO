@@ -3,7 +3,7 @@ package com.ptc.halo.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "weeks")
+@Table(name = "weeks", uniqueConstraints = @UniqueConstraint(name = "uk_week_subject_number", columnNames = {"subject_id", "week_number"}))
 public class WeekEntity {
 
     @Id

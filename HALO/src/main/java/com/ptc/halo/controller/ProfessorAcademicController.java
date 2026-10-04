@@ -10,6 +10,8 @@ import com.ptc.halo.entity.UserEntity;
 import com.ptc.halo.repository.UserRepository;
 import com.ptc.halo.service.ProfessorAcademicService;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -39,7 +41,7 @@ public class ProfessorAcademicController {
 
     @PostMapping("/subjects")
     public ResponseEntity<SubjectResponse> createSubject(
-            @RequestBody SubjectRequest request,
+            @Valid @RequestBody SubjectRequest request,
             Authentication authentication) {
 
         UserEntity professor =
@@ -66,7 +68,7 @@ public class ProfessorAcademicController {
 
     @GetMapping("/subjects/{id}")
     public ResponseEntity<SubjectResponse> viewSubjectById(
-            @PathVariable Long id, Authentication authentication) {
+            @PathVariable("id") @Positive Long id, Authentication authentication) {
 
         return ResponseEntity.ok(
                 professorAcademicService.viewSubjectById(id, getCurrentProfessor(authentication))
@@ -76,8 +78,8 @@ public class ProfessorAcademicController {
 
     @PutMapping("/subjects/{id}")
     public ResponseEntity<SubjectResponse> updateSubject(
-            @PathVariable Long id,
-            @RequestBody SubjectUpdateRequest request,
+            @PathVariable("id") @Positive Long id,
+            @Valid @RequestBody SubjectUpdateRequest request,
             Authentication authentication) {
 
         UserEntity professor =
@@ -95,7 +97,7 @@ public class ProfessorAcademicController {
 
     @DeleteMapping("/subjects/{id}")
     public ResponseEntity<String> deleteSubject(
-            @PathVariable Long id,
+            @PathVariable("id") @Positive Long id,
             Authentication authentication) {
 
         UserEntity professor =
@@ -118,8 +120,8 @@ public class ProfessorAcademicController {
 
     @PostMapping("/subjects/{subjectId}/weeks")
     public ResponseEntity<WeekResponse> createWeek(
-            @PathVariable Long subjectId,
-            @RequestBody WeekRequest request,
+            @PathVariable("subjectId") @Positive Long subjectId,
+            @Valid @RequestBody WeekRequest request,
             Authentication authentication) {
 
         UserEntity professor =
@@ -137,7 +139,7 @@ public class ProfessorAcademicController {
 
     @GetMapping("/subjects/{subjectId}/weeks")
     public ResponseEntity<List<WeekResponse>> viewAllWeeks(
-            @PathVariable Long subjectId, Authentication authentication) {
+            @PathVariable("subjectId") @Positive Long subjectId, Authentication authentication) {
 
         return ResponseEntity.ok(
                 professorAcademicService.viewAllWeeks(
@@ -149,7 +151,7 @@ public class ProfessorAcademicController {
 
     @GetMapping("/weeks/{id}")
     public ResponseEntity<WeekResponse> viewWeekById(
-            @PathVariable Long id, Authentication authentication) {
+            @PathVariable("id") @Positive Long id, Authentication authentication) {
 
         return ResponseEntity.ok(
                 professorAcademicService.viewWeekById(id, getCurrentProfessor(authentication))
@@ -159,8 +161,8 @@ public class ProfessorAcademicController {
 
     @PutMapping("/weeks/{id}")
     public ResponseEntity<WeekResponse> updateWeek(
-            @PathVariable Long id,
-            @RequestBody WeekUpdateRequest request,
+            @PathVariable("id") @Positive Long id,
+            @Valid @RequestBody WeekUpdateRequest request,
             Authentication authentication) {
 
         UserEntity professor =
@@ -178,7 +180,7 @@ public class ProfessorAcademicController {
 
     @DeleteMapping("/weeks/{id}")
     public ResponseEntity<String> deleteWeek(
-            @PathVariable Long id,
+            @PathVariable("id") @Positive Long id,
             Authentication authentication) {
 
         UserEntity professor =
@@ -199,8 +201,25 @@ public class ProfessorAcademicController {
     // CURRENT PROFESSOR
     // =========================
 
+    // MVC method-validation exceptions also extend ResponseStatusException;
+    // handle them explicitly before this controller's business-error handler.
+    @ExceptionHandler(org.springframework.web.method.annotation.HandlerMethodValidationException.class)
+    public ResponseEntity<?> validation(org.springframework.web.method.annotation.HandlerMethodValidationException error) {
+        return new ProfessorValidationHandler().parameters(error);
+    }
+
     @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
     public ResponseEntity<java.util.Map<String, Object>> scopedError(org.springframework.web.server.ResponseStatusException error) {
+        if (error.getStatusCode().value() == 409 && "WEEK_NUMBER_ALREADY_EXISTS".equals(error.getReason())) {
+            return ResponseEntity.status(409).body(java.util.Map.of(
+                    "status", 409, "code", "WEEK_NUMBER_ALREADY_EXISTS",
+                    "message", "This subject already has that week number. Choose another week number."));
+        }
+        if (error.getStatusCode().value() == 409 && "SUBJECT_HAS_CONTENT".equals(error.getReason())) {
+            return ResponseEntity.status(409).body(java.util.Map.of(
+                    "status", 409, "code", "SUBJECT_HAS_CONTENT",
+                    "message", "This subject still contains weeks or learning modules. Remove its content before deleting the subject."));
+        }
         return ResponseEntity.status(error.getStatusCode()).body(java.util.Map.of(
                 "status", error.getStatusCode().value(), "code", "RESOURCE_NOT_FOUND",
                 "message", "The requested resource is unavailable."));

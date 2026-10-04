@@ -23,6 +23,10 @@ const ALLOWED_FILE_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg'
 
 export default function LessonEditor() {
   const { subjectId, weekId } = useParams();
+  return <RouteLessonEditor key={JSON.stringify([subjectId, weekId])} subjectId={subjectId} weekId={weekId} />;
+}
+
+function RouteLessonEditor({ subjectId, weekId }) {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const materialsInputRef = useRef(null);
@@ -40,13 +44,14 @@ export default function LessonEditor() {
   const [reloadKey, setReloadKey] = useState(0);
   const [pendingAction, setPendingAction] = useState(null);
   const actionLock = useRef(false);
-  const mounted = useRef(false);
+  const lifecycle = useRef(null);
   useEffect(() => {
-    mounted.current = true;
     const controller = new AbortController();
+    lifecycle.current = controller;
+    const isCurrent = () => lifecycle.current === controller && !controller.signal.aborted;
     getLearningModuleByWeek(weekId, { signal: controller.signal })
       .then((existing) => {
-        if (controller.signal.aborted) return;
+        if (!isCurrent()) return;
         setModule(existing);
         setLessonText(existing?.lessonText ?? '');
         setYoutubeLink(existing?.youtubeLink ?? '');
@@ -55,13 +60,13 @@ export default function LessonEditor() {
         setLoadError('');
       })
       .catch(() => {
-        if (!controller.signal.aborted) setLoadError('Could not load this week. Retry before saving materials.');
+        if (isCurrent()) setLoadError('Could not load this week. Retry before saving materials.');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (isCurrent()) setLoading(false);
       });
-    return () => { mounted.current = false; controller.abort(); };
-  }, [weekId, reloadKey]);
+    return () => { controller.abort(); };
+  }, [subjectId, weekId, reloadKey]);
   const isSaving = pendingAction === 'save';
   const isGenerating = pendingAction === 'generate';
   const isApproving = pendingAction === 'approve';
@@ -147,12 +152,14 @@ export default function LessonEditor() {
   }
 
   async function runAction(action, request, successMessage) {
-    if (actionLock.current || isBusy || isPublished) return;
+    const identity = lifecycle.current;
+    const isCurrent = () => identity !== null && lifecycle.current === identity && !identity.signal.aborted;
+    if (!isCurrent() || actionLock.current || isBusy || isPublished) return;
     actionLock.current = true;
     setPendingAction(action);
     try {
-      const updated = await request();
-      if (!mounted.current) return;
+      const updated = await request(isCurrent);
+      if (!isCurrent()) return;
       setModule(updated);
       if (action === 'generate' && updated.aiGenerationStatus !== 'COMPLETED') {
         showToast('The lesson could not be generated from these materials.', 'error');
@@ -160,16 +167,52 @@ export default function LessonEditor() {
         showToast(successMessage, 'success');
       }
     } catch (error) {
-      if (!mounted.current) return;
+      if (!isCurrent()) return;
+      const materialMessages = {
+        MODULE_MATERIALS_REQUIRED: 'Upload at least one original lesson file before publishing.',
+        MODULE_MATERIAL_UNREADABLE: 'An original lesson file could not be read or indexed. Replace it with a readable file and try again.',
+        MODULE_MATERIAL_UNSUPPORTED: 'An original lesson file has an unsupported format. Replace it before publishing.',
+        MODULE_MATERIAL_MISMATCH: 'Lesson files do not match this module. Reload and check its attachments before publishing.',
+        MODULE_MATERIALS_TOO_LARGE: 'Lesson materials exceed the supported indexing limits. Reduce their size before publishing.',
+        MODULE_INDEX_UNAVAILABLE: 'Lesson material preparation is unavailable. Please try publishing again later.',
+      };
+      if (action === 'approve' && Object.hasOwn(materialMessages, error.response?.data?.code)) {
+        showToast(materialMessages[error.response.data.code], 'error', 8000);
+        return;
+      }
+      const approvalStatus = error.response?.status;
+      if (action === 'approve' && (!error.response || approvalStatus >= 500 || approvalStatus === 408 || approvalStatus === 409)) {
+        try {
+          const latest = await getLearningModuleByWeek(weekId, { signal: identity.signal });
+          if (!isCurrent()) return;
+          if (!latest || latest.id !== module.id) {
+            setLoadError('The module changed or is unavailable. Reload before trying to publish again.');
+            return;
+          }
+          setModule(latest);
+          setLessonText(latest.lessonText ?? '');
+          setYoutubeLink(latest.youtubeLink ?? '');
+          setAiNotes(latest.aiNotes ?? '');
+          if (latest.status === 'APPROVED') {
+            showToast(successMessage, 'success');
+          } else {
+            showToast('Approval was not confirmed. The lesson is not currently published. The server may still be processing it; reload its status before trying again.', 'error', 8000);
+          }
+        } catch {
+          if (!isCurrent()) return;
+          setLoadError('Could not verify whether publishing completed. Retry loading to check its status before approving again.');
+        }
+        return;
+      }
       // Generation clears saved content before calling Gemini. Refresh even on
       // failure so an old preview cannot still be approved in the editor.
       if (action === 'generate') {
         try {
           const latest = await getLearningModuleByWeek(weekId);
-          if (!mounted.current) return;
+          if (!isCurrent()) return;
           setModule(latest);
         } catch {
-          if (!mounted.current) return;
+          if (!isCurrent()) return;
           setLoadError('Could not refresh the generation result. Retry loading before editing or publishing.');
         }
       }
@@ -183,10 +226,12 @@ export default function LessonEditor() {
         : status === 413
           ? 'The upload exceeds the server size limit. Choose smaller files.'
           : "Couldn't update the module. Please try again.";
-      if (mounted.current) showToast(message, 'error', 8000);
+      if (isCurrent()) showToast(message, 'error', 8000);
     } finally {
-      actionLock.current = false;
-      if (mounted.current) setPendingAction(null);
+      if (isCurrent()) {
+        actionLock.current = false;
+        setPendingAction(null);
+      }
     }
   }
 
@@ -195,22 +240,23 @@ export default function LessonEditor() {
       showToast('Add lesson text, a YouTube link, or a file first.', 'error');
       return;
     }
-    return runAction('save', async () => {
+    return runAction('save', async (isCurrent) => {
       const materials = { lessonText, youtubeLink, aiNotes };
       if (!module) {
         const created = await createLearningModule(weekId, { ...materials, files });
-        if (mounted.current) setFiles([]);
+        if (isCurrent()) setFiles([]);
         return created;
       }
       let updated = module;
       if (textChanged) {
         updated = await updateLearningModule(module.id, materials);
-        if (mounted.current) setModule(updated);
+        if (isCurrent()) setModule(updated);
       }
       // Retain only failed/pending uploads if a later request fails.
       for (const file of files) {
+        if (!isCurrent()) return;
         updated = await uploadModuleFile(module.id, file);
-        if (mounted.current) {
+        if (isCurrent()) {
           setModule(updated);
           setFiles((remaining) => remaining.filter((item) => item !== file));
         }

@@ -1,9 +1,16 @@
 package com.ptc.halo.dtoRequest;
 
+import jakarta.validation.constraints.*;
+
 public class WeekUpdateRequest {
 
+    @NotNull
+    @Positive
+    @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WeekNumberDeserializer.class)
     private Integer weekNumber;
 
+    @NotBlank
+    @Size(max = 255)
     private String title;
 
 
@@ -27,6 +34,6 @@ public class WeekUpdateRequest {
 
 
     public void setTitle(String title) {
-        this.title = title;
+        this.title = title == null ? null : title.strip();
     }
 }

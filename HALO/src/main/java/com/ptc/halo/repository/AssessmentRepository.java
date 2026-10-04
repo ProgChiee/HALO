@@ -7,6 +7,8 @@ import java.util.Optional;
 
 public interface AssessmentRepository
         extends JpaRepository<AssessmentEntity, Long> {
+    long countByModule_Week_Subject_Professor_User_Id(Long professorId);
+
 
     Optional<AssessmentEntity> findByModuleId(Long moduleId);
 }

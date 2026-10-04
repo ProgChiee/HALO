@@ -27,6 +27,7 @@ class ProfessorModuleHttpTest {
  @MockBean AiLearningFileRepository files;
  @MockBean WeekRepository weeks;
  @MockBean UserRepository users;
+ @MockBean com.ptc.halo.component.ModuleMaterialIndex materialIndex;
  @MockBean FileUploadService storage;
  @MockBean AiGenerationService generation;
  @MockBean AssessmentService assessment;
@@ -34,6 +35,19 @@ class ProfessorModuleHttpTest {
  @MockBean CustomUserDetailsService details;
  @MockBean JwtService jwt;
  final String base="/api/professor/ai-learning-modules";
+ @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory;
+ @Test void directUploadsReturnStructuredValidationErrors() throws Exception {
+  token("PROFESSOR");var module=new com.ptc.halo.entity.AiLearningModuleEntity();module.setStatus(com.ptc.halo.enums.LessonStatus.PENDING);
+  when(modules.findByIdAndWeek_Subject_Professor_User_Id(2L,7L)).thenReturn(Optional.of(module));
+  var real=new FileUploadService(new LessonStoragePaths(directory.toString()));
+  when(storage.uploadFile(any(),eq(module))).thenAnswer(call->real.uploadFile(call.getArgument(0),module));
+  mvc.perform(multipart(base+"/2/files").file(new org.springframework.mock.web.MockMultipartFile("file","fake.pdf","application/pdf","not PDF".getBytes())).header("Authorization","Bearer test-token"))
+   .andExpect(status().isUnsupportedMediaType()).andExpect(jsonPath("$.status").value(415)).andExpect(jsonPath("$.code").value("UPLOAD_FILE_UNSUPPORTED"));
+  for(int i=0;i<10;i++)module.addFile(new com.ptc.halo.entity.AiLearningFileEntity());
+  mvc.perform(multipart(base+"/2/files").file(new org.springframework.mock.web.MockMultipartFile("file","fake.pdf","application/pdf",new byte[]{1})).header("Authorization","Bearer test-token"))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("MODULE_FILE_LIMIT_EXCEEDED"));
+  verifyNoInteractions(audit,files);
+ }
  void token(String role) {
   when(jwt.extractUsername("test-token")).thenReturn("prof@example.test");
   when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
@@ -59,5 +73,27 @@ class ProfessorModuleHttpTest {
    token(role);mvc.perform(get(base+"/2").header("Authorization","Bearer test-token")).andExpect(status().isForbidden());
   }
   verifyNoInteractions(modules,files,weeks,storage,generation,assessment,audit);
+ }
+
+ @Test void staleGenerationAndOptimisticWritesReturnSafe409() throws Exception {
+  token("PROFESSOR");var module=new com.ptc.halo.entity.AiLearningModuleEntity();module.setStatus(com.ptc.halo.enums.LessonStatus.PENDING);
+  when(modules.findByIdAndWeek_Subject_Professor_User_Id(2L,7L)).thenReturn(Optional.of(module));
+  when(generation.generateLesson(2L)).thenThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"STALE_MODULE_OPERATION"));
+  mvc.perform(post(base+"/2/generate").header("Authorization","Bearer test-token"))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("STALE_MODULE_OPERATION"));
+  doThrow(new org.springframework.dao.OptimisticLockingFailureException("internal detail")).when(generation).generateLesson(2L);
+  mvc.perform(post(base+"/2/generate").header("Authorization","Bearer test-token"))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("STALE_MODULE_OPERATION"))
+   .andExpect(jsonPath("$.message").value("This module changed while the operation was running. Reload it before trying again."));
+  verifyNoInteractions(audit);
+ }
+
+ @Test void filelessPublicationReturnsActionableConflict() throws Exception {
+  token("PROFESSOR");var module=new com.ptc.halo.entity.AiLearningModuleEntity();module.setStatus(com.ptc.halo.enums.LessonStatus.PENDING);module.setAiGenerationStatus(com.ptc.halo.enums.AiGenerationStatus.COMPLETED);
+  when(modules.findByIdAndWeek_Subject_Professor_User_Id(2L,7L)).thenReturn(Optional.of(module));
+  mvc.perform(put(base+"/2/approve").header("Authorization","Bearer test-token"))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("MODULE_MATERIALS_REQUIRED"))
+   .andExpect(jsonPath("$.message").value("Upload at least one original lesson file before publishing."));
+  verifyNoInteractions(materialIndex,assessment,audit);
  }
 }

@@ -53,6 +53,17 @@ public class ProfessorStudentController {
         );
     }
     @PreAuthorize("hasRole('PROFESSOR')")
+    @GetMapping("/progress-summaries")
+    public ResponseEntity<Map<String, Object>> getProgressSummaries(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size, Authentication authentication) {
+        var result = professorStudentService.getProgressSummaries(currentProfessor(authentication), page, size);
+        return ResponseEntity.ok(Map.of("content", result.getContent(), "number", result.getNumber(),
+                "size", result.getSize(), "totalElements", result.getTotalElements(),
+                "totalPages", result.getTotalPages(), "first", result.isFirst(), "last", result.isLast(),
+                "badgeScope", "INSTITUTION_WIDE"));
+    }
+    @PreAuthorize("hasRole('PROFESSOR')")
     @GetMapping("/{userId}/subjects")
     public ResponseEntity<List<StudentSubjectResponse>>
     getStudentSubjects(
@@ -91,6 +102,8 @@ public class ProfessorStudentController {
     }
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> notFound(ResponseStatusException error) {
+        if ("INVALID_PAGINATION".equals(error.getReason())) return ResponseEntity.badRequest().body(Map.of(
+                "status", 400, "code", "INVALID_PAGINATION", "message", "Page must be non-negative and size must be positive."));
         return ResponseEntity.status(error.getStatusCode()).body(Map.of(
                 "status", error.getStatusCode().value(), "code", "RESOURCE_NOT_FOUND", "message", "The requested resource is unavailable."));
     }

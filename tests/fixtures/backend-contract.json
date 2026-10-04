@@ -1,5 +1,5 @@
 {
-  "source": "HALO.zip / HALO/src/main/java/com/ptc/halo; professor GET-by-week verified against updated local AiLearningModuleController.java on 2026-09-29",
+  "source": "HALO.zip / HALO/src/main/java/com/ptc/halo; professor GET-by-week verified against updated local AiLearningModuleController.java on 2026-09-29; progress-summaries verified against local ProfessorStudentController.java on 2026-10-04",
   "endpoints": [
     {
       "method": "POST",
@@ -204,6 +204,11 @@
     {
       "method": "GET",
       "path": "/api/professor/students",
+      "controller": "ProfessorStudentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/students/progress-summaries",
       "controller": "ProfessorStudentController.java"
     },
     {

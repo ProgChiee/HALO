@@ -27,6 +27,7 @@ class ProfessorStudentScopeTest {
  @Autowired AssessmentRepository assessments;
  @Autowired AssessmentAttemptRepository attempts;
  @Autowired StudentBadgeRepository badges;
+ @Autowired jakarta.persistence.EntityManager entityManager;
  UserEntity a,b,student,empty;
  Long ownedSubject;
  @BeforeEach void setup() {
@@ -49,6 +50,25 @@ class ProfessorStudentScopeTest {
  }
  @Test void listIncludesStudentAccountsEvenWithoutProfile() {
   assertEquals(2,service.getStudents(a).size());assertEquals(2,service.getStudents(b).size());
+ }
+ @Test void paginatedSummariesScopeCountsAndKeepZeroActivityStudents() {
+  var stats=entityManager.getEntityManagerFactory().unwrap(org.hibernate.SessionFactory.class).getStatistics();
+  stats.setStatisticsEnabled(true);entityManager.flush();entityManager.clear();stats.clear();
+  var first=service.getProgressSummaries(a,0,1);
+  assertEquals(2,first.getTotalElements());assertEquals(2,first.getTotalPages());
+  var row=first.getContent().get(0);
+  assertEquals(student.getId(),row.userId());assertEquals(1,row.completedModules());assertEquals(1,row.passedAssessments());assertEquals(1,row.totalBadges());
+  assertEquals(2,stats.getPrepareStatementCount());assertEquals(0,stats.getEntityLoadCount());
+  var second=service.getProgressSummaries(a,1,1);assertTrue(second.isLast());
+  row=second.getContent().get(0);assertEquals(empty.getId(),row.userId());assertEquals(0,row.completedModules());assertEquals(0,row.passedAssessments());assertEquals(0,row.totalBadges());
+  assertEquals(1,service.getProgressSummaries(b,0,20).getContent().get(0).completedModules());
+  var c=user("c",Role.PROFESSOR);
+  assertTrue(service.getProgressSummaries(c,0,20).stream().allMatch(r->r.completedModules()==0 && r.passedAssessments()==0));
+  assertEquals(100,service.getProgressSummaries(a,0,1000).getSize());
+  assertTrue(service.getProgressSummaries(a,4,20).isEmpty());
+  assertEquals(400,assertThrows(ResponseStatusException.class,()->service.getProgressSummaries(a,-1,20)).getStatusCode().value());
+  assertEquals(400,assertThrows(ResponseStatusException.class,()->service.getProgressSummaries(a,0,0)).getStatusCode().value());
+  assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.getProgressSummaries(student,0,20));
  }
  @Test void progressHistoryAndSubjectsAreOwnedOnly() {
   var result=service.getStudentProgress(student.getId(),a);

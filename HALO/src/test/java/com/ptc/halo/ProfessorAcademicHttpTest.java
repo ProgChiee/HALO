@@ -60,4 +60,21 @@ class ProfessorAcademicHttpTest {
   }
   verifyNoInteractions(service);
  }
+
+ @Test void nonemptySubjectReturnsSafeConflict() throws Exception {
+  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);
+  when(users.findByEmail("prof@example.test")).thenReturn(java.util.Optional.of(actor));
+  doThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"SUBJECT_HAS_CONTENT"))
+    .when(service).deleteSubject(1L,actor);
+  mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/professor/subjects/1").header("Authorization","Bearer test-token"))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SUBJECT_HAS_CONTENT"))
+   .andExpect(jsonPath("$.message").value("This subject still contains weeks or learning modules. Remove its content before deleting the subject."));
+ }
+
+ @Test void duplicateWeekReturnsSafe409() throws Exception {
+  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);when(users.findByEmail("prof@example.test")).thenReturn(java.util.Optional.of(actor));
+  when(service.createWeek(eq(1L),any(),eq(actor))).thenThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"WEEK_NUMBER_ALREADY_EXISTS"));
+  mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/professor/subjects/1/weeks").contentType("application/json").content("{\"weekNumber\":1,\"title\":\"Week\"}").header("Authorization","Bearer test-token"))
+   .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("WEEK_NUMBER_ALREADY_EXISTS"));
+ }
 }

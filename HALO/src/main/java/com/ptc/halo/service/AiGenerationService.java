@@ -33,12 +33,16 @@ public class AiGenerationService {
     private final ChatClient chatClient;
     private final AiLearningModuleRepository aiLearningModuleRepository;
     private final ObjectMapper objectMapper;
+    private final ModuleGenerationState generationState;
+    private final LessonStoragePaths storage;
 
     public AiGenerationService(
             ChatClient.Builder chatClientBuilder,
             AiLearningModuleRepository aiLearningModuleRepository,
-            ObjectMapper objectMapper, ModuleMaterialIndex materialIndex
+            ObjectMapper objectMapper, ModuleMaterialIndex materialIndex, ModuleGenerationState generationState, LessonStoragePaths storage
     ) {
+        this.storage = storage;
+        this.generationState = generationState;
         this.materialIndex = materialIndex;
         this.chatClient = chatClientBuilder.build();
         this.aiLearningModuleRepository = aiLearningModuleRepository;
@@ -49,31 +53,10 @@ public class AiGenerationService {
     // GENERATE LESSON
     // =========================================================
 
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public AiLearningModuleEntity generateLesson(Long moduleId) {
 
-        AiLearningModuleEntity module =
-                aiLearningModuleRepository
-                        .findWithFilesById(moduleId)
-                        .orElseThrow(() ->
-                                new ResponseStatusException(HttpStatus.NOT_FOUND, "AI Learning Module not found")
-                        );
-
-        if (module.getStatus() == LessonStatus.APPROVED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Published lessons cannot be regenerated through the draft editor.");
-        }
-
-        // Reset previous generated content
-        clearGeneratedContent(module);
-
-        // Professor has not approved/declined the new generation yet
-        module.setStatus(LessonStatus.PENDING);
-
-        // AI is currently generating
-        module.setAiGenerationStatus(
-                AiGenerationStatus.PENDING
-        );
-
-        aiLearningModuleRepository.save(module);
+        AiLearningModuleEntity module = generationState.begin(moduleId);
 
         try {
 
@@ -174,7 +157,7 @@ public class AiGenerationService {
                         moduleId
                 );
 
-                return aiLearningModuleRepository.save(module);
+                return generationState.finish(moduleId, module);
             }
 
             // =====================================================
@@ -217,9 +200,12 @@ public class AiGenerationService {
                     moduleId
             );
 
-            return aiLearningModuleRepository.save(module);
+            return generationState.finish(moduleId, module);
 
+        } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "STALE_MODULE_OPERATION");
         } catch (Exception e) {
+            if (e instanceof ResponseStatusException response && response.getStatusCode().value() == 409) throw response;
 
             // =====================================================
             // TECHNICAL FAILURE
@@ -233,7 +219,11 @@ public class AiGenerationService {
                     AiGenerationStatus.FAILED
             );
 
-            aiLearningModuleRepository.save(module);
+            try {
+                generationState.finish(moduleId, module);
+            } catch (org.springframework.dao.OptimisticLockingFailureException stale) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "STALE_MODULE_OPERATION");
+            }
 
             log.error("AI lesson generation FAILED moduleId={} exceptionType={}",
                     moduleId, e.getClass().getSimpleName());
@@ -277,7 +267,7 @@ public class AiGenerationService {
             }
 
             File file =
-                    new File(filePath);
+                    storage.resolve(filePath).toFile();
 
             if (!file.exists()) {
 

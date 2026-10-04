@@ -1,3 +1,4 @@
+import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
@@ -105,7 +106,7 @@ export default function SubjectManagement() {
       setSubjectModal(null);
       await refetchSubjects();
     } catch (err) {
-      console.error(err);
+      logProfessorError('save-subject', err);
       setFormError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -121,8 +122,10 @@ export default function SubjectManagement() {
       setDeletingSubject(null);
       await refetchSubjects();
     } catch (err) {
-      console.error(err);
-      showToast('Something went wrong. Please try again.', 'error');
+      logProfessorError('delete-subject', err);
+      showToast(err?.response?.data?.code === 'SUBJECT_HAS_CONTENT'
+        ? 'This subject still contains weeks or learning modules. Remove its content before deleting the subject.'
+        : 'Something went wrong. Please try again.', 'error');
     } finally {
       setIsDeleting(false);
     }
@@ -155,8 +158,10 @@ export default function SubjectManagement() {
       }
       setExpandedId(addingWeekTo.id);
     } catch (err) {
-      console.error(err);
-      setFormError('Something went wrong. Please try again.');
+      logProfessorError('create-week', err);
+      setFormError(err?.response?.data?.code === 'WEEK_NUMBER_ALREADY_EXISTS'
+        ? 'This subject already has that week number. Choose another week number.'
+        : 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -324,7 +329,7 @@ export default function SubjectManagement() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.modalTitle}>Delete "{deletingSubject.subjectName}"?</h3>
             <p className={styles.modalWarning}>
-              This will also remove all modules inside it. This action cannot be undone.
+              Only an empty subject can be deleted. Remove its weeks and learning modules first. Deleting an empty subject cannot be undone.
             </p>
             <div className={styles.modalActions}>
               <Button variant="secondary" onClick={() => setDeletingSubject(null)} disabled={isDeleting}>Cancel</Button>

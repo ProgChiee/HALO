@@ -31,6 +31,7 @@ class ProfessorModuleOwnershipTest {
  @Autowired WeekRepository weeks;
  @Autowired ProfessorRepository professors;
  @Autowired UserRepository users;
+ @MockBean com.ptc.halo.component.ModuleMaterialIndex materialIndex;
  @MockBean FileUploadService storage;
  @MockBean AiGenerationService generation;
  @MockBean AssessmentService assessment;
@@ -75,7 +76,7 @@ class ProfessorModuleOwnershipTest {
   assertEquals(moduleCount,modules.count()); assertEquals(fileCount,files.count());
   assertEquals("original bytes",Files.readString(original));
   assertEquals(LessonStatus.PENDING,modules.findById(module.getId()).orElseThrow().getStatus());
-  verifyNoInteractions(storage,generation,assessment,audit);
+  verifyNoInteractions(storage,generation,assessment,audit,materialIndex);
  }
  @Test void crossProfessorCannotReadOrMutateAndFilesRemainIntact() throws Exception {allDenied(stranger);}
  @Test void unassignedSubjectCannotBeAccessedEvenByPreviousOwner() throws Exception {
@@ -100,5 +101,39 @@ class ProfessorModuleOwnershipTest {
   when(storage.uploadFile(any(),eq(module))).thenReturn(added);
   controller.uploadFile(module.getId(),upload(),owner);assertNotNull(added.getId());
   controller.deleteFile(file.getId(),owner);verify(storage).deleteFile(original.toString());assertFalse(files.existsById(file.getId()));
+ }
+
+ @Test void filelessTextLinkAndEmptyModulesCannotPublish() {
+  module.getFiles().clear();modules.saveAndFlush(module);
+  for(String source:List.of("text","link","empty")) {
+   module.setLessonText(source.equals("text")?"Lesson text":null);
+   module.setYoutubeLink(source.equals("link")?"https://www.youtube.com/watch?v=example":null);
+   var error=assertThrows(ResponseStatusException.class,()->controller.approveLesson(module.getId(),owner));
+   assertEquals("MODULE_MATERIALS_REQUIRED",error.getReason());assertEquals(409,controller.handleRequestError(error).getStatusCode().value());
+   assertEquals(LessonStatus.PENDING,module.getStatus());
+  }
+  verifyNoInteractions(materialIndex,assessment,audit);
+ }
+ @Test void realOriginalPdfIndexesBeforeSuccessfulPublication() throws Exception {
+  try(var document=new org.apache.pdfbox.pdmodel.PDDocument()) {
+   var page=new org.apache.pdfbox.pdmodel.PDPage();document.addPage(page);
+   try(var stream=new org.apache.pdfbox.pdmodel.PDPageContentStream(document,page)) {
+    stream.beginText();stream.setFont(new org.apache.pdfbox.pdmodel.font.PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA),12);
+    stream.newLineAtOffset(50,700);stream.showText("Hospitality front office staff welcome guests and manage hotel reservations.");stream.endText();
+   }
+   document.save(original.toFile());
+  }
+  var index=new com.ptc.halo.component.ModuleMaterialIndex(mock(org.springframework.ai.chat.client.ChatClient.class),new com.fasterxml.jackson.databind.ObjectMapper(),new com.ptc.halo.service.LessonStoragePaths(directory.toString()));
+  when(materialIndex.getOrBuild(any())).thenAnswer(call->index.getOrBuild(call.getArgument(0)));
+  assertEquals(LessonStatus.APPROVED,controller.approveLesson(module.getId(),owner).getBody().getStatus());
+  assertFalse(index.getOrBuild(module).chunks().isEmpty());
+  var order=inOrder(materialIndex,assessment,audit);order.verify(materialIndex).getOrBuild(any());order.verify(assessment).generateAssessment(module.getId());order.verify(audit).createLog(any(),any(),anyString());
+ }
+ @Test void unreadableOriginalFilePreventsPublicationAndAssessment() {
+  var index=new com.ptc.halo.component.ModuleMaterialIndex(mock(org.springframework.ai.chat.client.ChatClient.class),new com.fasterxml.jackson.databind.ObjectMapper(),new com.ptc.halo.service.LessonStoragePaths(directory.toString()));
+  when(materialIndex.getOrBuild(any())).thenAnswer(call->index.getOrBuild(call.getArgument(0)));
+  var error=assertThrows(ResponseStatusException.class,()->controller.approveLesson(module.getId(),owner));
+  assertEquals("MODULE_MATERIAL_UNREADABLE",error.getReason());assertEquals(409,controller.handleRequestError(error).getStatusCode().value());
+  assertEquals(LessonStatus.PENDING,module.getStatus());verifyNoInteractions(assessment,audit);
  }
 }

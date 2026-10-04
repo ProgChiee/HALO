@@ -64,3 +64,23 @@ test('empty subject list retains Create Subject and reloads after creating witho
     host.remove();
   }
 });
+
+test('subject delete confirmation is truthful and conflict leaves the subject visible', async () => {
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const adapter = api.defaults.adapter, toasts = [];
+  api.defaults.adapter = async config => {
+    if (config.method === 'delete') throw { response: { status: 409, data: { code: 'SUBJECT_HAS_CONTENT' } } };
+    return { status: 200, headers: {}, config, data: [{ id: 1, subjectCode: 'S', subjectName: 'Subject with content', yearLevel: 'FIRST_YEAR' }] };
+  };
+  try {
+    await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Professor' }, logout() {} } },
+      React.createElement(ToastContext.Provider, { value: { showToast: (...args) => toasts.push(args) } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Subjects))))));
+    await act(async () => host.querySelector('[aria-label="Delete subject"]').click());
+    assert.match(host.textContent, /Only an empty subject can be deleted/);
+    assert.doesNotMatch(host.textContent, /also remove all modules/);
+    await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Delete').click());
+    assert.deepEqual(toasts, [['This subject still contains weeks or learning modules. Remove its content before deleting the subject.', 'error']]);
+    assert.ok(host.querySelector('[aria-label="Delete subject"]'));
+    assert.ok([...host.querySelectorAll('button')].find(button => button.textContent === 'Delete'));
+  } finally { await act(async () => root.unmount()); host.remove(); api.defaults.adapter = adapter; }
+});
