@@ -3,7 +3,6 @@ package com.ptc.halo.controller;
 import com.ptc.halo.dtoRequest.StudentAnswerRequest;
 import com.ptc.halo.dtoResponse.*;
 import com.ptc.halo.entity.AssessmentAttemptEntity;
-import com.ptc.halo.entity.AssessmentEntity;
 import com.ptc.halo.entity.UserEntity;
 import com.ptc.halo.repository.UserRepository;
 import com.ptc.halo.service.AssessmentService;
@@ -12,9 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/student/assessment")
@@ -30,27 +27,6 @@ public class StudentAssessmentController {
         this.userRepository = userRepository;
     }
 
-    @PostMapping("/generate/{moduleId}")
-    public ResponseEntity<Map<String, Object>> generateAssessment(
-            @PathVariable Long moduleId) {
-
-        AssessmentEntity assessment =
-                assessmentService.generateAssessment(moduleId);
-
-        Map<String, Object> response = new HashMap<>();
-
-        response.put("message", "Assessment generated successfully");
-        response.put("assessmentId", assessment.getId());
-        response.put("title", assessment.getTitle());
-        response.put(
-                "questionCount",
-                assessment.getQuestions().size()
-        );
-        response.put("passingScore", assessment.getPassingScore());
-        response.put("status", assessment.getStatus());
-
-        return ResponseEntity.ok(response);
-    }
     @GetMapping("/{moduleId}")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<AssessmentResponse>

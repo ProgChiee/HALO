@@ -41,3 +41,52 @@ public class ProfessorProfileController {
         );
     }
 }
+
+/*
+    @PutMapping("/profile")
+    public ResponseEntity<ProfessorProfileResponse> updateProfile(
+            @RequestBody ProfessorProfileUpdateRequest request,
+            Authentication authentication) {
+
+        UserEntity professor =
+                userRepository
+                        .findByEmail(authentication.getName())
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Professor not found"
+                                )
+                        );
+
+        return ResponseEntity.ok(
+                profileService.updateProfessorProfile(
+                        professor,
+                        request
+                )
+        );
+    }
+}
+
+@PutMapping("/profile")
+public ResponseEntity<ProfessorProfileResponse> updateProfile(
+        @RequestBody ProfessorProfileUpdateRequest request,
+        Authentication authentication) {
+
+    UserEntity professor =
+            userRepository
+                    .findByEmail(authentication.getName())
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Professor not found"
+                            )
+                    );
+
+    return ResponseEntity.ok(
+            profileService.updateProfessorProfile(
+                    professor,
+                    request
+            )
+    );
+}
+}
+
+ */

@@ -307,80 +307,52 @@ public class AssessmentService {
             );
         }
 
-        if (request == null ||
-                request.getAnswers() == null ||
-                request.getAnswers().isEmpty()) {
-
-            throw new RuntimeException(
-                    "No answers were submitted"
-            );
+        // Eligibility can change after an attempt starts. Recheck before accepting answers.
+        AssessmentEntity assessment = attempt.getAssessment();
+        progressionService.validateModuleAccess(assessment.getModule().getId(), student);
+        if (assessment.getStatus() != AssessmentStatus.AVAILABLE) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_NOT_AVAILABLE");
         }
 
+        // Validate the whole set before writing any answers or awarding progress/badges.
+        var expected = questionRepository.findByAssessmentIdOrderByQuestionNumberAsc(attempt.getAssessment().getId());
+        var expectedIds = expected.stream().map(AssessmentQuestionEntity::getId).collect(java.util.stream.Collectors.toSet());
+        if (expectedIds.isEmpty() || request == null || request.getAnswers() == null
+                || request.getAnswers().size() != expectedIds.size()) throw invalidAnswerSet();
+        var submitted = new java.util.HashMap<Long, String>();
+        for (var item : request.getAnswers()) {
+            if (item == null || item.getQuestionId() == null || !expectedIds.contains(item.getQuestionId())
+                    || item.getAnswer() == null) throw invalidAnswerSet();
+            String answer = item.getAnswer().trim().toUpperCase(java.util.Locale.ROOT);
+            if (!answer.matches("[ABCD]") || submitted.putIfAbsent(item.getQuestionId(), answer) != null)
+                throw invalidAnswerSet();
+        }
+        if (!submitted.keySet().equals(expectedIds)) throw invalidAnswerSet();
+
         int correctAnswers = 0;
-
-        for (StudentAnswerRequest.AnswerItem item
-                : request.getAnswers()) {
-
-            AssessmentQuestionEntity question =
-                    questionRepository.findById(
-                            item.getQuestionId()
-                    ).orElseThrow(() ->
-                            new RuntimeException(
-                                    "Question not found: "
-                                            + item.getQuestionId()
-                            )
-                    );
-
-            if (!question.getAssessment().getId()
-                    .equals(attempt.getAssessment().getId())) {
-
-                throw new RuntimeException(
-                        "Question does not belong to this assessment"
-                );
-            }
-
-            if (item.getAnswer() == null ||
-                    item.getAnswer().isBlank()) {
-
-                throw new RuntimeException(
-                        "Answer cannot be empty for question: "
-                                + item.getQuestionId()
-                );
-            }
-
-            String studentAnswer =
-                    item.getAnswer()
-                            .trim()
-                            .toUpperCase();
-
-            if (!studentAnswer.matches("[ABCD]")) {
-
-                throw new RuntimeException(
-                        "Invalid answer for question: "
-                                + item.getQuestionId()
-                );
-            }
-
-            StudentAnswerEntity answer =
-                    new StudentAnswerEntity();
-
+        var answers = new ArrayList<StudentAnswerEntity>();
+        for (var question : expected) {
+            String studentAnswer = submitted.get(question.getId());
+            var answer = new StudentAnswerEntity();
             answer.setAttempt(attempt);
             answer.setQuestion(question);
             answer.setAnswer(studentAnswer);
-
-            studentAnswerRepository.save(answer);
-
-            if (question.getCorrectAnswer()
-                    .equalsIgnoreCase(studentAnswer)) {
-
-                correctAnswers++;
-            }
+            answers.add(answer);
+            if (question.getCorrectAnswer().equalsIgnoreCase(studentAnswer)) correctAnswers++;
         }
-
-        int totalQuestions =
-                attempt.getAssessment()
-                        .getQuestions()
-                        .size();
+        try {
+            studentAnswerRepository.saveAllAndFlush(answers);
+        } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+            for (Throwable cause = conflict; cause != null; cause = cause.getCause()) {
+                if (cause instanceof org.hibernate.exception.ConstraintViolationException constraint
+                        && constraint.getConstraintName() != null
+                        && constraint.getConstraintName().toLowerCase(java.util.Locale.ROOT).contains("uk_student_answer_attempt_question"))
+                    throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "ANSWERS_ALREADY_RECORDED");
+            }
+            throw conflict;
+        }
+        int totalQuestions = expectedIds.size();
 
         int score =
                 (int) Math.round(
@@ -461,6 +433,10 @@ public class AssessmentService {
 
     }
 
+    private org.springframework.web.server.ResponseStatusException invalidAnswerSet() {
+        return new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_ANSWER_SET");
+    }
+
     public List<AssessmentAttemptHistoryResponse> getAttemptHistory(
             Long moduleId,
             UserEntity student) {
@@ -501,6 +477,7 @@ public class AssessmentService {
                 })
                 .toList();
     }
+    @Transactional(readOnly = true)
     public AssessmentResultResponse getAttemptResult(
             Long attemptId,
             UserEntity student) {
