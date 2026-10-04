@@ -14,7 +14,7 @@ export function parseLoginResponse(response) {
     throw new Error('Invalid login response');
   }
   return {
-    user: { name: response.name, email: response.email, role, backendRole: response.role },
+    user: { name: response.name, email: response.email, role, backendRole: response.role, mustChangePassword: response.mustChangePassword === true },
     token: response.token,
   };
 }

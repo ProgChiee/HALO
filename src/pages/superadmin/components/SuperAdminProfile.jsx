@@ -1,6 +1,8 @@
+import { useAuth } from '../../../context/login/useAuth';
+import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState, useEffect } from 'react';
 import { User as UserIcon, KeyRound } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
+import PageShell from '../../../components/shared/PageShell';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { getSuperAdminProfile } from '../../../services/superadmin/superadminService';
@@ -13,10 +15,11 @@ import styles from '../styles/SuperAdminProfile.module.css';
 // derived client-side from the name.
 
 export default function SuperAdminProfile() {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(user?.mustChangePassword === true);
 
   useEffect(() => {
     let isMounted = true;
@@ -25,8 +28,8 @@ export default function SuperAdminProfile() {
         const data = await getSuperAdminProfile();
         if (isMounted) setProfile(data);
       } catch (err) {
-        console.error(err);
-        if (isMounted) setLoadError(true);
+  
+        if (isMounted) setLoadError(apiErrorMessage(err));
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -37,33 +40,29 @@ export default function SuperAdminProfile() {
 
   if (isLoading) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
-        <div className={styles.contentArea}>
+      <PageShell responsive navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
+        <div>
           <p className={styles.loadingText}>Loading profile...</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   if (loadError || !profile) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
-        <div className={styles.contentArea}>
-          <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
+      <PageShell responsive navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
+        <div>
+          <p className={styles.loadingText}>{loadError || 'Could not load this page.'}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
-
-      <div className={styles.contentArea}>
+    <PageShell responsive navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
         <header className={styles.topbar}>
           <div className={styles.breadcrumb}>
             <UserIcon size={16} />
@@ -72,6 +71,7 @@ export default function SuperAdminProfile() {
         </header>
 
         <main className={styles.main}>
+          {user?.mustChangePassword && <p role="alert">Change your temporary password before using Super Admin features.</p>}
           <div className={styles.profileHeader}>
             <div className={styles.avatar}>{avatarInitial}</div>
             <div>
@@ -99,7 +99,7 @@ export default function SuperAdminProfile() {
 
           <button
             className={styles.actionRow}
-            onClick={() => setShowChangePassword(true)}
+            onClick={event => { event.currentTarget.focus(); setShowChangePassword(true); }}
           >
             <span className={styles.actionIcon}>
               <KeyRound size={16} />
@@ -107,9 +107,8 @@ export default function SuperAdminProfile() {
             Change password
           </button>
         </main>
-      </div>
 
-      <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
-    </div>
+      <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
+    </PageShell>
   );
 }

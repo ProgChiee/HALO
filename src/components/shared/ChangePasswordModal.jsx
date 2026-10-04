@@ -1,6 +1,10 @@
+import { useAuth } from '../../context/login/useAuth';
+import { useNavigate } from 'react-router-dom';
+import { apiErrorMessage } from '../../utils/apiErrors';
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import Button from './Button';
+import Dialog from './Dialog';
 import { useToast } from '../../context/notifications/useToast';
 import { changePassword } from '../../services/authService';
 import styles from './ChangePasswordModal.module.css';
@@ -14,7 +18,9 @@ import styles from './ChangePasswordModal.module.css';
  * const [showChangePassword, setShowChangePassword] = useState(false);
  * <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
  */
-export default function ChangePasswordModal({ isOpen, onClose }) {
+export default function ChangePasswordModal({ isOpen, onClose, accessible = false }) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const { showToast } = useToast();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -49,13 +55,13 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
     if (isSaving) return;
     setFormError('');
 
-    if (!currentPassword || !newPassword || !confirmNewPassword) {
+    if (!currentPassword.trim() || !newPassword.trim() || !confirmNewPassword) {
       setFormError('Please fill in all fields.');
       return;
     }
 
-    if (newPassword.length < 8) {
-      setFormError('New password must be at least 8 characters.');
+    if (newPassword.length < 8 || new TextEncoder().encode(newPassword).length > 72) {
+      setFormError('New password must be at least 8 characters and at most 72 UTF-8 bytes.');
       return;
     }
 
@@ -72,31 +78,33 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
     setIsSaving(true);
     try {
       await changePassword(currentPassword, newPassword);
-      showToast('Password changed successfully.', 'success');
+      showToast('Password changed. Please sign in again.', 'success');
+      logout();
+      navigate('/login', { replace: true });
       resetAndClose();
-    } catch {
-      setFormError('Something went wrong. Please check your current password and try again.');
+    } catch (err) {
+      setFormError(apiErrorMessage(err, 'Please check your current password and try again.'));
     } finally {
       setIsSaving(false);
     }
   }
 
-  return (
-    <div className={styles.modalOverlay} onClick={handleCloseAttempt}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+  const content = (
+    <>
         <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>Change Password</h3>
-          <button className={styles.closeBtn} onClick={handleCloseAttempt} aria-label="Close">
+          <h3 id="change-password-title" className={styles.modalTitle}>Change Password</h3>
+          <button className={styles.closeBtn} onClick={handleCloseAttempt} disabled={isSaving} aria-label="Close">
             <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>Current password</label>
+            <label htmlFor="current-password" className={styles.label}>Current password</label>
             <input
               type="password"
               className={styles.input}
+              id="current-password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               autoComplete="current-password"
@@ -104,10 +112,11 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>New password</label>
+            <label htmlFor="new-password" className={styles.label}>New password</label>
             <input
               type="password"
               className={styles.input}
+              id="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               autoComplete="new-password"
@@ -115,10 +124,11 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>Confirm new password</label>
+            <label htmlFor="confirm-password" className={styles.label}>Confirm new password</label>
             <input
               type="password"
               className={styles.input}
+              id="confirm-password"
               value={confirmNewPassword}
               onChange={(e) => setConfirmNewPassword(e.target.value)}
               autoComplete="new-password"
@@ -136,7 +146,10 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </>
   );
+  if (accessible) return <Dialog labelledBy="change-password-title" onClose={handleCloseAttempt} busy={isSaving} className={styles.modal}>{content}</Dialog>;
+  return <div className={styles.modalOverlay} onClick={handleCloseAttempt}>
+    <div className={styles.modal} onClick={event => event.stopPropagation()}>{content}</div>
+  </div>;
 }

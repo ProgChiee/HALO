@@ -46,6 +46,10 @@
 }
 
 /* --- Table --- */
+.tableScroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+
+.tableScroll > .tableCard { min-width: 720px; }
+
 .tableCard {
   background: var(--color-bg-stat-card);
   border: 1px solid var(--color-border-stat-card);
@@ -55,7 +59,7 @@
 
 .tableHeaderRow {
   display: grid;
-  grid-template-columns: 1.2fr 1.6fr 1fr 0.8fr 76px;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(240px, 1.6fr) 110px 96px;
   gap: var(--space-md);
   padding: var(--space-md) var(--space-lg);
   background: var(--color-bg-topbar);
@@ -67,7 +71,7 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 1.2fr 1.6fr 1fr 0.8fr 76px;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(240px, 1.6fr) 110px 96px;
   gap: var(--space-md);
   align-items: center;
   padding: var(--space-md) var(--space-lg);
@@ -234,3 +238,7 @@
   font-size: var(--text-sm);
 }
 .statusText { font-size: var(--text-sm); font-weight: 600; }
+
+.adminName { overflow-wrap: anywhere; }
+.modal input { min-width: 0; width: 100%; box-sizing: border-box; }
+@media (max-width: 480px) { .modal { padding: 1rem; } }

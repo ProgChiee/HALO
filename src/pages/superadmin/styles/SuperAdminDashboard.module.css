@@ -135,3 +135,9 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+.activityRow > div { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .activityRow { align-items: flex-start; flex-direction: column; gap: 0.5rem; }
+  .activityTime { margin-left: 0; }
+  .statsGrid { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
+}

@@ -16,3 +16,20 @@
   overflow-y: auto;
   overflow-x: hidden;
 }
+.responsive { height: 100dvh; }
+.responsive > .content { height: 100dvh; }
+.responsive > aside { height: 100dvh; overflow-wrap: anywhere; }
+.mobileBar, .drawerHeader { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1rem; }
+.mobileBar { flex-shrink: 0; border-bottom: 1px solid var(--color-border-panel); color: var(--color-accent-active); }
+.menuButton { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; background: transparent; color: var(--color-text-primary); border: 1px solid var(--color-border-panel); border-radius: var(--radius-sm); }
+.drawer { position: absolute; top: 0; bottom: 0; left: 0; width: min(300px, 90vw); max-height: 100dvh; background: var(--color-bg-sidebar); padding: 0; }
+.drawerHeader h2 { font-size: var(--text-md); color: var(--color-text-primary); }
+.drawer aside { position: static; width: 100%; height: auto; min-height: calc(100dvh - 76px); border: 0; overflow: visible; }
+.drawer aside > div:last-child { overflow-wrap: anywhere; }
+.responsive :focus-visible { outline: 2px solid var(--color-accent-active); outline-offset: 3px; }
+@media (max-width: 768px) {
+  .responsive > .content > header, .responsive > .content > main { padding: 1rem; }
+  .responsive > .content > header { flex-wrap: wrap; gap: 0.75rem; }
+}
+
+.responsive > .content > header > div { min-width: 0; flex-wrap: wrap; }

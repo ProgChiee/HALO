@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../../context/login/useAuth';
 import { User as UserIcon, KeyRound } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
@@ -15,10 +16,11 @@ import styles from '../styles/AdminProfile.module.css';
 // until one exists.
 
 export default function AdminProfile() {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(user?.mustChangePassword === true);
 
   useEffect(() => {
     let isMounted = true;
@@ -26,8 +28,7 @@ export default function AdminProfile() {
       try {
         const data = await getAdminProfile();
         if (isMounted) setProfile(data);
-      } catch (err) {
-        console.error(err);
+      } catch {
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -65,6 +66,7 @@ export default function AdminProfile() {
       </header>
 
       <main className={styles.main}>
+        {user?.mustChangePassword && <p role="alert">Change your temporary password before using Admin features.</p>}
         <div className={styles.profileHeader}>
           <div className={styles.avatar}>{avatarInitial}</div>
           <div>

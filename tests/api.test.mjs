@@ -11,6 +11,57 @@ let quiz;
 let mentor;
 let captured;
 const responseData = { marker: 'response preserved' };
+
+test('Admin request failures log only safe diagnostics and preserve errors for the UI', async () => {
+  const originalAdapter = api.defaults.adapter;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  const originalLog = console.log;
+  const logged = [];
+  const rawLogs = [];
+  console.warn = (...args) => logged.push(args);
+  console.error = console.log = (...args) => rawLogs.push(args);
+  api.defaults.adapter = async config => {
+    throw {
+      config: { ...config, url: config.url + '?resetToken=PRIVATE_RESET', headers: { Authorization: 'Bearer PRIVATE_JWT' }, data: { password: 'PRIVATE_PASSWORD' } },
+      request: { personalInformation: 'PRIVATE_PERSON' },
+      response: { status: 409, data: { code: 'EMAIL_ALREADY_EXISTS', message: 'PRIVATE_RESPONSE' } },
+    };
+  };
+  try {
+    const calls = [
+      () => admin.getAdminDashboardData(), () => admin.getAdminRecentActivity(),
+      () => admin.getProfessors(),
+      () => admin.createProfessor({ name: 'Fixture', email: 'fixture@example.test', password: 'PRIVATE_PASSWORD', professorId: 'P1' }),
+      () => admin.updateProfessor(1, { name: 'Fixture', email: 'fixture@example.test', professorId: 'P1' }),
+      () => admin.toggleProfessorStatus(1), () => admin.getAdminProfile(),
+      () => auth.changePassword('PRIVATE_CURRENT', 'PRIVATE_PASSWORD'),
+    ];
+    const { apiErrorMessage } = await server.ssrLoadModule('/src/utils/apiErrors.js');
+    for (const call of calls) {
+      await assert.rejects(call(), error => {
+        assert.equal(error.response.status, 409);
+        assert.equal(apiErrorMessage(error), 'An account with this email already exists.');
+        return true;
+      });
+    }
+    assert.equal(logged.length, calls.length);
+    assert.deepEqual(rawLogs, []);
+    for (const [label, diagnostic] of logged) {
+      assert.equal(label, '[HALO API]');
+      assert.deepEqual(Object.keys(diagnostic).sort(), ['code', 'endpoint', 'method', 'status']);
+      assert.equal(diagnostic.status, 409);
+      assert.equal(diagnostic.code, 'EMAIL_ALREADY_EXISTS');
+      assert.ok(diagnostic.endpoint.startsWith('/'));
+    }
+    assert.doesNotMatch(JSON.stringify(logged), /PRIVATE_|Authorization|Bearer|fixture@example|resetToken/i);
+  } finally {
+    api.defaults.adapter = originalAdapter;
+    console.warn = originalWarn;
+    console.error = originalError;
+    console.log = originalLog;
+  }
+});
 function memoryStorage() {
   const values = new Map();
   return { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
@@ -135,11 +186,11 @@ test('role menus do not offer routes forbidden by SecurityConfig', async () => {
 test('401 from an old token does not clear a newer session; current token expiry does', async () => {
   const reject = api.interceptors.response.handlers[0].rejected;
   localStorage.setItem('halo_token', 'new-token');
-  await assert.rejects(reject({ response: { status: 401 }, config: { headers: { Authorization: 'Bearer old-token' } } }));
+  await assert.rejects(reject({ response: { status: 401, data: { code: 'INVALID_OR_EXPIRED_TOKEN' } }, config: { headers: { Authorization: 'Bearer old-token' } } }));
   assert.equal(localStorage.getItem('halo_token'), 'new-token');
   let notified = false;
   window.addEventListener('halo:session-expired', () => { notified = true; }, { once: true });
-  await assert.rejects(reject({ response: { status: 401 }, config: { headers: { Authorization: 'Bearer new-token' } } }));
+  await assert.rejects(reject({ response: { status: 401, data: { code: 'INVALID_OR_EXPIRED_TOKEN' } }, config: { headers: { Authorization: 'Bearer new-token' } } }));
   assert.equal(localStorage.getItem('halo_token'), null);
   assert.equal(notified, true);
 });
@@ -206,4 +257,109 @@ test('lesson and mentor requests have finite timeouts and authenticated transpor
   assert.equal(captured.timeout, 90000);
   await mentor.sendMessage(45, 'Explain');
   assert.equal(captured.timeout, 90000);
+});
+
+
+test('shared timeout bounds ordinary requests without shortening uploads', async () => {
+  assert.equal(api.defaults.timeout, 15000);
+  await auth.login('account@example.test', 'test-password');
+  assert.equal(captured.timeout, 15000);
+  await professor.createLearningModule(7, { lessonText: 'Test', files: [] });
+  assert.equal(captured.timeout, 180000);
+});
+
+
+test('temporary-password account cannot render normal privileged content', async () => {
+  const React = await import('react'); const { renderToString } = await import('react-dom/server');
+  const { MemoryRouter } = await import('react-router-dom');
+  const { AuthContext } = await server.ssrLoadModule('/src/context/login/useAuth.js');
+  const { default: Guard } = await server.ssrLoadModule('/src/routes/ProtectedRoute.jsx');
+  for (const path of ['/superadmin', '/superadmin/profile']) {
+    const html = renderToString(React.createElement(MemoryRouter, { initialEntries: [path] },
+      React.createElement(AuthContext.Provider, { value: { role: 'superadmin', isAuthenticated: true, user: { mustChangePassword: true } } },
+        React.createElement(Guard, { allowedRoles: ['superadmin'] }, 'protected-content'))));
+    assert.equal(html.includes('protected-content'), path.endsWith('/profile'));
+  }
+});
+
+test('API diagnostics do not expose token, password or raw error/config', async () => {
+  const original = console.warn; const logs = [];
+  console.warn = (...args) => logs.push(args);
+  try {
+    await assert.rejects(api.interceptors.response.handlers[0].rejected({
+      code: 'ECONNABORTED', config: { method: 'post', url: '/super-admin/create-admin',
+        headers: { Authorization: 'Bearer private-test-token' }, data: { password: 'private-test-password' } },
+    }));
+    assert.ok(!JSON.stringify(logs).includes('private-test'));
+  } finally { console.warn = original; }
+});
+
+
+test('activity widget 401/500 does not invalidate current session', async () => {
+ localStorage.setItem('halo_user', JSON.stringify({ name: 'Test', email: 'test@example.test', role: 'superadmin' }));
+ localStorage.setItem('halo_token', 'widget-token');
+ let events = 0; const listener = () => events++;
+ window.addEventListener('halo:session-expired', listener);
+ try {
+  for (const status of [401, 500]) {
+   await assert.rejects(api.interceptors.response.handlers[0].rejected({ response: { status, data: { code: 'AUTHENTICATION_REQUIRED' } }, config: { headers: { Authorization: 'Bearer widget-token' } } }));
+   assert.equal(localStorage.getItem('halo_token'), 'widget-token');
+  }
+  assert.equal(events, 0);
+ } finally { window.removeEventListener('halo:session-expired', listener); }
+});
+
+test('dashboard renders each successful section independently of the failed section', async () => {
+ const React = await import('react'); const { renderToString } = await import('react-dom/server');
+ const { MemoryRouter } = await import('react-router-dom');
+ const { AuthContext } = await server.ssrLoadModule('/src/context/login/useAuth.js');
+ const { DashboardSections } = await server.ssrLoadModule('/src/pages/superadmin/components/SuperAdminDashboard.jsx');
+ const render = (statistics, logs) => renderToString(React.createElement(MemoryRouter, null,
+  React.createElement(AuthContext.Provider, { value: { user: null } }, React.createElement(DashboardSections, { statistics, logs }))));
+ const ok = { isLoading: false, error: null, reload: () => {} };
+ const stats = { ...ok, data: { totalUsers: 123, totalAdmins: 4, totalStudents: 100, totalProfessors: 18, activeUsers: 120, inactiveUsers: 3 } };
+ const logs = { ...ok, data: [{ id: 1, userName: 'Actor', action: 'Test activity', createdAt: '2026-01-01T12:00:00' }] };
+ let html = render(stats, { ...logs, error: new Error('failed') });
+ assert.ok(html.includes('Total Users')); assert.ok(html.includes('123')); assert.ok(html.includes('Retry activity logs'));
+ html = render({ ...stats, data: null, error: new Error('failed') }, logs);
+ assert.ok(html.includes('Test activity')); assert.ok(html.includes('Retry statistics'));
+});
+
+
+test('Super Admin mutations normalize input and send an explicit desired status', async () => {
+ const service = await server.ssrLoadModule('/src/services/superadmin/superadminService.js');
+ const previous = api.defaults.adapter;
+ const requests = [];
+ api.defaults.adapter = async config => { requests.push(config); return { data: {}, status: 200, headers: {}, config }; };
+ try {
+  await service.addAdmin({ name: '  Admin  ', email: ' TEST@EXAMPLE.TEST ', password: 'test-password-12' });
+  assert.deepEqual(JSON.parse(requests[0].data), { name: 'Admin', email: 'test@example.test', password: 'test-password-12' });
+  await service.setAdminStatus(7, 'ACTIVE'); await service.setAdminStatus(7, 'ACTIVE');
+  assert.deepEqual(requests.slice(1).map(c => JSON.parse(c.data)), [{ status: 'ACTIVE' }, { status: 'ACTIVE' }]);
+  assert.equal(requests[1].url, '/super-admin/admin/7/status');
+  assert.equal(requests.length, 3);
+ } finally { api.defaults.adapter = previous; }
+});
+
+test('Super Admin monitoring forwards pagination/filter and dashboard only requests ten recent logs', async () => {
+ const service = await server.ssrLoadModule('/src/services/superadmin/superadminService.js');
+ const previous = api.defaults.adapter;
+ const requests = [];
+ const rows = [{ id: 1, action: 'Created Admin' }];
+ api.defaults.adapter = async config => { requests.push(config); return { data: { content: rows, totalElements: 100 }, status: 200, headers: {}, config }; };
+ try {
+  const signal = new AbortController().signal;
+  const page = await service.getActivityLogs({ signal, params: { page: 2, size: 20, search: 'created', activityType: 'ACCOUNT' } });
+  assert.equal(page.totalElements, 100);
+  assert.deepEqual(requests[0].params, { page: 2, size: 20, search: 'created', activityType: 'ACCOUNT' });
+  assert.equal(requests[0].signal, signal);
+  assert.deepEqual(await service.getRecentActivityLogs(), rows);
+  assert.deepEqual(requests[1].params, { page: 0, size: 10 });
+ } finally { api.defaults.adapter = previous; }
+});
+
+test('Super Admin errors display safe specific messages without exposing arbitrary internal text', async () => {
+ const { apiErrorMessage } = await server.ssrLoadModule('/src/utils/apiErrors.js');
+ assert.equal(apiErrorMessage({ response: { data: { code: 'EMAIL_ALREADY_EXISTS', message: 'private SQL' } } }), 'An account with this email already exists.');
+ assert.equal(apiErrorMessage({ response: { data: { message: 'private SQL' } } }), 'The request failed. Please try again.');
 });

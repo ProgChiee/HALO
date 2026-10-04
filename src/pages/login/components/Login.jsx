@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
@@ -5,7 +6,7 @@ import { useAuth } from '../../../context/login/useAuth';
 import { useToast } from '../../../context/notifications/useToast';
 import { login as loginService } from '../../../services/authService';
 import { parseLoginResponse } from '../../../utils/backendContract';
-import { ROLE_HOME } from '../../../utils/roles';
+import { ROLE_HOME, getPasswordChangeRoute } from '../../../utils/roles';
 import Button from '../../../components/shared/Button';
 import bgImage from '../../../assets/login/BG.jpeg';
 import logo from '../../../assets/login/Logo.svg';
@@ -39,11 +40,11 @@ export default function Login() {
       const { user, token } = parseLoginResponse(response);
       login(user, token, rememberMe);
       showToast('Welcome back!', 'success');
-      navigate(ROLE_HOME[user.role], { replace: true });
+      navigate(user.mustChangePassword ? getPasswordChangeRoute(user.role) : ROLE_HOME[user.role], { replace: true });
     } catch (err) {
       setError(err.response?.status === 401 || err.response?.status === 403
         ? 'Login failed. Check your credentials and account status.'
-        : 'Unable to sign in. Check that the backend is available and try again.');
+        : apiErrorMessage(err, 'Unable to sign in. Check that the backend is available and try again.'));
     } finally {
       setIsLoading(false);
     }

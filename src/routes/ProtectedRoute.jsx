@@ -1,5 +1,6 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/login/useAuth';
+import { getPasswordChangeRoute } from '../utils/roles';
 
 /**
  * Usage:
@@ -10,7 +11,8 @@ import { useAuth } from '../context/login/useAuth';
  * If no allowedRoles is passed, any logged-in user can access it.
  */
 export default function ProtectedRoute({ allowedRoles, children }) {
-  const { isAuthenticated, role, isLoading } = useAuth();
+  const location = useLocation();
+  const { isAuthenticated, role, isLoading, user } = useAuth();
 
   if (isLoading) {
     return <div>Loading...</div>; // swap with a proper loading spinner component
@@ -24,5 +26,9 @@ export default function ProtectedRoute({ allowedRoles, children }) {
     return <Navigate to="/unauthorized" replace />;
   }
 
+  const passwordRoute = getPasswordChangeRoute(role);
+  if (user?.mustChangePassword && location.pathname !== passwordRoute) {
+    return <Navigate to={passwordRoute} replace />;
+  }
   return children;
 }

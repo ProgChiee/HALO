@@ -176,3 +176,12 @@ test('mentor failure retains lesson; switching modules suppresses stale session 
     assert.deepEqual(events, abort ? ['lesson'] : ['lesson', 'mentor-error']);
   }
 });
+
+
+test('temporary password flag survives storage and timeout errors are safe', async () => {
+  const { apiErrorMessage } = await import('../src/utils/apiErrors.js');
+  const result = parseLoginResponse({ role: 'SUPER_ADMIN', name: 'Test', email: 'test@example.test', token: 'test-token', mustChangePassword: true });
+  const values = { halo_user: JSON.stringify(result.user), halo_token: result.token };
+  assert.equal(readSession([{ getItem: key => values[key] }]).user.mustChangePassword, true);
+  assert.equal(apiErrorMessage({ code: 'ECONNABORTED', config: { password: 'never shown' } }), 'The request took too long. Please try again.');
+});

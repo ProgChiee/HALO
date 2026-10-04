@@ -1,3 +1,4 @@
+import { validateProfessor, professorValidationError } from '../../../utils/adminProfessorValidation';
 import { useState, useRef, useMemo } from 'react';
 import { GraduationCap, Search, Plus, Eye, Pencil, Power, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
@@ -81,24 +82,17 @@ export default function ProfessorManagement() {
     if (isSubmitting) return;
     setFormError('');
 
-    if (!name || !email || !password || !professorId) {
-      setFormError('Please fill in all fields.');
-      return;
-    }
-    if (password.length < 8) {
-      setFormError('Password must be at least 8 characters.');
-      return;
-    }
+    const validationError = validateProfessor({ name, email, password, professorId }, true);
+    if (validationError) { setFormError(validationError); return; }
 
     setIsSubmitting(true);
     try {
-      await createProfessor({ name, email, password, professorId });
+      await createProfessor({ name: name.trim(), email: email.trim().toLowerCase(), password, professorId: professorId.trim() });
       showToast('Professor account created.', 'success');
       setShowCreateModal(false);
       await refetchProfessors();
-    } catch (err) {
-      console.error(err);
-      setFormError('Something went wrong. Please try again.');
+    } catch (error) {
+      setFormError(professorValidationError(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -134,20 +128,17 @@ export default function ProfessorManagement() {
     if (isSubmitting) return;
     setFormError('');
 
-    if (!name || !email || !professorId) {
-      setFormError('Please fill in all fields.');
-      return;
-    }
+    const validationError = validateProfessor({ name, email, professorId });
+    if (validationError) { setFormError(validationError); return; }
 
     setIsSubmitting(true);
     try {
-      await updateProfessor(editingProfessor.id, { name, email, professorId });
+      await updateProfessor(editingProfessor.id, { name: name.trim(), email: email.trim().toLowerCase(), professorId: professorId.trim() });
       showToast('Professor info updated.', 'success');
       setEditingProfessor(null);
       await refetchProfessors();
-    } catch (err) {
-      console.error(err);
-      setFormError('Something went wrong. Please try again.');
+    } catch (error) {
+      setFormError(professorValidationError(error));
     } finally {
       setIsSubmitting(false);
     }

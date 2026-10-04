@@ -479,3 +479,12 @@
   border-radius: var(--radius-pill);
 }
 .activityActor { font-weight: 600; }
+
+.superAdminTabs { flex-wrap: wrap; }
+.superAdminActivity .logText { overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+  .superAdminTabs { padding: 1rem 1rem 0; }
+  .superAdminActivity .summaryRow, .superAdminActivity .toolbarRow { flex-wrap: wrap; }
+  .superAdminActivity .summaryCard { min-width: 0; }
+  .superAdminActivity .logRow { flex-wrap: wrap; }
+}

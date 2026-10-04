@@ -22,3 +22,7 @@ export const ROLE_HOME = {
   [ROLES.PROFESSOR]: '/professor',
   [ROLES.STUDENT]: '/student',
 };
+
+export function getPasswordChangeRoute(role) {
+  return ({ [ROLES.ADMIN]: '/admin/profile', [ROLES.SUPERADMIN]: '/superadmin/profile' })[role] ?? '/unauthorized';
+}

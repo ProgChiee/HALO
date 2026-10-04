@@ -1,0 +1,25 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  overscroll-behavior: contain;
+}
+.dialog {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+.dialog :focus-visible { outline: 2px solid var(--color-accent-active); outline-offset: 3px; }
+@media (max-width: 480px) {
+  .dialog { padding: 1rem; }
+}

@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { apiErrorMessage } from '../../../utils/apiErrors';
+import { useState, useMemo, useCallback } from 'react';
 import { Activity, Search, Bot, MessageSquare, Users, TrendingUp, GraduationCap, AlertTriangle } from 'lucide-react';
 import {
   BarChart,
@@ -73,6 +74,7 @@ export default function Monitoring() {
 
   return (
     <PageShell
+      responsive={isSuperAdmin}
       navItems={isSuperAdmin ? SUPERADMIN_NAV_ITEMS : ADMIN_NAV_ITEMS}
       sectionLabel={isSuperAdmin ? 'Superadmin' : 'Admin'}
       roleBadge={isSuperAdmin ? 'Superadmin' : 'Admin'}
@@ -85,7 +87,7 @@ export default function Monitoring() {
         </div>
       </header>
 
-      <div className={styles.tabRow}>
+      <div className={`${styles.tabRow} ${isSuperAdmin ? styles.superAdminTabs : ''}`}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -97,7 +99,7 @@ export default function Monitoring() {
         ))}
       </div>
 
-      {activeTab === 'activity' && <ActivityLogTab loader={isSuperAdmin ? getActivityLogs : getActivityLog} />}
+      {activeTab === 'activity' && <ActivityLogTab loader={isSuperAdmin ? getActivityLogs : getActivityLog} paginated={isSuperAdmin} />}
       {!isSuperAdmin && activeTab === 'ai-usage' && <AiUsageTab />}
       {!isSuperAdmin && activeTab === 'quiz-performance' && <QuizPerformanceTab />}
       {activeTab === 'admin-activity' && isSuperAdmin && <AdminActivityTab />}
@@ -108,10 +110,22 @@ export default function Monitoring() {
 // ---------------------------------------------------------------------------
 // Tab 1: Activity Log
 // ---------------------------------------------------------------------------
-function ActivityLogTab({ loader }) {
-  const { data: logs, isLoading, error: loadError, reload: loadLogs } = useRemoteData(loader, []);
+function ActivityLogTab({ loader, paginated = false }) {
+  const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const serverSearch = paginated ? searchQuery : '';
+  const serverCategory = paginated ? activeCategory : 'all';
+  const requestKey = JSON.stringify([page, serverSearch, serverCategory]);
+  const loadPage = useCallback(async (config) => {
+    const result = await loader(paginated ? {
+      ...config, params: { page, size: 20, search: serverSearch, ...(serverCategory === 'all' ? {} : { activityType: serverCategory }) },
+    } : config);
+    return paginated ? { ...result, requestKey } : result;
+  }, [loader, paginated, page, serverSearch, serverCategory, requestKey]);
+  const { data, isLoading, error: loadError, reload: loadLogs } = useRemoteData(loadPage, paginated ? { content: [], totalElements: 0, totalPages: 0 } : []);
+  const logs = paginated ? data.content : data;
+  const pagePending = paginated && (isLoading || data.requestKey !== requestKey);
   const { showToast } = useToast();
 
   async function handleRetry() {
@@ -119,14 +133,14 @@ function ActivityLogTab({ loader }) {
   }
 
   const filteredLogs = useMemo(() => {
-    return logs.filter((log) => {
+    return paginated ? logs : logs.filter((log) => {
       const matchesCategory = activeCategory === 'all' || log.activityType === activeCategory;
       const matchesSearch =
         (log.action ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (log.userName ?? '').toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [logs, searchQuery, activeCategory]);
+  }, [logs, searchQuery, activeCategory, paginated]);
 
   // No severity/error concept exists on the real ActivityLogResponse (no
   // "type: success|error" field) — showing AUTH-category event count
@@ -136,15 +150,15 @@ function ActivityLogTab({ loader }) {
     [logs]
   );
 
-  if (isLoading) {
+  if (isLoading && (!paginated || !data.requestKey)) {
     return <div className={styles.main}><p className={styles.loadingText}>Loading activity log...</p></div>;
   }
 
-  if (loadError) {
+  if (loadError && !paginated) {
     return (
       <div className={styles.main}>
         <div className={styles.errorState}>
-          <p>Couldn't load the activity log. Please check your connection and try again.</p>
+          <p>{apiErrorMessage(loadError, "Couldn't load the activity log. Please try again.")}</p>
           <button className={styles.retryBtn} onClick={handleRetry}>Retry</button>
         </div>
       </div>
@@ -152,15 +166,15 @@ function ActivityLogTab({ loader }) {
   }
 
   return (
-    <main className={styles.main}>
+    <main className={`${styles.main} ${paginated ? styles.superAdminActivity : ''}`}>
       <div className={styles.summaryRow}>
         <div className={styles.summaryCard}>
-          <p className={styles.summaryValue}>{logs.length}</p>
-          <p className={styles.summaryLabel}>Total events</p>
+          <p className={styles.summaryValue}>{paginated ? data.totalElements : logs.length}</p>
+          <p className={styles.summaryLabel}>{paginated ? 'Matching events' : 'Total events'}</p>
         </div>
         <div className={styles.summaryCard}>
           <p className={styles.summaryValue}>{authEventCount}</p>
-          <p className={styles.summaryLabel}>Auth events</p>
+          <p className={styles.summaryLabel}>{paginated ? 'Auth events on this page' : 'Auth events'}</p>
         </div>
       </div>
 
@@ -171,8 +185,9 @@ function ActivityLogTab({ loader }) {
             type="text"
             className={styles.searchInput}
             placeholder="Search activity log"
+            maxLength={paginated ? 200 : undefined}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
           />
         </div>
 
@@ -181,7 +196,7 @@ function ActivityLogTab({ loader }) {
             <button
               key={cat.id}
               className={`${styles.filterChip} ${activeCategory === cat.id ? styles.filterChipActive : ''}`}
-              onClick={() => setActiveCategory(cat.id)}
+              onClick={() => { setActiveCategory(cat.id); setPage(0); }}
             >
               {cat.label}
             </button>
@@ -189,8 +204,13 @@ function ActivityLogTab({ loader }) {
         </div>
       </div>
 
-      <div className={styles.logCard}>
-        {filteredLogs.map((log) => (
+      <div className={styles.logCard} aria-busy={pagePending && !loadError}>
+        {paginated && loadError && <div className={styles.errorState}>
+          <p>{apiErrorMessage(loadError, "Couldn't load the activity log. Please try again.")}</p>
+          <button className={styles.retryBtn} onClick={handleRetry}>Retry</button>
+        </div>}
+        {pagePending && !loadError && <p role="status">Loading activity log...</p>}
+        {!pagePending && !loadError && filteredLogs.map((log) => (
           <div key={log.id} className={styles.logRow}>
             <div className={styles.logContent}>
               <p className={styles.logText}>
@@ -202,10 +222,15 @@ function ActivityLogTab({ loader }) {
           </div>
         ))}
 
-        {filteredLogs.length === 0 && (
+        {!pagePending && !loadError && filteredLogs.length === 0 && (
           <p className={styles.emptyState}>No activity matches your search/filter.</p>
         )}
       </div>
+      {paginated && <nav aria-label="Activity log pages" className={styles.toolbarRow}>
+        <button className={styles.retryBtn} disabled={page === 0 || pagePending} onClick={() => setPage(p => p - 1)}>Previous</button>
+        <span>Page {data.totalPages === 0 ? 0 : data.number + 1} of {data.totalPages}</span>
+        <button className={styles.retryBtn} disabled={pagePending || page + 1 >= data.totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+      </nav>}
     </main>
   );
 }
@@ -482,10 +507,10 @@ function AdminActivityTab() {
   const { data: admins, isLoading, error, reload } = useRemoteData(getAdminMonitoring, []);
   if (isLoading) return <p className={styles.loadingText}>Loading admin activity...</p>;
   if (error) return <div className={styles.errorState}>
-    <p>Couldn't load admin activity.</p>
+    <p>{apiErrorMessage(error, "Couldn't load admin activity.")}</p>
     <button className={styles.retryBtn} onClick={reload}>Retry</button>
   </div>;
-  return <main className={styles.main}>
+  return <main className={`${styles.main} ${styles.superAdminActivity}`}>
     <h2 className={styles.panelTitle}>Admin Account Activity</h2>
     <div className={styles.logCard}>
       {admins.map((admin) => <div key={admin.adminId} className={styles.logRow}>

@@ -155,3 +155,5 @@
   border-radius: var(--radius-sm);
   color: var(--color-accent-active);
 }
+.infoValue, .fullName { overflow-wrap: anywhere; }
+.profileHeader > div { min-width: 0; }

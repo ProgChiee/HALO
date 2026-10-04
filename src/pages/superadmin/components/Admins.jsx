@@ -1,10 +1,12 @@
-import { useState, useRef } from 'react';
+import { apiErrorMessage } from '../../../utils/apiErrors';
+import { useState, useRef, useEffect } from 'react';
 import { Users, Plus, Trash2, X, Power } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
+import PageShell from '../../../components/shared/PageShell';
+import Dialog from '../../../components/shared/Dialog';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getAdmins, addAdmin, toggleAdminStatus } from '../../../services/superadmin/superadminService';
+import { getAdmins, addAdmin, setAdminStatus } from '../../../services/superadmin/superadminService';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/Admins.module.css';
@@ -24,10 +26,21 @@ const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
 export default function Admins() {
   const { showToast } = useToast();
 
-  const { data: admins, setData: setAdmins, isLoading, error: loadError, reload: loadAdmins } = useRemoteData(getAdmins, []);
-  const toggleLock = useRef(false);
+  const { data: admins, isLoading, error: loadError, reload: loadAdmins } = useRemoteData(getAdmins, []);
+  const statusLock = useRef(false);
+  const createLock = useRef(false);
+  const instance = useRef(0);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    instance.current += 1;
+    return () => {
+      mounted.current = false;
+      instance.current += 1;
+    };
+  }, []);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [togglingId, setTogglingId] = useState(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -35,16 +48,24 @@ export default function Admins() {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function refetchAdmins() {
-    try {
-    const data = await getAdmins();
-    setAdmins(data);
-    } catch {
-      showToast("Saved, but the list could not refresh. Reload the page.", 'error');
-    }
+  function resetForm() {
+    setName('');
+    setEmail('');
+    setPassword('');
+    setFormError('');
   }
 
-  function openAddModal() {
+  function closeAddModal() {
+    if (createLock.current) return;
+    instance.current += 1;
+    resetForm();
+    setShowAddModal(false);
+  }
+
+  function openAddModal(event) {
+    if (createLock.current || statusLock.current) return;
+    event?.currentTarget?.focus();
+    instance.current += 1;
     setName('');
     setEmail('');
     setPassword('');
@@ -54,49 +75,61 @@ export default function Admins() {
 
   async function handleAddAdmin(e) {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (createLock.current || statusLock.current || !showAddModal) return;
     setFormError('');
 
-    if (!name || !email || !password) {
+    if (!name.trim() || !email.trim() || !password.trim()) {
       setFormError('Please fill in all fields.');
       return;
     }
-    if (!email.toLowerCase().endsWith(INSTITUTIONAL_DOMAIN)) {
-      setFormError(`Email must end with ${INSTITUTIONAL_DOMAIN}`);
+    if (name.trim().length > 100 || email.trim().length > 254) {
+      setFormError('Name must be at most 100 characters; email at most 254.');
       return;
     }
-    if (password.length < 8) {
-      setFormError('Password must be at least 8 characters.');
+    if (password.length < 12 || new TextEncoder().encode(password).length > 72) {
+      setFormError('Password must be at least 12 characters and at most 72 UTF-8 bytes.');
       return;
     }
 
+    createLock.current = true;
+    const requestInstance = instance.current;
+    const isCurrent = () => mounted.current && instance.current === requestInstance;
     setIsSubmitting(true);
     try {
       await addAdmin({ name, email, password });
-      showToast('Admin account created.', 'success');
+      if (!isCurrent()) return;
+      resetForm();
       setShowAddModal(false);
-      await refetchAdmins();
+      showToast('Admin account created.', 'success');
+      await loadAdmins();
     } catch (err) {
-      console.error(err);
-      setFormError('Something went wrong. Please try again.');
+
+      if (isCurrent()) setFormError(apiErrorMessage(err));
     } finally {
-      setIsSubmitting(false);
+      if (isCurrent()) {
+        createLock.current = false;
+        setIsSubmitting(false);
+      }
     }
   }
 
-  async function handleToggleStatus(admin) {
-    if (toggleLock.current) return;
-    toggleLock.current = true;
-    setTogglingId(admin.id);
+  async function handleSetStatus(admin) {
+    if (statusLock.current || createLock.current) return;
+    statusLock.current = true;
+    const isCurrent = () => mounted.current;
+    setUpdatingStatusId(admin.id);
     try {
-      const updated = await toggleAdminStatus(admin.id);
-      setAdmins((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+      const updated = await setAdminStatus(admin.id, admin.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
+      if (!isCurrent()) return;
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
-    } catch {
-      showToast("Couldn't update the account status. Please try again.", 'error');
+      await loadAdmins();
+    } catch (err) {
+      if (isCurrent()) showToast(apiErrorMessage(err, "Couldn't update the account status. Please try again."), 'error');
     } finally {
-      toggleLock.current = false;
-      setTogglingId(null);
+      if (isCurrent()) {
+        statusLock.current = false;
+        setUpdatingStatusId(null);
+      }
     }
   }
 
@@ -106,16 +139,13 @@ export default function Admins() {
   }
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin" />
-
-      <div className={styles.contentArea}>
+    <PageShell responsive navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
         <header className={styles.topbar}>
           <div className={styles.breadcrumb}>
             <Users size={16} />
             Admins
           </div>
-          <Button onClick={openAddModal}>
+          <Button onClick={openAddModal} disabled={isSubmitting || updatingStatusId !== null}>
             <Plus size={16} style={{ marginRight: 6 }} />
             Add Admin
           </Button>
@@ -126,7 +156,7 @@ export default function Admins() {
             <p className={styles.loadingText}>Loading admins...</p>
           ) : loadError ? (
             <div className={styles.tableCard} style={{ padding: '3rem', textAlign: 'center' }}>
-              <p className={styles.loadingText}>Couldn't load admins. Please check your connection.</p>
+              <p className={styles.loadingText}>{apiErrorMessage(loadError, "Couldn't load admins. Please check your connection.")}</p>
               <button
                 onClick={loadAdmins}
                 style={{ marginTop: '12px', color: 'var(--color-accent-active)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
@@ -135,6 +165,7 @@ export default function Admins() {
               </button>
             </div>
           ) : (
+            <div className={styles.tableScroll} role="region" aria-label="Admin accounts" tabIndex={0}>
             <div className={styles.tableCard}>
               <div className={styles.tableHeaderRow}>
                 <span>Name</span>
@@ -153,8 +184,8 @@ export default function Admins() {
                   <div className={styles.actionsCell}>
                     <button
                       className={`${styles.actionBtn} ${admin.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
-                      onClick={() => handleToggleStatus(admin)}
-                      disabled={togglingId !== null}
+                      onClick={() => handleSetStatus(admin)}
+                      disabled={updatingStatusId !== null || isSubmitting}
                       aria-label={admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                     >
                       <Power size={15} />
@@ -176,26 +207,27 @@ export default function Admins() {
                 <p className={styles.emptyState}>No admins yet. Click "Add Admin" to create one.</p>
               )}
             </div>
+            </div>
           )}
         </main>
-      </div>
 
       {showAddModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowAddModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <Dialog labelledBy="add-admin-title" describedBy={formError ? 'add-admin-error' : undefined} onClose={closeAddModal} busy={isSubmitting} className={styles.modal}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Add new Admin</h3>
-              <button className={styles.closeBtn} onClick={() => setShowAddModal(false)} aria-label="Close">
+              <h3 id="add-admin-title" className={styles.modalTitle}>Add new Admin</h3>
+              <button className={styles.closeBtn} onClick={closeAddModal} disabled={isSubmitting} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleAddAdmin} className={styles.form}>
               <div className={styles.field}>
-                <label className={styles.label}>Full name</label>
+                <label htmlFor="admin-name" className={styles.label}>Full name</label>
                 <input
+                  id="admin-name"
                   type="text"
                   className={styles.input}
+                  disabled={isSubmitting}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Juan Dela Cruz"
@@ -203,8 +235,10 @@ export default function Admins() {
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Email</label>
+                <label htmlFor="admin-email" className={styles.label}>Email</label>
                 <input
+                  id="admin-email"
+                  disabled={isSubmitting}
                   type="email"
                   className={styles.input}
                   value={email}
@@ -214,23 +248,25 @@ export default function Admins() {
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Initial password</label>
+                <label htmlFor="admin-password" className={styles.label}>Initial password</label>
                 <input
+                  id="admin-password"
+                  disabled={isSubmitting}
                   type="password"
                   className={styles.input}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+                  placeholder="At least 12 characters"
                 />
               </div>
 
-              {formError && <p className={styles.formError}>{formError}</p>}
+              {formError && <p id="add-admin-error" role="alert" className={styles.formError}>{formError}</p>}
 
+              <Button type="button" variant="secondary" onClick={closeAddModal} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" isLoading={isSubmitting}>Create Admin account</Button>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
-    </div>
+    </PageShell>
   );
 }

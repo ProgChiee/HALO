@@ -29,8 +29,7 @@ export default function AdminDashboard() {
           setData(dashboard);
           setActivity(recentActivity.slice(0, 10));
         }
-      } catch (err) {
-        console.error(err);
+      } catch {
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);

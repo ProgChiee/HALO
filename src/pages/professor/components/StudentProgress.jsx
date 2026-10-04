@@ -80,7 +80,7 @@ export default function StudentProgress() {
             <span>Section</span>
             <span>Completed Modules</span>
             <span>Assessments Passed</span>
-            <span>Badges</span>
+            <span>Institution-wide Achievements</span>
           </div>
 
           {rows.map((student) => (
@@ -94,7 +94,7 @@ export default function StudentProgress() {
           ))}
 
           {rows.length === 0 && (
-            <p className={styles.emptyState}>No students enrolled yet.</p>
+            <p className={styles.emptyState}>No student accounts found.</p>
           )}
         </div>
       </main>
