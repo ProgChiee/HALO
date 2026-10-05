@@ -5,7 +5,7 @@ import Sidebar from '../../../components/shared/Sidebar';
 import Button from '../../../components/shared/Button';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getWeekLesson } from '../../../services/student/studentService';
-import { openSession, sendMessage as sendMentorMessage } from '../../../services/student/aiMentorService';
+import { openSession, getConversation, getExchange, sendMessage as sendMentorMessage } from '../../../services/student/aiMentorService';
 import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
 import { useToast } from '../../../context/notifications/useToast';
 import { loadLessonChat } from '../../../utils/lessonLoader';
@@ -28,11 +28,17 @@ function ModuleLessonChat({ topicId, weekId }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [beforeId, setBeforeId] = useState(null);
+  const [olderLoading, setOlderLoading] = useState(false);
+  const [olderError, setOlderError] = useState('');
+  const olderLock = useRef(false);
+  const prepending = useRef(false);
   const [draft, setDraft] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const requestScope = useRef(null);
   const sendLock = useRef(false);
+  const pendingSend = useRef(null);
   const { speak, stop, speakingId, isSupported: ttsSupported } = useTextToSpeech();
   const { showToast } = useToast();
 
@@ -52,6 +58,7 @@ function ModuleLessonChat({ topicId, weekId }) {
         setMentorLoading(true);
       },
       onMentor: (conversation) => {
+        setBeforeId(conversation.hasOlder ? conversation.nextBeforeId : null);
         setSessionId(conversation.sessionId);
         setMentorLoading(false);
         setMessages(conversation.messages.map((m) => ({
@@ -68,6 +75,7 @@ function ModuleLessonChat({ topicId, weekId }) {
   }, [topicId, weekId, reloadKey]);
 
   useEffect(() => {
+    if (prepending.current) { prepending.current = false; return; }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isAiTyping]);
 
@@ -83,6 +91,10 @@ function ModuleLessonChat({ topicId, weekId }) {
   }
 
   function retryLesson() {
+    setBeforeId(null);
+    setOlderLoading(false);
+    setOlderError('');
+    olderLock.current = false;
     setIsLoading(true);
     setLoadError('');
     setMentorLoading(false);
@@ -108,6 +120,31 @@ function ModuleLessonChat({ topicId, weekId }) {
     );
   }
 
+  async function loadOlder() {
+    const scope = requestScope.current;
+    if (!beforeId || olderLock.current || !scope || scope.signal.aborted) return;
+    olderLock.current = true; setOlderLoading(true); setOlderError('');
+    try {
+      const page = await getConversation(sessionId, beforeId, { signal: scope.signal });
+      if (scope.signal.aborted || requestScope.current !== scope) return;
+      if (page.sessionId !== sessionId || page.moduleId !== lesson.id || !Array.isArray(page.messages)) throw new Error('Invalid conversation page');
+      prepending.current = true;
+      setMessages(current => {
+        const ids = new Set(current.map(message => message.id));
+        const older = page.messages.filter(message => {
+          if (ids.has(message.id)) return false;
+          ids.add(message.id); return true;
+        }).map(m => ({ id: m.id, sender: m.sender === 'STUDENT' ? 'user' : 'ai', text: m.message }));
+        return [...older, ...current];
+      });
+      setBeforeId(page.hasOlder ? page.nextBeforeId : null);
+    } catch {
+      if (!scope.signal.aborted && requestScope.current === scope) setOlderError('Could not load older messages. Please try again.');
+    } finally {
+      if (!scope.signal.aborted && requestScope.current === scope) { olderLock.current = false; setOlderLoading(false); }
+    }
+  }
+
   async function handleSend(e) {
     e.preventDefault();
     if (sendLock.current) return;
@@ -118,18 +155,38 @@ function ModuleLessonChat({ topicId, weekId }) {
     const scope = requestScope.current;
     if (!scope || scope.signal.aborted) return;
     sendLock.current = true;
+    if (!pendingSend.current || pendingSend.current.text !== text || pendingSend.current.sessionId !== sessionId) {
+      pendingSend.current = { text, sessionId, requestId: crypto.randomUUID() };
+    }
+    const requestId = pendingSend.current.requestId;
     const userMessage = { id: crypto.randomUUID(), sender: 'user', text };
     setMessages((prev) => [...prev, userMessage]);
     setDraft('');
     setIsAiTyping(true);
 
     try {
-      const result = await sendMentorMessage(sessionId, text, { signal: scope.signal });
+      const result = await sendMentorMessage(sessionId, text, { signal: scope.signal, requestId });
       if (scope.signal.aborted || requestScope.current !== scope) return;
       if (typeof result?.haloMessage !== 'string' || !result.haloMessage.trim()) throw Object.assign(new Error('Empty reply'), { code: 'MENTOR_EMPTY_RESPONSE' });
       setMessages((prev) => [...prev, { id: crypto.randomUUID(), sender: 'ai', text: result.haloMessage }]);
+      pendingSend.current = null;
     } catch (err) {
       if (!scope.signal.aborted && requestScope.current === scope) {
+        const status = err?.response?.status;
+        const uncertain = !status || status >= 500;
+        if (uncertain) {
+          try {
+            const saved = await getExchange(sessionId, requestId, { signal: scope.signal });
+            if (scope.signal.aborted || requestScope.current !== scope) return;
+            if (saved.sessionId !== sessionId || saved.moduleId !== lesson.id || typeof saved.haloMessage !== 'string' || !saved.haloMessage.trim()) throw new Error('Invalid saved exchange', { cause: err });
+            setMessages(prev => [...prev, { id: crypto.randomUUID(), sender: 'ai', text: saved.haloMessage }]);
+            pendingSend.current = null;
+            return;
+          } catch {
+            if (scope.signal.aborted || requestScope.current !== scope) return;
+            // Retain the request ID: an in-flight original can still commit after this GET.
+          }
+        }
         setMessages((prev) => prev.filter((message) => message.id !== userMessage.id));
         setDraft(text);
         showToast(lessonErrorMessage(err, 'mentor'), 'error');
@@ -191,6 +248,8 @@ function ModuleLessonChat({ topicId, weekId }) {
               <Button onClick={retryLesson}>Retry mentor connection</Button>
             </div>
           )}
+          {beforeId && <Button onClick={loadOlder} disabled={olderLoading}>{olderLoading ? 'Loading older messages...' : 'Load older messages'}</Button>}
+          {olderError && <p role="alert">{olderError}</p>}
           {messages.map((msg) => (
             <div
               key={msg.id}

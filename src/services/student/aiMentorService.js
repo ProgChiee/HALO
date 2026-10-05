@@ -11,11 +11,17 @@ export async function openSession(moduleId, config = {}) {
 }
 
 export async function sendMessage(sessionId, message, config = {}) {
-  const res = await apiClient.post(`/student/mentor/message/${sessionId}`, { message }, { timeout: 90000, ...config });
+  const { requestId, ...requestConfig } = config;
+  const res = await apiClient.post(`/student/mentor/message/${sessionId}`, { message, requestId }, { timeout: 90000, ...requestConfig });
   return res.data;
 }
 
-export async function getConversation(sessionId) {
-  const res = await apiClient.get(`/student/mentor/session/${sessionId}`);
+export async function getExchange(sessionId, requestId, config = {}) {
+  const res = await apiClient.get(`/student/mentor/message/${sessionId}/request/${requestId}`, config);
+  return res.data;
+}
+
+export async function getConversation(sessionId, beforeId = null, config = {}) {
+  const res = await apiClient.get(`/student/mentor/session/${sessionId}`, { ...config, params: { beforeId } });
   return res.data;
 }

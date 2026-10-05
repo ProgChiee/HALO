@@ -7,6 +7,12 @@ public class MentorConversationResponse {
     private Long sessionId;
     private Long moduleId;
     private List<MentorMessageResponse> messages;
+    private boolean hasOlder;
+    private Long nextBeforeId;
+    public boolean isHasOlder() { return hasOlder; }
+    public void setHasOlder(boolean hasOlder) { this.hasOlder = hasOlder; }
+    public Long getNextBeforeId() { return nextBeforeId; }
+    public void setNextBeforeId(Long nextBeforeId) { this.nextBeforeId = nextBeforeId; }
 
     public MentorConversationResponse() {
     }

@@ -38,14 +38,19 @@ public class StudentMentorController {
                 mentorService.sendMessage(
                         sessionId,
                         student,
-                        request.getMessage()
+                        request.getMessage(), request.getRequestId()
                 );
 
         return ResponseEntity.ok(response);
     }
+    @GetMapping("/message/{sessionId}/request/{requestId}")
+    public ResponseEntity<MentorSessionResponse> getExchange(@PathVariable Long sessionId, @PathVariable String requestId, Authentication authentication) {
+        return ResponseEntity.ok(mentorService.getExchange(sessionId, access.requireStudent(authentication), requestId));
+    }
     @GetMapping("/session/{sessionId}")
     public ResponseEntity<MentorConversationResponse> getConversation(
             @PathVariable("sessionId") Long sessionId,
+            @RequestParam(required = false) @jakarta.validation.constraints.Positive Long beforeId,
             Authentication authentication) {
 
         UserEntity student = access.requireStudent(authentication);
@@ -53,7 +58,7 @@ public class StudentMentorController {
         MentorConversationResponse response =
                 mentorService.getConversation(
                         sessionId,
-                        student
+                        student, beforeId
                 );
 
         return ResponseEntity.ok(response);

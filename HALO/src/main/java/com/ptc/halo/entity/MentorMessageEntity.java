@@ -6,12 +6,16 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "mentor_messages")
+@Table(name = "mentor_messages", uniqueConstraints = @UniqueConstraint(name = "uk_mentor_request_sender", columnNames = {"session_id", "request_id", "sender"}))
 public class MentorMessageEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "request_id", length = 36)
+    private String requestId;
+    public String getRequestId() { return requestId; }
+    public void setRequestId(String requestId) { this.requestId = requestId; }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", nullable = false)

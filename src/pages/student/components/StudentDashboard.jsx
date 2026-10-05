@@ -16,80 +16,65 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [summary, setSummary] = useState(null); // StudentDashboardResponse
-  const [subjects, setSubjects] = useState([]); // StudentSubjectResponse[]
-  const [nextLesson, setNextLesson] = useState(null); // { subject, week } | null
+  const [summary, setSummary] = useState(null);
+  const [subjects, setSubjects] = useState([]);
+  const [nextLesson, setNextLesson] = useState(null);
+  const [statsStatus, setStatsStatus] = useState('loading');
+  const [subjectsStatus, setSubjectsStatus] = useState('loading');
+  const [continueStatus, setContinueStatus] = useState('loading');
+  const [statsRetry, setStatsRetry] = useState(0);
+  const [subjectsRetry, setSubjectsRetry] = useState(0);
+  const [continueRetry, setContinueRetry] = useState(0);
 
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
 
-    async function loadData() {
-      try {
-        const [dashboardSummary, subjectList] = await Promise.all([
-          getDashboardData(),
-          getSubjectsData(),
-        ]);
-        if (!isMounted) return;
-        setSummary(dashboardSummary);
-        setSubjects(subjectList);
+    getDashboardData({ signal: controller.signal }).then(data => {
+      if (!controller.signal.aborted) { setSummary(data); setStatsStatus('ready'); }
+    }).catch(error => {
+      if (!controller.signal.aborted) { logStudentError('load-dashboard', error); setStatsStatus('error'); }
+    });
+    return () => controller.abort();
+  }, [statsRetry]);
 
-        for (const subject of subjectList) {
-          if (subject.progressPercentage >= 100) continue;
-          try {
-            const weeks = await getSubjectWeeks(subject.subjectId);
-            if (!isMounted) return;
-            const week = findAvailableWeek(weeks);
-            if (week) {
-              setNextLesson({ subject, week });
-              break;
-            }
-          } catch {
-            // The summary is still useful when an optional next-lesson lookup fails.
-            if (!isMounted) return;
+  useEffect(() => {
+    const controller = new AbortController();
+
+    getSubjectsData({ signal: controller.signal }).then(data => {
+      if (!controller.signal.aborted) { setSubjects(data); setSubjectsStatus('ready'); }
+    }).catch(error => {
+      if (!controller.signal.aborted) { logStudentError('load-subjects', error); setSubjectsStatus('error'); }
+    });
+    return () => controller.abort();
+  }, [subjectsRetry]);
+
+  useEffect(() => {
+    if (subjectsStatus !== 'ready') return;
+    const controller = new AbortController();
+
+    const candidates = subjects.filter(subject => subject.progressPercentage < 100);
+    Promise.allSettled(candidates.map(subject => getSubjectWeeks(subject.subjectId, { signal: controller.signal })))
+      .then(results => {
+        if (controller.signal.aborted) return;
+        let failed = false;
+        for (let i = 0; i < results.length; i++) {
+          if (results[i].status === 'rejected') {
+            failed = true; logStudentError('load-continue', results[i].reason); continue;
           }
+          const week = findAvailableWeek(results[i].value);
+          if (week) { setNextLesson({ subject: candidates[i], week }); setContinueStatus('ready'); return; }
         }
-      } catch (err) {
-        logStudentError('load-dashboard', err);
-        if (isMounted) setLoadError(true);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
+        setContinueStatus(failed ? 'error' : 'ready');
+      });
+    return () => controller.abort();
+  }, [subjects, subjectsStatus, continueRetry]);
 
-    loadData();
-    return () => { isMounted = false; };
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
-        <div className={styles.contentArea}>
-          <p className={styles.loadingText}>Loading your dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loadError || !summary) {
-    return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
-        <div className={styles.contentArea}>
-          <p className={styles.loadingText}>Couldn't load your dashboard. Please refresh and try again.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const statCards = [
+  const statCards = summary ? [
     { id: 'completedModules', icon: CheckCircle2, value: summary.completedModules, label: 'Modules completed' },
     { id: 'passedAssessments', icon: TrendingUp, value: summary.passedAssessments, label: 'Assessments passed' },
     { id: 'totalBadges', icon: Award, value: summary.totalBadges, label: 'Badges earned' },
     { id: 'latestScore', icon: BookOpen, value: `${summary.latestAssessmentScore ?? 0}%`, label: 'Latest assessment score' },
-  ];
+  ] : [];
 
   const nextSubject = subjects.find((s) => s.progressPercentage < 100);
 
@@ -109,7 +94,9 @@ export default function StudentDashboard() {
           <h1 className={styles.greeting}>Welcome back, {firstName}! 👋</h1>
           <p className={styles.subtext}>Here's your learning overview for today</p>
 
-          <div className={styles.statsGrid}>
+          {statsStatus === 'loading' && <p role="status">Loading dashboard statistics...</p>}
+          {statsStatus === 'error' && <div role="alert"><p>Couldn't load your dashboard statistics.</p><Button onClick={() => { setStatsStatus('loading'); setStatsRetry(value => value + 1); }}>Retry statistics</Button></div>}
+          {statsStatus === 'ready' && <div className={styles.statsGrid}>
             {statCards.map((stat) => {
               const Icon = stat.icon;
               return (
@@ -122,14 +109,17 @@ export default function StudentDashboard() {
                 </div>
               );
             })}
-          </div>
+          </div>}
 
           <h2 className={styles.sectionTitle}>Continue Where You Left Off</h2>
           <div className={styles.continueCard}>
             <div className={styles.continueIcon}>
               <BookOpen size={20} />
             </div>
-            {nextSubject ? (
+            {subjectsStatus === 'loading' || (subjectsStatus === 'ready' && continueStatus === 'loading') ? <p role="status">Finding your next lesson...</p>
+              : subjectsStatus === 'error' ? <p>Continue is unavailable until Subjects loads.</p>
+              : continueStatus === 'error' ? <div role="alert"><p>Couldn't load your next lesson.</p><Button onClick={() => { setContinueStatus('loading'); setNextLesson(null); setContinueRetry(value => value + 1); }}>Retry Continue</Button></div>
+              : nextSubject ? (
               <>
                 <div className={styles.continueInfo}>
                   <p className={styles.continueMeta}>Up next</p>
@@ -137,7 +127,7 @@ export default function StudentDashboard() {
                     {nextLesson ? `Week ${nextLesson.week.weekNumber}: ${nextLesson.week.title}` : nextSubject.subjectName}
                   </p>
                   <p className={styles.continueSubmeta}>
-                    {nextLesson ? nextSubject.subjectName : `${nextSubject.completedWeeks}/${nextSubject.totalWeeks} weeks completed`}
+                    {nextLesson ? nextLesson.subject.subjectName : `${nextSubject.completedWeeks}/${nextSubject.totalWeeks} weeks completed`}
                   </p>
                 </div>
                 <Button
@@ -159,7 +149,9 @@ export default function StudentDashboard() {
           </div>
 
           <h2 className={styles.sectionTitle}>Enrolled Subjects</h2>
-          <div className={styles.subjectsList}>
+          {subjectsStatus === 'loading' && <p role="status">Loading subjects...</p>}
+          {subjectsStatus === 'error' && <div role="alert"><p>Couldn't load your subjects.</p><Button onClick={() => { setSubjectsStatus('loading'); setContinueStatus('loading'); setNextLesson(null); setSubjectsRetry(value => value + 1); }}>Retry subjects</Button></div>}
+          {subjectsStatus === 'ready' && <div className={styles.subjectsList}>
             {subjects.map((subject) => (
               <div key={subject.subjectId} className={styles.subjectRow}>
                 <span className={styles.subjectName}>{subject.subjectName}</span>
@@ -169,7 +161,7 @@ export default function StudentDashboard() {
             {subjects.length === 0 && (
               <p className={styles.emptyState}>No subjects enrolled yet.</p>
             )}
-          </div>
+          </div>}
         </main>
       </div>
     </div>

@@ -9,13 +9,18 @@ import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getWeekLesson } from '../../../services/student/studentService';
 import { getAssessmentStatus, getAssessment, startAttempt, submitAttempt, getAttemptResult } from '../../../services/student/quizService';
 import { buildAssessmentAnswers } from '../../../utils/backendContract';
+import { shouldReconcileQuiz, isSavedQuizResult } from '../../../utils/quizReconciliation';
 import styles from '../styles/Quiz.module.css';
 
 // The server scores A/B/C/D answers and completes module progress on a passing attempt.
 const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
 export default function Quiz() {
-  const { weekId } = useParams();
+  const { topicId, weekId } = useParams();
+  return <WeekQuiz key={`${topicId}:${weekId}`} weekId={weekId} />;
+}
+
+function WeekQuiz({ weekId }) {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -171,7 +176,25 @@ export default function Quiz() {
         }
       } catch (err) {
         logStudentError('submit-quiz', err);
-        if (mounted.current) showToast("Couldn't submit your quiz. Please try again.", 'error');
+        if (!mounted.current) return;
+        if (shouldReconcileQuiz(err)) {
+          try {
+            const saved = await getAttemptResult(attemptId);
+            if (!mounted.current) return;
+            if (!isSavedQuizResult(saved, attemptId)) throw new Error('Invalid saved result', { cause: err });
+            setResult(saved);
+            setStage('results');
+            showToast('Quiz submitted!', 'success');
+          } catch (reconcileError) {
+            if (!mounted.current) return;
+            logStudentError('submit-quiz', reconcileError);
+            const unsubmitted = reconcileError?.response?.data?.code === 'ASSESSMENT_NOT_SUBMITTED';
+            showToast(unsubmitted ? 'Your quiz has not been submitted yet. Please try again.'
+              : 'Could not confirm your submission. Please check your connection and try again.', 'error');
+          }
+        } else {
+          showToast("Couldn't submit your quiz. Please try again.", 'error');
+        }
       } finally {
         actionLock.current = false;
         if (mounted.current) setIsSubmitting(false);

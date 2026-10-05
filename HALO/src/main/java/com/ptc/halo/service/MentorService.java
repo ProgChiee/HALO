@@ -102,12 +102,52 @@ public class MentorService {
         return module;
     }
     private void saveMessage(MentorSessionEntity session, MessageSender sender, String text) {
-        var message = new MentorMessageEntity(); message.setSession(session); message.setSender(sender);
+        saveMessage(session, sender, text, null);
+    }
+    private void saveMessage(MentorSessionEntity session, MessageSender sender, String text, String key) {
+        var message = new MentorMessageEntity(); message.setRequestId(key); message.setSession(session); message.setSender(sender);
         message.setMessage(text); message.setCreatedAt(LocalDateTime.now()); mentorMessageRepository.save(message);
     }
 
+    private String requestKey(String key) {
+        if (key != null && !key.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST_ID");
+        return key == null ? null : key.toLowerCase(java.util.Locale.ROOT);
+    }
+    private MentorSessionResponse existingExchange(Long sessionId, Long moduleId, String key, String text) {
+        if (key == null) return null;
+        var saved = mentorMessageRepository.findBySessionIdAndRequestIdAndSender(sessionId, key, MessageSender.HALO);
+        if (saved.isEmpty()) return null;
+        if (text != null) {
+            var question = mentorMessageRepository.findBySessionIdAndRequestIdAndSender(sessionId, key, MessageSender.STUDENT).orElseThrow();
+            if (!text.equals(question.getMessage())) throw new ResponseStatusException(HttpStatus.CONFLICT, "REQUEST_ID_REUSED");
+        }
+        var response = new MentorSessionResponse(); response.setSessionId(sessionId); response.setModuleId(moduleId);
+        response.setHaloMessage(saved.get().getMessage()); return response;
+    }
+    @Transactional(readOnly = true)
+    public MentorSessionResponse getExchange(Long sessionId, UserEntity student, String requestId) {
+        var session = ownedSession(sessionId, student);
+        progressionService.validateModuleAccess(session.getModule().getId(), currentStudent(student));
+        var response = existingExchange(sessionId, session.getModule().getId(), requestKey(requestId), null);
+        if (response == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "EXCHANGE_NOT_FOUND");
+        return response;
+    }
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public MentorSessionResponse sendMessage(Long sessionId, UserEntity student, String studentMessage) {
+        return sendMessage(sessionId, student, studentMessage, null);
+    }
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public MentorSessionResponse sendMessage(Long sessionId, UserEntity student, String studentMessage, String requestId) {
+        String key = requestKey(requestId);
+        if (key != null) {
+            var existing = transactions.execute(tx -> {
+                var session = ownedSession(sessionId, student);
+                progressionService.validateModuleAccess(session.getModule().getId(), currentStudent(student));
+                return existingExchange(sessionId, session.getModule().getId(), key, studentMessage);
+            });
+            if (existing != null) return existing;
+        }
         Captured captured = transactions.execute(tx -> {
             var session = ownedSession(sessionId, student);
             if (studentMessage == null || studentMessage.isBlank() || studentMessage.length() > 4000)
@@ -128,8 +168,10 @@ public class MentorService {
             var session = ownedSession(sessionId, student);
             if (!Objects.equals(session.getModule().getId(), module.getId()))
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "MENTOR_STATE_CHANGED");
-            saveMessage(session, MessageSender.STUDENT, studentMessage);
-            saveMessage(session, MessageSender.HALO, reply);
+            var existing = existingExchange(sessionId, module.getId(), key, studentMessage);
+            if (existing != null) return existing;
+            saveMessage(session, MessageSender.STUDENT, studentMessage, key);
+            saveMessage(session, MessageSender.HALO, reply, key);
             session.setLastActivityAt(LocalDateTime.now()); session.setProgressStatus(MentorProgressStatus.LEARNING);
             mentorSessionRepository.save(session);
             var response = new MentorSessionResponse(); response.setSessionId(sessionId);
@@ -137,73 +179,29 @@ public class MentorService {
         });
     }
     @Transactional(readOnly = true)
-    public MentorConversationResponse getConversation(
-            Long sessionId,
-            UserEntity student) {
-
-        MentorSessionEntity session =
-                mentorSessionRepository.findById(sessionId)
-                        .orElseThrow(() ->
-                                new ResponseStatusException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND")
-                        );
-
-        if (!session.getStudent().getId()
-                .equals(student.getId())) {
-
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "SESSION_NOT_OWNED");
-        }
-
+    public MentorConversationResponse getConversation(Long sessionId, UserEntity student) {
+        return getConversation(sessionId, student, null);
+    }
+    @Transactional(readOnly = true)
+    public MentorConversationResponse getConversation(Long sessionId, UserEntity student, Long beforeId) {
+        var session = ownedSession(sessionId, student);
         progressionService.validateModuleAccess(session.getModule().getId(), student);
-
-        List<MentorMessageEntity> messages =
-                mentorMessageRepository
-                        .findBySessionIdOrderByCreatedAtAsc(
-                                sessionId
-                        );
-
-        List<MentorMessageResponse> messageResponses =
-                messages.stream()
-                        .map(message -> {
-
-                            MentorMessageResponse response =
-                                    new MentorMessageResponse();
-
-                            response.setId(
-                                    message.getId()
-                            );
-
-                            response.setSender(
-                                    message.getSender()
-                            );
-
-                            response.setMessage(
-                                    message.getMessage()
-                            );
-
-                            response.setCreatedAt(
-                                    message.getCreatedAt()
-                            );
-
-                            return response;
-
-                        })
-                        .toList();
-
-        MentorConversationResponse response =
-                new MentorConversationResponse();
-
-        response.setSessionId(
-                session.getId()
-        );
-
-        response.setModuleId(
-                session.getModule().getId()
-        );
-
-        response.setMessages(
-                messageResponses
-        );
-
+        if (beforeId != null && beforeId <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
+        return conversationWindow(sessionId, session.getModule().getId(), beforeId);
+    }
+    private MentorConversationResponse conversationWindow(Long sessionId, Long moduleId, Long beforeId) {
+        final int windowSize = 30;
+        var fetched = mentorMessageRepository.findWindow(sessionId, beforeId, org.springframework.data.domain.PageRequest.of(0, windowSize + 1));
+        boolean hasOlder = fetched.size() > windowSize;
+        var window = new ArrayList<>(fetched.subList(0, Math.min(windowSize, fetched.size())));
+        Collections.reverse(window);
+        var response = new MentorConversationResponse(); response.setSessionId(sessionId); response.setModuleId(moduleId);
+        response.setHasOlder(hasOlder);
+        response.setNextBeforeId(hasOlder ? window.get(0).getId() : null);
+        response.setMessages(window.stream().map(message -> {
+            var item = new MentorMessageResponse(); item.setId(message.getId()); item.setSender(message.getSender());
+            item.setMessage(message.getMessage()); item.setCreatedAt(message.getCreatedAt()); return item;
+        }).toList());
         return response;
     }
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
@@ -266,58 +264,8 @@ public class MentorService {
         }
 
 
-        List<MentorMessageEntity> messages =
-                mentorMessageRepository
-                        .findBySessionIdOrderByCreatedAtAsc(
-                                session.getId()
-                        );
-
-        List<MentorMessageResponse> messageResponses =
-                messages.stream()
-                        .map(message -> {
-
-                            MentorMessageResponse response =
-                                    new MentorMessageResponse();
-
-                            response.setId(
-                                    message.getId()
-                            );
-
-                            response.setSender(
-                                    message.getSender()
-                            );
-
-                            response.setMessage(
-                                    message.getMessage()
-                            );
-
-                            response.setCreatedAt(
-                                    message.getCreatedAt()
-                            );
-
-                            return response;
-
-                        })
-                        .toList();
-
-        MentorConversationResponse response =
-                new MentorConversationResponse();
-
-        response.setSessionId(
-                session.getId()
-        );
-
-        response.setModuleId(
-                moduleId
-        );
-
-        response.setMessages(
-                messageResponses
-        );
-
-        return response;
+        return conversationWindow(session.getId(), moduleId, null);
     }
-
 
     private String answerWithinModule(AiLearningModuleEntity module, String question, String history) {
         ModuleMaterialIndex.Index index = materialIndex.getOrBuild(module);
