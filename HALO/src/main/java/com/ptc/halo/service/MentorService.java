@@ -38,6 +38,8 @@ public class MentorService {
     private static final Logger log = LoggerFactory.getLogger(MentorService.class);
 
     public static final String OUT_OF_SCOPE = "That question is outside the scope of the current lesson. I can help you with topics covered by this module.";
+    private final org.springframework.transaction.support.TransactionTemplate transactions;
+    private final com.ptc.halo.repository.UserRepository users;
     private final ModuleMaterialIndex materialIndex;
     private final ChatClient chatClient;
     private final AiLearningModuleRepository aiLearningModuleRepository;
@@ -50,7 +52,9 @@ public class MentorService {
             ChatClient.Builder chatClientBuilder,
             AiLearningModuleRepository aiLearningModuleRepository,
             MentorSessionRepository mentorSessionRepository,
-            MentorMessageRepository mentorMessageRepository, ObjectMapper objectMapper, StudentLearningProgressionService progressionService, ModuleMaterialIndex materialIndex) {
+            MentorMessageRepository mentorMessageRepository, ObjectMapper objectMapper, StudentLearningProgressionService progressionService, ModuleMaterialIndex materialIndex, org.springframework.transaction.PlatformTransactionManager transactionManager, com.ptc.halo.repository.UserRepository users) {
+        this.transactions = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        this.users = users;
         this.materialIndex = materialIndex;
 
         this.chatClient = chatClientBuilder.build();
@@ -64,143 +68,73 @@ public class MentorService {
         this.progressionService = progressionService;
     }
 
-    @Transactional
-    public MentorSessionResponse sendMessage(
-            Long sessionId,
-            UserEntity student,
-            String studentMessage) {
+    private record Captured(AiLearningModuleEntity module, Long version, List<String> files, String history) {}
 
-        MentorSessionEntity session =
-                mentorSessionRepository.findById(sessionId)
-                        .orElseThrow(() ->
-                                new ResponseStatusException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND")
-                        );
-
-
-        if (!session.getStudent().getId()
-                .equals(student.getId())) {
-
+    private UserEntity currentStudent(UserEntity student) {
+        return users.findById(student.getId()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED"));
+    }
+    private MentorSessionEntity ownedSession(Long id, UserEntity student) {
+        var session = mentorSessionRepository.findById(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND"));
+        if (!Objects.equals(session.getStudent().getId(), student.getId()))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "SESSION_NOT_OWNED");
-        }
-
-        AiLearningModuleEntity module =
-                session.getModule();
-
-        progressionService.validateModuleAccess(
-                module.getId(),
-                student
-        );
-
-        if (module.getStatus() != LessonStatus.APPROVED) {
-
+        return session;
+    }
+    private List<String> fileState(AiLearningModuleEntity module) {
+        return module.getFiles().stream().map(f -> java.util.Arrays.asList(f.getId(), f.getFilePath(),
+                f.getStoredFileName(), f.getOriginalFileName(), f.getFileType()).toString()).sorted().toList();
+    }
+    private Captured capture(Long moduleId, UserEntity student, String history) {
+        progressionService.validateModuleAccess(moduleId, currentStudent(student));
+        var module = aiLearningModuleRepository.findWithFilesById(moduleId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "MODULE_NOT_FOUND"));
+        if (module.getStatus() != LessonStatus.APPROVED)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "LESSON_NOT_APPROVED");
-        }
+        return new Captured(module, module.getVersion(), fileState(module), history);
+    }
+    private AiLearningModuleEntity revalidate(Captured captured, UserEntity student) {
+        var module = aiLearningModuleRepository.findForMentorOpenById(captured.module().getId()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "MODULE_NOT_FOUND"));
+        progressionService.validateModuleAccess(module.getId(), currentStudent(student));
+        if (!Objects.equals(captured.version(), module.getVersion()) || !captured.files().equals(fileState(module)))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "MENTOR_STATE_CHANGED");
+        return module;
+    }
+    private void saveMessage(MentorSessionEntity session, MessageSender sender, String text) {
+        var message = new MentorMessageEntity(); message.setSession(session); message.setSender(sender);
+        message.setMessage(text); message.setCreatedAt(LocalDateTime.now()); mentorMessageRepository.save(message);
+    }
 
-        if (studentMessage == null || studentMessage.isBlank() || studentMessage.length() > 4000) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "MESSAGE_REQUIRED");
-        }
-
-        MentorMessageEntity studentMessageEntity =
-                new MentorMessageEntity();
-
-        studentMessageEntity.setSession(session);
-        studentMessageEntity.setSender(
-                MessageSender.STUDENT
-        );
-        studentMessageEntity.setMessage(
-                studentMessage
-        );
-        studentMessageEntity.setCreatedAt(
-                LocalDateTime.now()
-        );
-
-        mentorMessageRepository.save(
-                studentMessageEntity
-        );
-
-
-        List<MentorMessageEntity> recentMessages =
-                mentorMessageRepository
-                        .findTop10BySessionIdOrderByCreatedAtDesc(
-                                sessionId
-                        );
-
-        List<MentorMessageEntity> conversationContext =
-                new ArrayList<>(recentMessages);
-
-        Collections.reverse(conversationContext);
-
-        StringBuilder conversationText =
-                new StringBuilder();
-
-        for (MentorMessageEntity message :
-                conversationContext) {
-
-            conversationText
-                    .append(message.getSender())
-                    .append(": ")
-                    .append(message.getMessage())
-                    .append("\n");
-        }
-
-        String haloMessage = answerWithinModule(module, studentMessage, conversationText.toString());
-
-        if (haloMessage == null ||
-                haloMessage.isBlank()) {
-
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "MENTOR_EMPTY_RESPONSE");
-        }
-
-
-        MentorMessageEntity haloMessageEntity =
-                new MentorMessageEntity();
-
-        haloMessageEntity.setSession(session);
-
-        haloMessageEntity.setSender(
-                MessageSender.HALO
-        );
-
-        haloMessageEntity.setMessage(
-                haloMessage
-        );
-
-        haloMessageEntity.setCreatedAt(
-                LocalDateTime.now()
-        );
-
-        mentorMessageRepository.save(
-                haloMessageEntity
-        );
-
-
-        session.setLastActivityAt(
-                LocalDateTime.now()
-        );
-
-        session.setProgressStatus(
-                MentorProgressStatus.LEARNING
-        );
-
-        mentorSessionRepository.save(session);
-
-
-        MentorSessionResponse response =
-                new MentorSessionResponse();
-
-        response.setSessionId(
-                session.getId()
-        );
-
-        response.setModuleId(
-                module.getId()
-        );
-
-        response.setHaloMessage(
-                haloMessage
-        );
-
-        return response;
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public MentorSessionResponse sendMessage(Long sessionId, UserEntity student, String studentMessage) {
+        Captured captured = transactions.execute(tx -> {
+            var session = ownedSession(sessionId, student);
+            if (studentMessage == null || studentMessage.isBlank() || studentMessage.length() > 4000)
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "MESSAGE_REQUIRED");
+            var recent = new ArrayList<>(mentorMessageRepository.findTop10BySessionIdOrderByCreatedAtDesc(sessionId));
+            // Previously the new Student message occupied one of the ten context slots.
+            if (recent.size() > 9) recent = new ArrayList<>(recent.subList(0, 9));
+            Collections.reverse(recent);
+            var history = new StringBuilder();
+            for (var message : recent) history.append(message.getSender()).append(": ").append(message.getMessage()).append("\n");
+            history.append(MessageSender.STUDENT).append(": ").append(studentMessage).append("\n");
+            return capture(session.getModule().getId(), student, history.toString());
+        });
+        String reply = answerWithinModule(captured.module(), studentMessage, captured.history());
+        if (reply == null || reply.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "MENTOR_EMPTY_RESPONSE");
+        return transactions.execute(tx -> {
+            var module = revalidate(captured, student);
+            var session = ownedSession(sessionId, student);
+            if (!Objects.equals(session.getModule().getId(), module.getId()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "MENTOR_STATE_CHANGED");
+            saveMessage(session, MessageSender.STUDENT, studentMessage);
+            saveMessage(session, MessageSender.HALO, reply);
+            session.setLastActivityAt(LocalDateTime.now()); session.setProgressStatus(MentorProgressStatus.LEARNING);
+            mentorSessionRepository.save(session);
+            var response = new MentorSessionResponse(); response.setSessionId(sessionId);
+            response.setModuleId(module.getId()); response.setHaloMessage(reply); return response;
+        });
     }
     @Transactional(readOnly = true)
     public MentorConversationResponse getConversation(
@@ -272,31 +206,14 @@ public class MentorService {
 
         return response;
     }
-    @Transactional
-    public MentorConversationResponse openSession(
-            Long moduleId,
-            UserEntity student) {
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public MentorConversationResponse openSession(Long moduleId, UserEntity student) {
+        Captured captured = transactions.execute(tx -> capture(moduleId, student, ""));
+        materialIndex.getOrBuild(captured.module());
+        return transactions.execute(tx -> finishOpen(moduleId, student, revalidate(captured, student)));
+    }
 
-        progressionService.validateModuleAccess(
-                moduleId,
-                student
-        );
-
-        AiLearningModuleEntity module =
-                aiLearningModuleRepository.findForMentorOpenById(moduleId)
-                        .orElseThrow(() ->
-                                new ResponseStatusException(HttpStatus.NOT_FOUND, "MODULE_NOT_FOUND")
-                        );
-
-        if (module.getStatus() != LessonStatus.APPROVED) {
-
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "LESSON_NOT_APPROVED");
-        }
-
-
-        // Original files alone define scope. Preparation never reads another module.
-        materialIndex.getOrBuild(module);
-
+    private MentorConversationResponse finishOpen(Long moduleId, UserEntity student, AiLearningModuleEntity module) {
         MentorSessionEntity session =
                 mentorSessionRepository
                         .findByStudentIdAndModuleId(

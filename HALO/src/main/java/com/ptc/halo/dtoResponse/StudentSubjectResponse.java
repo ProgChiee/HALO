@@ -13,6 +13,10 @@ public class StudentSubjectResponse {
     private YearLevel yearLevel;
 
     private Integer totalWeeks;
+    private Integer eligibleModuleCount;
+
+    public Integer getEligibleModuleCount() { return eligibleModuleCount; }
+    public void setEligibleModuleCount(Integer eligibleModuleCount) { this.eligibleModuleCount = eligibleModuleCount; }
 
     private Integer completedWeeks;
 

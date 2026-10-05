@@ -1,3 +1,4 @@
+import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronDown, ChevronUp, CheckCircle2, Play, Lock, BookOpen } from 'lucide-react';
@@ -41,7 +42,7 @@ export default function Subjects() {
         const data = await getSubjectsData();
         if (isMounted) setSubjects(data);
       } catch (err) {
-        console.error(err);
+        logStudentError('load-subjects', err);
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);

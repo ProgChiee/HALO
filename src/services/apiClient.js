@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { clearSession, readSession } from '../utils/session';
+import { logStudentError } from '../utils/studentDiagnostics';
 
 // VITE_API_URL must include /api; same-origin deployments use /api by default.
 const apiClient = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api', timeout: 15000 });
@@ -17,7 +18,9 @@ apiClient.interceptors.response.use(
   (error) => {
     if (import.meta.env.DEV && error.code !== 'ERR_CANCELED') {
       // Never log tokens, request bodies, student questions, or file contents.
-      console.warn('[HALO API]', {
+      if (/^(?:\/api)?\/student(?:\/|$)/.test(error.config?.url ?? '')) {
+        logStudentError('request-failed', error);
+      } else console.warn('[HALO API]', {
         method: error.config?.method?.toUpperCase(),
         endpoint: (error.config?.url ?? '').split('?')[0].replace(/[^/a-zA-Z0-9_-]/g, '').slice(0, 160),
         status: error.response?.status ?? 'NO_RESPONSE',

@@ -30,12 +30,13 @@ public class AssessmentService {
     private final BadgeService badgeService;
     private final ActivityLogService activityLogService;
     private final StudentLearningProgressionService progressionService;
+    private final UserRepository userRepository;
 
     public AssessmentService(
             AssessmentRepository assessmentRepository,
             AssessmentQuestionRepository questionRepository,
             AiLearningModuleRepository moduleRepository,
-            AssessmentAiService assessmentAiService, AssessmentAttemptRepository assessmentAttemptRepository, StudentAnswerRepository studentAnswerRepository, StudentModuleProgressRepository studentModuleProgressRepository, BadgeService badgeService, ActivityLogService activityLogService, StudentLearningProgressionService progressionService) {
+            AssessmentAiService assessmentAiService, AssessmentAttemptRepository assessmentAttemptRepository, StudentAnswerRepository studentAnswerRepository, StudentModuleProgressRepository studentModuleProgressRepository, BadgeService badgeService, ActivityLogService activityLogService, StudentLearningProgressionService progressionService, UserRepository userRepository) {
 
         this.assessmentRepository = assessmentRepository;
         this.questionRepository = questionRepository;
@@ -47,6 +48,7 @@ public class AssessmentService {
         this.badgeService = badgeService;
         this.activityLogService = activityLogService;
         this.progressionService = progressionService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -160,15 +162,11 @@ public class AssessmentService {
         AssessmentEntity assessment =
                 assessmentRepository.findByModuleId(moduleId)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Assessment not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "ASSESSMENT_NOT_FOUND")
                         );
 
         if (assessment.getStatus() != AssessmentStatus.AVAILABLE) {
-            throw new RuntimeException(
-                    "Assessment is not available"
-            );
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_NOT_AVAILABLE");
         }
 
         List<AssessmentQuestionResponse> questions =
@@ -215,10 +213,12 @@ public class AssessmentService {
 
         return response;
     }
+    @Transactional
     public AssessmentAttemptEntity startAttempt(
             Long moduleId,
             UserEntity student) {
 
+        lockStudentLifecycle(student);
         progressionService.validateModuleAccess(
                 moduleId,
                 student
@@ -227,15 +227,11 @@ public class AssessmentService {
         AssessmentEntity assessment =
                 assessmentRepository.findByModuleId(moduleId)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Assessment not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "ASSESSMENT_NOT_FOUND")
                         );
 
         if (assessment.getStatus() != AssessmentStatus.AVAILABLE) {
-            throw new RuntimeException(
-                    "Assessment is not available"
-            );
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_NOT_AVAILABLE");
         }
 
         List<AssessmentAttemptEntity> attempts =
@@ -255,9 +251,7 @@ public class AssessmentService {
                         );
 
         if (alreadyPassed) {
-            throw new RuntimeException(
-                    "Assessment already passed"
-            );
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_ALREADY_PASSED");
         }
 
         // Resume unfinished attempt
@@ -287,24 +281,20 @@ public class AssessmentService {
             UserEntity student,
             StudentAnswerRequest request) {
 
+        lockStudentLifecycle(student);
         AssessmentAttemptEntity attempt =
                 assessmentAttemptRepository.findById(attemptId)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Assessment attempt not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "ATTEMPT_NOT_FOUND")
                         );
 
         if (!attempt.getStudent().getId().equals(student.getId())) {
-            throw new RuntimeException(
-                    "This assessment attempt does not belong to the student"
-            );
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "ACCESS_DENIED");
         }
 
         if (attempt.getSubmittedAt() != null) {
-            throw new RuntimeException(
-                    "Assessment attempt has already been submitted"
-            );
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_ALREADY_SUBMITTED");
         }
 
         // Eligibility can change after an attempt starts. Recheck before accepting answers.
@@ -433,6 +423,14 @@ public class AssessmentService {
 
     }
 
+    private void lockStudentLifecycle(UserEntity student) {
+        // First database operation: serialize starts/submits (including shared progress/badges)
+        // for this Student across application instances until the transaction completes.
+        userRepository.findForAssessmentLifecycle(student.getId()).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND"));
+    }
+
     private org.springframework.web.server.ResponseStatusException invalidAnswerSet() {
         return new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_ANSWER_SET");
     }
@@ -449,9 +447,7 @@ public class AssessmentService {
         AssessmentEntity assessment =
                 assessmentRepository.findByModuleId(moduleId)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Assessment not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "ASSESSMENT_NOT_FOUND")
                         );
 
         List<AssessmentAttemptEntity> attempts =
@@ -485,24 +481,18 @@ public class AssessmentService {
         AssessmentAttemptEntity attempt =
                 assessmentAttemptRepository.findById(attemptId)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Assessment attempt not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "ATTEMPT_NOT_FOUND")
                         );
 
         if (!attempt.getStudent().getId()
                 .equals(student.getId())) {
 
-            throw new RuntimeException(
-                    "You cannot view this assessment attempt"
-            );
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "ACCESS_DENIED");
         }
 
         if (attempt.getSubmittedAt() == null) {
 
-            throw new RuntimeException(
-                    "Assessment has not been submitted yet"
-            );
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_NOT_SUBMITTED");
         }
 
         List<StudentAnswerEntity> answers =

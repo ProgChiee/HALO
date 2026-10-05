@@ -1,3 +1,4 @@
+import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { Award } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
@@ -26,7 +27,7 @@ export default function Badges() {
         const data = await getBadgesData();
         if (isMounted) setEarnedBadges(data);
       } catch (err) {
-        console.error(err);
+        logStudentError('load-badges', err);
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);

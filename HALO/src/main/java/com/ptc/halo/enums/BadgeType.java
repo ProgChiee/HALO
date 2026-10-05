@@ -16,7 +16,7 @@ public enum BadgeType {
     ASSESSMENT_ACE,
 
     // Subject Progress
-    HALFWAY_THERE,
+    MODULE_FINISHER,
     SUBJECT_MASTER,
 
     // Special

@@ -1,3 +1,4 @@
+import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp } from 'lucide-react';
@@ -50,7 +51,7 @@ export default function StudentDashboard() {
           }
         }
       } catch (err) {
-        console.error(err);
+        logStudentError('load-dashboard', err);
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);

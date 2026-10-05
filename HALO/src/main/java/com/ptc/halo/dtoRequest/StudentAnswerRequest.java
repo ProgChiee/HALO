@@ -4,7 +4,8 @@ import java.util.List;
 
 public class StudentAnswerRequest {
 
-    private List<AnswerItem> answers;
+    @jakarta.validation.constraints.NotEmpty
+    private List<@jakarta.validation.constraints.NotNull @jakarta.validation.Valid AnswerItem> answers;
 
     public StudentAnswerRequest() {
     }
@@ -19,7 +20,11 @@ public class StudentAnswerRequest {
 
     public static class AnswerItem {
 
+        @jakarta.validation.constraints.NotNull
+        @jakarta.validation.constraints.Positive
         private Long questionId;
+        @jakarta.validation.constraints.NotBlank
+        @jakarta.validation.constraints.Pattern(regexp = "\\s*[ABCDabcd]\\s*")
         private String answer;
 
         public AnswerItem() {

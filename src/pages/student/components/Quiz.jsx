@@ -1,3 +1,4 @@
+import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ClipboardCheck, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
@@ -61,7 +62,7 @@ export default function Quiz() {
           setAssessment(fetchedAssessment);
         }
       } catch (err) {
-        console.error(err);
+        logStudentError('load-quiz', err);
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -129,7 +130,7 @@ export default function Quiz() {
       setCurrentIndex(0);
       setSelectedAnswers({});
     } catch (err) {
-      console.error(err);
+      logStudentError('start-quiz', err);
       if (mounted.current) showToast("Couldn't start the quiz. Please try again.", 'error');
     } finally {
       actionLock.current = false;
@@ -169,7 +170,7 @@ export default function Quiz() {
           // The submitted result remains authoritative; start rechecks eligibility.
         }
       } catch (err) {
-        console.error(err);
+        logStudentError('submit-quiz', err);
         if (mounted.current) showToast("Couldn't submit your quiz. Please try again.", 'error');
       } finally {
         actionLock.current = false;

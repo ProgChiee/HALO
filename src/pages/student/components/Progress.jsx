@@ -1,29 +1,17 @@
+import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { CheckCircle2, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../../../components/shared/Sidebar';
 import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
-import { getProgressData, getSubjectsData } from '../../../services/student/studentService';
+import { getSubjectsData } from '../../../services/student/studentService';
 import styles from '../styles/Progress.module.css';
 
-// ⚠️ Redesigned for the real backend. getProgressData() only returns a
-// flat [{ moduleId, weekId, completed, completedAt }] list — no subject
-// names, no quiz scores, no single "overall %" field. The per-subject
-// breakdown below reuses getSubjectsData() instead (it already has
-// subjectName + completedWeeks/totalWeeks per subject, which maps well to
-// the old "Completed Subjects" section).
-//
-// The "Quiz Scores" section from the old mock is NOT included — showing
-// real per-quiz history would mean calling
-// quizService.getAttemptHistory(moduleId) once per completed module (an
-// extra N+1 round of requests). Worth adding once the rest of the app is
-// confirmed working; skipped here to keep this page's load time
-// reasonable for now.
-
+// Module totals and completion counts use the same eligible-subject summaries.
 export default function Progress() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [completedModules, setCompletedModules] = useState([]);
+
   const [subjects, setSubjects] = useState([]);
 
   useEffect(() => {
@@ -31,16 +19,13 @@ export default function Progress() {
 
     async function loadData() {
       try {
-        const [progress, subjectList] = await Promise.all([
-          getProgressData(),
-          getSubjectsData(),
-        ]);
+        const subjectList = await getSubjectsData();
         if (isMounted) {
-          setCompletedModules(progress.filter((p) => p.completed));
+
           setSubjects(subjectList);
         }
       } catch (err) {
-        console.error(err);
+        logStudentError('load-progress', err);
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -73,8 +58,9 @@ export default function Progress() {
     );
   }
 
-  const totalWeeks = subjects.reduce((sum, s) => sum + s.totalWeeks, 0);
-  const overall = totalWeeks > 0 ? Math.round((subjects.reduce((sum, subject) => sum + subject.completedWeeks, 0) / totalWeeks) * 100) : 0;
+  const totalModules = subjects.reduce((sum, s) => sum + (s.eligibleModuleCount ?? 0), 0);
+  const completedModules = subjects.reduce((sum, s) => sum + s.completedWeeks, 0);
+  const overall = totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
 
   return (
     <div className={styles.layout}>
@@ -119,14 +105,14 @@ export default function Progress() {
               <div className={styles.statCard}>
                 <span className={styles.statIcon}><CheckCircle2 size={16} /></span>
                 <div>
-                  <p className={styles.statValue}>{completedModules.length}</p>
+                  <p className={styles.statValue}>{completedModules}</p>
                   <p className={styles.statLabel}>Modules completed</p>
                 </div>
               </div>
               <div className={styles.statCard}>
                 <span className={styles.statIcon}><BookOpen size={16} /></span>
                 <div>
-                  <p className={styles.statValue}>{totalWeeks}</p>
+                  <p className={styles.statValue}>{totalModules}</p>
                   <p className={styles.statLabel}>Total modules</p>
                 </div>
               </div>

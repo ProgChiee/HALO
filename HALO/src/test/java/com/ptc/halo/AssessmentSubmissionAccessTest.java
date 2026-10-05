@@ -98,24 +98,57 @@ class AssessmentSubmissionAccessTest {
  }
  @Test void resultGuardsPreserveOwnershipAndSubmissionSecrecy(){
   var unfinished=assertThrows(RuntimeException.class,()->service.getAttemptResult(attempt.getId(),student));
-  assertEquals("Assessment has not been submitted yet",unfinished.getMessage());
+  assertEquals("ASSESSMENT_NOT_SUBMITTED",((ResponseStatusException)unfinished).getReason());
   service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"A"),item(q2.getId(),"B")));
   var other=new UserEntity();other.setId(Long.MAX_VALUE);
   var denied=assertThrows(RuntimeException.class,()->service.getAttemptResult(attempt.getId(),other));
-  assertEquals("You cannot view this assessment attempt",denied.getMessage());
+  assertEquals("ACCESS_DENIED",((ResponseStatusException)denied).getReason());
   var missing=assertThrows(RuntimeException.class,()->service.getAttemptResult(Long.MAX_VALUE,student));
-  assertEquals("Assessment attempt not found",missing.getMessage());
+  assertEquals("ATTEMPT_NOT_FOUND",((ResponseStatusException)missing).getReason());
  }
- @Test void missingResultRetainsSafeExistingHttpError() throws Exception {
+ @Test void missingResultReturnsSafe404() throws Exception {
   var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
     new com.ptc.halo.controller.StudentAssessmentController(service,users))
     .setControllerAdvice(new com.ptc.halo.controller.StudentLessonExceptionHandler()).build();
   mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/student/assessment/result/"+Long.MAX_VALUE)
     .principal(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(student.getEmail(),"unused")))
-    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isInternalServerError())
-    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("INTERNAL_SERVER_ERROR"))
-    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("INTERNAL_SERVER_ERROR"))
+    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
+    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("ATTEMPT_NOT_FOUND"))
+    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("ATTEMPT_NOT_FOUND"))
     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.trace").doesNotExist());
+ }
+ java.util.List<Object> concurrently(java.util.concurrent.Callable<?> action) throws Exception {
+  var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+  var ready=new java.util.concurrent.CountDownLatch(2);var go=new java.util.concurrent.CountDownLatch(1);
+  java.util.concurrent.Callable<Object> task=()->{ready.countDown();assertTrue(go.await(10,java.util.concurrent.TimeUnit.SECONDS));
+   try{return action.call();}catch(ResponseStatusException e){return e;}};
+  try {
+   var one=pool.submit(task);var two=pool.submit(task);
+   assertTrue(ready.await(10,java.util.concurrent.TimeUnit.SECONDS));go.countDown();
+   return java.util.List.of(one.get(20,java.util.concurrent.TimeUnit.SECONDS),two.get(20,java.util.concurrent.TimeUnit.SECONDS));
+  } finally {go.countDown();pool.shutdownNow();}
+ }
+ @Test void concurrentStartsCreateExactlyOneUnfinishedAttempt() throws Exception {
+  Long moduleId=modules.findAll().get(0).getId();attempts.deleteAll();
+  var results=concurrently(()->service.startAttempt(moduleId,student));
+  var one=(AssessmentAttemptEntity)results.get(0);var two=(AssessmentAttemptEntity)results.get(1);
+  assertEquals(one.getId(),two.getId());assertEquals(1,attempts.count());
+  assertNull(attempts.findById(one.getId()).orElseThrow().getSubmittedAt());
+ }
+ @Test void concurrentSubmitsCommitOnceAndRepeatsHaveNoSideEffects() throws Exception {
+  var results=concurrently(()->service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"A"),item(q2.getId(),"B"))));
+  assertEquals(1,results.stream().filter(AssessmentAttemptEntity.class::isInstance).count());
+  var error=(ResponseStatusException)results.stream().filter(ResponseStatusException.class::isInstance).findFirst().orElseThrow();
+  assertEquals(409,error.getStatusCode().value());assertEquals("ASSESSMENT_ALREADY_SUBMITTED",error.getReason());
+  assertEquals(2,answers.count());assertEquals(1,progress.count());assertEquals(100,attempts.findById(attempt.getId()).orElseThrow().getScore());
+  var awarded=badges.findAll();assertFalse(awarded.isEmpty());
+  assertEquals(awarded.size(),awarded.stream().map(StudentBadgeEntity::getBadgeType).distinct().count());
+  int auditCount=mockingDetails(audit).getInvocations().size();
+  assertEquals(2+awarded.size(),auditCount);
+  var repeat=assertThrows(ResponseStatusException.class,()->service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"C"),item(q2.getId(),"C"))));
+  assertEquals("ASSESSMENT_ALREADY_SUBMITTED",repeat.getReason());
+  assertEquals(2,answers.count());assertEquals(1,progress.count());assertEquals(awarded.size(),badges.count());
+  assertEquals(auditCount,mockingDetails(audit).getInvocations().size());
  }
  @Test void anotherStudentsAttemptRemainsInaccessible(){
   var other=new UserEntity();other.setId(Long.MAX_VALUE);

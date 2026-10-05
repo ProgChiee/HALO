@@ -10,12 +10,15 @@ import com.ptc.halo.repository.AssessmentAttemptRepository;
 import com.ptc.halo.repository.StudentBadgeRepository;
 import com.ptc.halo.repository.StudentModuleProgressRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.ptc.halo.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class BadgeService {
+    private final UserRepository userRepository;
 
     private final StudentBadgeRepository studentBadgeRepository;
     private final ActivityLogService activityLogService;
@@ -27,7 +30,8 @@ public class BadgeService {
     public BadgeService(
             StudentBadgeRepository studentBadgeRepository, ActivityLogService activityLogService,
             StudentModuleProgressRepository studentModuleProgressRepository,
-            AssessmentAttemptRepository assessmentAttemptRepository) {
+            AssessmentAttemptRepository assessmentAttemptRepository, UserRepository userRepository) {
+        this.userRepository = userRepository;
 
         this.studentBadgeRepository =
                 studentBadgeRepository;
@@ -41,11 +45,25 @@ public class BadgeService {
     }
 
 
+    @Transactional
     public void checkAndAwardBadges(
             UserEntity student,
             AssessmentAttemptEntity currentAttempt) {
 
+        // Reuse the assessment lifecycle lock before any award reads. The surrounding
+        // transaction retains it through commit, including badge and audit writes.
+        userRepository.findForAssessmentLifecycle(student.getId()).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND"));
         checkProgressBadges(student);
+        if (studentModuleProgressRepository.countEligibleCompletedModules(student.getId()) > 0) {
+            awardBadge(student, BadgeType.MODULE_FINISHER, "Module Finisher",
+                    "Fully completed an available learning module.");
+        }
+        if (studentModuleProgressRepository.countMasteredEligibleSubjects(student.getId()) > 0) {
+            awardBadge(student, BadgeType.SUBJECT_MASTER, "Subject Master",
+                    "Completed every published, available module in one subject.");
+        }
 
         checkAssessmentBadges(
                 student,
@@ -294,11 +312,9 @@ public class BadgeService {
     private void checkHaloAchiever(
             UserEntity student) {
 
-        long totalBadges =
-                studentBadgeRepository
-                        .countByStudentId(
-                                student.getId()
-                        );
+        long totalBadges = studentBadgeRepository.findByStudentIdOrderByEarnedAtDesc(student.getId())
+                .stream().map(StudentBadgeEntity::getBadgeType)
+                .filter(type -> type != null && type != BadgeType.HALO_ACHIEVER).distinct().count();
 
         if (totalBadges >= 10) {
 
@@ -306,7 +322,7 @@ public class BadgeService {
                     student,
                     BadgeType.HALO_ACHIEVER,
                     "HALO Achiever",
-                    "Earned 10 different HALO badges."
+                    "Earned 10 distinct ordinary HALO badges."
             );
         }
     }

@@ -68,136 +68,24 @@ public class StudentLearningProgressionService {
 
         access.validateSubject(student, subject);
 
-        List<WeekEntity> weeks =
-                weekRepository
-                        .findBySubject_IdOrderByWeekNumberAsc(
-                                subjectId
-                        );
-
-
-        List<StudentWeekAccessResponse> responses =
-                new ArrayList<>();
-
-
-        for (int i = 0; i < weeks.size(); i++) {
-
-            WeekEntity week =
-                    weeks.get(i);
-
-
-            Optional<AiLearningModuleEntity> moduleOptional =
-                    aiLearningModuleRepository
-                            .findByWeekIdAndStatus(
-                                    week.getId(),
-                                    LessonStatus.APPROVED
-                            ).filter(module -> module.getAiGenerationStatus() == AiGenerationStatus.COMPLETED);
-
-
-            boolean lessonAvailable =
-                    moduleOptional.isPresent();
-
-
-            boolean completed = false;
-
-
-            if (moduleOptional.isPresent()) {
-
-                AiLearningModuleEntity module =
-                        moduleOptional.get();
-
-
-                Optional<StudentModuleProgressEntity> progressOptional =
-                        studentModuleProgressRepository
-                                .findByStudentIdAndModuleId(
-                                        student.getId(),
-                                        module.getId()
-                                );
-
-
-                completed =
-                        progressOptional.isPresent()
-                                &&
-                                Boolean.TRUE.equals(
-                                        progressOptional
-                                                .get()
-                                                .getCompleted()
-                                );
-            }
-
-
-            boolean unlocked;
-
-
-            // First week is always unlocked
-            if (i == 0) {
-
-                unlocked = true;
-
-            } else {
-
-                WeekEntity previousWeek =
-                        weeks.get(i - 1);
-
-
-                unlocked =
-                        isPreviousWeekCompleted(
-                                previousWeek,
-                                student
-                        );
-            }
-
-
-            StudentWeekAccessResponse response =
-                    new StudentWeekAccessResponse();
-
-
-            response.setWeekId(
-                    week.getId()
-            );
-
-            response.setWeekNumber(
-                    week.getWeekNumber()
-            );
-
-            response.setTitle(
-                    week.getTitle()
-            );
-
-            response.setUnlocked(
-                    unlocked
-            );
-
-            response.setCompleted(
-                    completed
-            );
-
-            response.setLessonAvailable(
-                    lessonAvailable
-            );
-
-
-            if (moduleOptional.isPresent()) {
-
-                response.setModuleId(
-                        moduleOptional
-                                .get()
-                                .getId()
-                );
-
-            } else {
-
-                response.setModuleId(null);
-            }
-
-
+        var rows = weekRepository.findStudentWeekRows(List.of(subjectId), student.getId());
+        List<StudentWeekAccessResponse> responses = new ArrayList<>();
+        boolean previousCompleted = true;
+        for (var row : rows) {
+            boolean completed = row.getCompletedCount() > 0;
+            var response = new StudentWeekAccessResponse();
+            response.setWeekId(row.getWeekId());
+            response.setWeekNumber(row.getWeekNumber());
+            response.setTitle(row.getTitle());
+            response.setModuleId(row.getModuleId());
+            response.setLessonAvailable(row.getModuleId() != null);
+            response.setCompleted(completed);
+            response.setUnlocked(previousCompleted);
             responses.add(response);
+            previousCompleted = completed;
         }
-
-
         return responses;
     }
-
-
     private boolean isPreviousWeekCompleted(
             WeekEntity previousWeek,
             UserEntity student) {

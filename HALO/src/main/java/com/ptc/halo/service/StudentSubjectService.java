@@ -88,63 +88,23 @@ public class StudentSubjectService {
     }
 
     private List<StudentSubjectResponse> summarizeSubjects(UserEntity student, List<SubjectEntity> subjects) {
-        List<StudentSubjectResponse> responses =
-                new ArrayList<>();
-
-
+        if (subjects.isEmpty()) return List.of();
+        var rows = weekRepository.findStudentWeekRows(subjects.stream().map(SubjectEntity::getId).toList(), student.getId());
+        var bySubject = rows.stream().collect(java.util.stream.Collectors.groupingBy(WeekRepository.StudentWeekRow::getSubjectId));
+        List<StudentSubjectResponse> responses = new ArrayList<>();
         for (SubjectEntity subject : subjects) {
-
-            int totalWeeks =
-                    weekRepository
-                            .findBySubject_Id(
-                                    subject.getId()
-                            )
-                            .size();
-
-
-            List<AiLearningModuleEntity>
-                    approvedModules =
-                    aiLearningModuleRepository
-                            .findByWeek_Subject_IdAndStatus(
-                                    subject.getId(),
-                                    LessonStatus.APPROVED
-                            );
-
-
-            int completedWeeks = 0;
-
-
-            for (AiLearningModuleEntity module
-                    : approvedModules) {
-
-                boolean completed =
-                        studentModuleProgressRepository
-                                .findByStudentIdAndModuleId(
-                                        student.getId(),
-                                        module.getId()
-                                )
-                                .map(progress ->
-                                        Boolean.TRUE.equals(
-                                                progress.getCompleted()
-                                        )
-                                )
-                                .orElse(false);
-
-
-                if (completed) {
-                    completedWeeks++;
-                }
-            }
-
-
+            var subjectRows = bySubject.getOrDefault(subject.getId(), List.of());
+            int totalWeeks = subjectRows.size();
+            int eligibleModuleCount = (int) subjectRows.stream().filter(row -> row.getModuleId() != null).count();
+            int completedWeeks = (int) subjectRows.stream().filter(row -> row.getCompletedCount() > 0).count();
             int progressPercentage = 0;
 
-            if (totalWeeks > 0) {
+            if (eligibleModuleCount > 0) {
 
                 progressPercentage =
                         (int) Math.round(
                                 ((double) completedWeeks
-                                        / totalWeeks)
+                                        / eligibleModuleCount)
                                         * 100
                         );
             }
@@ -152,6 +112,7 @@ public class StudentSubjectService {
 
             StudentSubjectResponse response =
                     new StudentSubjectResponse();
+            response.setEligibleModuleCount(eligibleModuleCount);
 
 
             response.setSubjectId(

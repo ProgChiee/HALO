@@ -64,6 +64,44 @@ class StudentAssessmentGenerationAccessTest {
         verifyNoInteractions(assessments);
     }
 
+    @Test void malformedAndInvalidSubmissionsAreSafe400() throws Exception {
+        token("STUDENT");
+        for (String body : new String[]{"{", "{}", "{\"answers\":[]}", "{\"answers\":[null]}",
+                "{\"answers\":[{\"questionId\":0,\"answer\":\"A\"}]}",
+                "{\"answers\":[{\"questionId\":1,\"answer\":\"SECRET_INVALID\"}]}",
+                "{\"answers\":[{\"answer\":\"A\"}]}"}) {
+            mvc.perform(post("/api/student/assessment/submit/1").header("Authorization", "Bearer test-token")
+                    .contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value(body.equals("{") ? "MALFORMED_REQUEST" : "VALIDATION_ERROR"))
+                    .andExpect(jsonPath("$.trace").doesNotExist());
+        }
+        for (String id : new String[]{"0", "-1", "invalid"}) {
+            mvc.perform(get("/api/student/assessment/result/" + id).header("Authorization", "Bearer test-token"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        }
+        verifyNoInteractions(assessments);
+    }
+
+    @Test void businessAuthAndUnexpectedFailuresKeepDistinctStatuses() throws Exception {
+        token("STUDENT");
+        var student = new UserEntity();
+        when(users.findByEmail("student@example.test")).thenReturn(Optional.of(student));
+        String[] codes = {"INVALID_ANSWER_SET", "ATTEMPT_NOT_FOUND", "ASSESSMENT_ALREADY_SUBMITTED", "ACCESS_DENIED", "AUTHENTICATION_REQUIRED"};
+        int[] statuses = {400, 404, 409, 403, 401};
+        for (int i = 0; i < codes.length; i++) {
+            doThrow(
+                    new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.valueOf(statuses[i]), codes[i])).when(assessments).submitAttempt(eq(1L), eq(student), any());
+            mvc.perform(post("/api/student/assessment/submit/1").header("Authorization", "Bearer test-token")
+                    .contentType("application/json").content("{\"answers\":[{\"questionId\":1,\"answer\":\"A\"}]}"))
+                    .andExpect(status().is(statuses[i])).andExpect(jsonPath("$.code").value(codes[i]));
+        }
+        when(assessments.getAttemptResult(1L, student)).thenThrow(new RuntimeException("SECRET_SQL_DETAIL"));
+        mvc.perform(get("/api/student/assessment/result/1").header("Authorization", "Bearer test-token"))
+                .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.message").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.trace").doesNotExist());
+    }
+
     @Test void studentCanReadAndStartExistingAssessment() throws Exception {
         token("STUDENT");
         var student = new UserEntity();

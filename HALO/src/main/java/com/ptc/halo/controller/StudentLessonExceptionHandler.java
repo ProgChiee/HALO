@@ -25,6 +25,24 @@ public class StudentLessonExceptionHandler {
         return response(403, "INVALID_ROLE_OR_ACCESS", request);
     }
 
+    @ExceptionHandler({org.springframework.web.bind.MethodArgumentNotValidException.class,
+            org.springframework.web.method.annotation.HandlerMethodValidationException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            jakarta.validation.ConstraintViolationException.class})
+    public ResponseEntity<Map<String, Object>> validation(Exception error, HttpServletRequest request) {
+        return response(400, "VALIDATION_ERROR", request);
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> malformed(Exception error, HttpServletRequest request) {
+        return response(400, "MALFORMED_REQUEST", request);
+    }
+
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> unauthenticated(Exception error, HttpServletRequest request) {
+        return response(401, "AUTHENTICATION_REQUIRED", request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> unexpected(Exception error, HttpServletRequest request) {
         // Do not expose credentials, upstream payloads or stack traces to the browser.

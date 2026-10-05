@@ -51,8 +51,11 @@ class ModuleScopedMentorTest {
         when(session.getModule()).thenReturn(module); when(session.getId()).thenReturn(21L);
         when(sessions.findById(21L)).thenReturn(Optional.of(session));
         when(messages.findTop10BySessionIdOrderByCreatedAtDesc(21L)).thenReturn(List.of());
+        var users = mock(UserRepository.class); when(users.findById(8L)).thenReturn(Optional.of(student));
+        when(modules.findWithFilesById(15L)).thenReturn(Optional.of(module));
+        when(modules.findForMentorOpenById(15L)).thenReturn(Optional.of(module));
         mentor = new MentorService(builder, modules, sessions, messages, mapper,
-                mock(StudentLearningProgressionService.class), index);
+                mock(StudentLearningProgressionService.class), index, new MentorOpenTest.Transactions(), users);
     }
     AiLearningFileEntity pdf(long id, String text, AiLearningModuleEntity owner) throws Exception {
         Path file = directory.resolve("material-" + id + ".pdf");

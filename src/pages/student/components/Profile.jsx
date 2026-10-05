@@ -1,3 +1,4 @@
+import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { User as UserIcon, KeyRound } from 'lucide-react';
 import Sidebar from '../../../components/shared/Sidebar';
@@ -29,7 +30,7 @@ export default function Profile() {
         const data = await getProfileData();
         if (isMounted) setProfile(data);
       } catch (err) {
-        console.error(err);
+        logStudentError('load-profile', err);
         if (isMounted) setLoadError(true);
       } finally {
         if (isMounted) setIsLoading(false);

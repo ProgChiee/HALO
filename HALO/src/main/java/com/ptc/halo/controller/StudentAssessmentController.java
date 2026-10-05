@@ -31,7 +31,7 @@ public class StudentAssessmentController {
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<AssessmentResponse>
     getAssessment(
-            @PathVariable Long moduleId,
+            @PathVariable @jakarta.validation.constraints.Positive Long moduleId,
             Authentication authentication) {
 
         UserEntity student =
@@ -40,9 +40,7 @@ public class StudentAssessmentController {
                                 authentication.getName()
                         )
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Student not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
 
         return ResponseEntity.ok(
@@ -54,7 +52,7 @@ public class StudentAssessmentController {
     }
     @PostMapping("/start/{moduleId}")
     public ResponseEntity<AssessmentAttemptResponse> startAttempt(
-            @PathVariable Long moduleId,
+            @PathVariable @jakarta.validation.constraints.Positive Long moduleId,
             Authentication authentication) {
 
         String email = authentication.getName();
@@ -62,9 +60,7 @@ public class StudentAssessmentController {
         UserEntity student =
                 userRepository.findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Student not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
 
         AssessmentAttemptEntity attempt =
@@ -88,8 +84,8 @@ public class StudentAssessmentController {
     }
     @PostMapping("/submit/{attemptId}")
     public ResponseEntity<AssessmentResultResponse> submitAttempt(
-            @PathVariable Long attemptId,
-            @RequestBody StudentAnswerRequest request,
+            @PathVariable @jakarta.validation.constraints.Positive Long attemptId,
+            @jakarta.validation.Valid @RequestBody StudentAnswerRequest request,
             Authentication authentication) {
 
         String email = authentication.getName();
@@ -97,9 +93,7 @@ public class StudentAssessmentController {
         UserEntity student =
                 userRepository.findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Student not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
 
         AssessmentAttemptEntity attempt =
@@ -120,7 +114,7 @@ public class StudentAssessmentController {
     }
     @GetMapping("/attempts/{moduleId}")
     public ResponseEntity<List<AssessmentAttemptHistoryResponse>> getAttemptHistory(
-            @PathVariable Long moduleId,
+            @PathVariable @jakarta.validation.constraints.Positive Long moduleId,
             Authentication authentication) {
 
         String email = authentication.getName();
@@ -128,9 +122,7 @@ public class StudentAssessmentController {
         UserEntity student =
                 userRepository.findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Student not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
 
         List<AssessmentAttemptHistoryResponse> response =
@@ -143,7 +135,7 @@ public class StudentAssessmentController {
     }
     @GetMapping("/result/{attemptId}")
     public ResponseEntity<AssessmentResultResponse> getAttemptResult(
-            @PathVariable Long attemptId,
+            @PathVariable @jakarta.validation.constraints.Positive Long attemptId,
             Authentication authentication) {
 
         String email = authentication.getName();
@@ -151,9 +143,7 @@ public class StudentAssessmentController {
         UserEntity student =
                 userRepository.findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Student not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
 
         AssessmentResultResponse response =
@@ -166,7 +156,7 @@ public class StudentAssessmentController {
     }
     @GetMapping("/status/{moduleId}")
     public ResponseEntity<AssessmentStatusResponse> getAssessmentStatus(
-            @PathVariable Long moduleId,
+            @PathVariable @jakarta.validation.constraints.Positive Long moduleId,
             Authentication authentication) {
 
         String email = authentication.getName();
@@ -174,9 +164,7 @@ public class StudentAssessmentController {
         UserEntity student =
                 userRepository.findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Student not found"
-                                )
+                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
 
         AssessmentStatusResponse response =

@@ -5,6 +5,7 @@ import com.ptc.halo.entity.StudentModuleProgressEntity;
 import com.ptc.halo.entity.UserEntity;
 import com.ptc.halo.repository.StudentModuleProgressRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ public class StudentProgressService {
                 studentModuleProgressRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<StudentModuleProgressResponse> getProgress(
             UserEntity student) {
 

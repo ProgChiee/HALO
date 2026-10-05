@@ -9,6 +9,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<UserEntity, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select u from UserEntity u where u.id = :id")
+    Optional<UserEntity> findForAssessmentLifecycle(@org.springframework.data.repository.query.Param("id") Long id);
+
     // Scalar aggregates avoid multiplying counts across progress, attempts, and badges.
     // No lazy entities or per-student repository calls are used by the summary page.
     @org.springframework.data.jpa.repository.Query(value = """
