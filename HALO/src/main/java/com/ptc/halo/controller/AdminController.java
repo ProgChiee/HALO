@@ -189,9 +189,7 @@ public class AdminController {
         return userRepository
                 .findByEmail(authentication.getName())
                 .orElseThrow(() ->
-                        new RuntimeException(
-                                "Admin not found"
-                        )
+                        new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                 );
     }
     @GetMapping("/profile")
@@ -202,9 +200,7 @@ public class AdminController {
                 userRepository
                         .findByEmail(authentication.getName())
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Admin not found"
-                                )
+                                new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                         );
 
         return ResponseEntity.ok(

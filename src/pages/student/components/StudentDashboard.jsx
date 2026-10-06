@@ -2,10 +2,9 @@ import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
+import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
 import { useAuth } from '../../../context/login/useAuth';
-import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getDashboardData, getSubjectsData, getSubjectWeeks } from '../../../services/student/studentService';
 import { findAvailableWeek } from '../../../utils/backendContract';
 import styles from '../styles/StudentDashboard.module.css';
@@ -79,8 +78,7 @@ export default function StudentDashboard() {
   const nextSubject = subjects.find((s) => s.progressPercentage < 100);
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+    <StudentPageShell>
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -164,6 +162,6 @@ export default function StudentDashboard() {
           </div>}
         </main>
       </div>
-    </div>
+    </StudentPageShell>
   );
 }

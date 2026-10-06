@@ -1,3 +1,4 @@
+import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText, Upload, Link2, Sparkles, Check, X, RefreshCw, Image as ImageIcon } from 'lucide-react';
@@ -59,8 +60,8 @@ function RouteLessonEditor({ subjectId, weekId }) {
         setFiles([]);
         setLoadError('');
       })
-      .catch(() => {
-        if (isCurrent()) setLoadError('Could not load this week. Retry before saving materials.');
+      .catch((error) => {
+        if (isCurrent()) setLoadError(professorErrorMessage(error, 'Could not load this week. Retry before saving materials.'));
       })
       .finally(() => {
         if (isCurrent()) setLoading(false);
@@ -220,12 +221,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
       if (status === 409 && action === 'save' && !module) {
         setLoadError('This week already has a module. Retry loading to open the existing lesson.');
       }
-      const serverMessage = error.response?.data?.message;
-      const message = typeof serverMessage === 'string' ? serverMessage : status === 403
-        ? 'The server refused this request (403). Check your professor session. If other professor pages work, ask the administrator to check the upload error in the server log.'
-        : status === 413
-          ? 'The upload exceeds the server size limit. Choose smaller files.'
-          : "Couldn't update the module. Please try again.";
+      const message = professorErrorMessage(error, "Couldn't update the module. Please try again.");
       if (isCurrent()) showToast(message, 'error', 8000);
     } finally {
       if (isCurrent()) {
@@ -297,7 +293,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
   const hasGeneratedContent = aiStatus === 'COMPLETED';
 
   return (
-    <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+    <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
       <header className={styles.topHeader}>
         <div className={styles.topHeaderLeft}>
           <button className={styles.backBtn} onClick={() => navigate('/professor/subjects')}>
@@ -339,11 +335,11 @@ function RouteLessonEditor({ subjectId, weekId }) {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>Lesson text</label>
+            <label htmlFor="lesson-text" className={styles.label}>Lesson text</label>
             <textarea
               className={styles.textarea}
               rows={6}
-              value={lessonText}
+              id="lesson-text" value={lessonText}
               onChange={(e) => setLessonText(e.target.value)}
               placeholder="Paste or write the lesson content here"
               disabled={editingDisabled}
@@ -355,7 +351,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
             <input
               type="text"
               className={styles.input}
-              value={youtubeLink}
+              aria-label="YouTube lesson link (optional)" value={youtubeLink}
               onChange={(e) => setYoutubeLink(e.target.value)}
               placeholder="YouTube link (optional)"
               disabled={editingDisabled}
@@ -363,11 +359,11 @@ function RouteLessonEditor({ subjectId, weekId }) {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>Notes for the AI mentor (optional)</label>
+            <label htmlFor="lesson-notes" className={styles.label}>Notes for the AI mentor (optional)</label>
             <textarea
               className={styles.textarea}
               rows={3}
-              value={aiNotes}
+              id="lesson-notes" value={aiNotes}
               onChange={(e) => setAiNotes(e.target.value)}
               placeholder="Anything the AI should emphasize or avoid"
               disabled={editingDisabled}
@@ -388,7 +384,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
             </button>
             <input
               ref={materialsInputRef}
-              type="file"
+              type="file" aria-label="Upload original lesson files"
               accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg"
               multiple
               hidden

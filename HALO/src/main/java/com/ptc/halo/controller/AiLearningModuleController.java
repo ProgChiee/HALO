@@ -198,14 +198,14 @@ public class AiLearningModuleController {
         if (module.getStatus() == LessonStatus.APPROVED) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "This lesson is already approved."
+                    "MODULE_ALREADY_APPROVED"
             );
         }
 
         if (module.getAiGenerationStatus() != AiGenerationStatus.COMPLETED) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Generate the lesson successfully before approving it."
+                    "MODULE_GENERATION_REQUIRED"
             );
         }
 
@@ -245,7 +245,7 @@ public class AiLearningModuleController {
         if (module.getAiGenerationStatus() != AiGenerationStatus.COMPLETED) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Only completed AI-generated lessons can be declined."
+                    "MODULE_GENERATION_REQUIRED"
             );
         }
 
@@ -388,7 +388,7 @@ public class AiLearningModuleController {
         if (module.getStatus() == LessonStatus.APPROVED) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Published lessons cannot be changed through the draft editor."
+                    "MODULE_NOT_EDITABLE"
             );
         }
     }
@@ -479,41 +479,7 @@ public class AiLearningModuleController {
     public ResponseEntity<Map<String, Object>> handleRequestError(
             ResponseStatusException exception
     ) {
-        if (exception.getStatusCode().value() == 404) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                    "status", 404, "code", "RESOURCE_NOT_FOUND",
-                    "message", "The requested resource is unavailable."));
-        }
-        if (exception.getStatusCode().value() == 409 && "STALE_MODULE_OPERATION".equals(exception.getReason())) return staleModule();
-        String materialCode = exception.getReason();
-        var uploadMessages = Map.of(
-                "UPLOAD_FILE_UNSUPPORTED", "Only readable PDF, PNG, and JPEG files are supported.",
-                "UPLOAD_FILE_UNREADABLE", "The file is empty, corrupt, protected, or unreadable. Upload a readable lesson file.",
-                "UPLOAD_FILE_TOO_LARGE", "Each lesson file must be no larger than 3 MB.",
-                "UPLOAD_FILENAME_REQUIRED", "A filename is required.",
-                "MODULE_FILE_LIMIT_EXCEEDED", "A module can contain at most 10 lesson files.");
-        if (uploadMessages.containsKey(materialCode == null ? "" : materialCode)) {
-            int status = exception.getStatusCode().value();
-            return ResponseEntity.status(status).body(Map.of("status", status, "code", materialCode, "message", uploadMessages.get(materialCode)));
-        }
-        if ("MODULE_MATERIALS_REQUIRED".equals(materialCode)) {
-            return ResponseEntity.status(409).body(Map.of("status", 409, "code", materialCode,
-                    "message", "Upload at least one original lesson file before publishing."));
-        }
-        if (java.util.Set.of("MODULE_MATERIAL_UNREADABLE", "MODULE_MATERIAL_UNSUPPORTED", "MODULE_MATERIAL_MISMATCH", "MODULE_MATERIALS_TOO_LARGE").contains(materialCode == null ? "" : materialCode)) {
-            return ResponseEntity.status(409).body(Map.of("status", 409, "code", materialCode,
-                    "message", "The original lesson files are not ready for Mentor. Replace unreadable, unsupported, or oversized files and try again."));
-        }
-        if ("MODULE_INDEX_UNAVAILABLE".equals(materialCode)) {
-            return ResponseEntity.status(502).body(Map.of("status", 502, "code", materialCode,
-                    "message", "Lesson material preparation is unavailable. Please try publishing again later."));
-        }
-        String message = exception.getReason() != null
-                ? exception.getReason()
-                : "The request could not be completed.";
-
-        return ResponseEntity.status(exception.getStatusCode())
-                .body(Map.of("message", message));
+        return ProfessorErrorResponses.status(exception);
     }
 
     @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
@@ -524,14 +490,9 @@ public class AiLearningModuleController {
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<Map<String, String>> handleDatabaseConflict(
+    public ResponseEntity<Map<String, Object>> handleDatabaseConflict(
             DataIntegrityViolationException exception
     ) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Map.of(
-                        "message",
-                        "The change conflicts with an existing record. "
-                                + "Reload the lesson before trying again."
-                ));
+        return ProfessorErrorResponses.reply(409, "RESOURCE_CONFLICT");
     }
 }

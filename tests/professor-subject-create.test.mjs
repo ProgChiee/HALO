@@ -45,15 +45,15 @@ test('empty subject list retains Create Subject and reloads after creating witho
     assert.equal(create.textContent.trim(), 'Create Subject');
     assert.equal(create.disabled, false);
     await act(async () => create.click());
-    const inputs = host.querySelectorAll('form input');
+    const inputs = document.querySelectorAll('[role="dialog"] form input');
     for (const [index, value] of [[0, 'TEST-CREATE'], [1, 'Test subject']]) {
       await act(async () => {
         Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(inputs[index], value);
         inputs[index].dispatchEvent(new dom.window.Event('input', { bubbles: true }));
       });
     }
-    await act(async () => host.querySelector('form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })));
-    assert.equal(host.querySelector('form'), null);
+    await act(async () => document.querySelector('[role="dialog"] form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })));
+    assert.equal(document.querySelector('[role="dialog"] form'), null);
     assert.doesNotMatch(host.textContent, /No subjects yet/);
     assert.match(host.textContent, /Test subject/);
     assert.deepEqual(calls.map(call => call.method), ['get', 'post', 'get']);
@@ -76,11 +76,11 @@ test('subject delete confirmation is truthful and conflict leaves the subject vi
     await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Professor' }, logout() {} } },
       React.createElement(ToastContext.Provider, { value: { showToast: (...args) => toasts.push(args) } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Subjects))))));
     await act(async () => host.querySelector('[aria-label="Delete subject"]').click());
-    assert.match(host.textContent, /Only an empty subject can be deleted/);
+    assert.match(document.querySelector('[role="dialog"]').textContent, /Only an empty subject can be deleted/);
     assert.doesNotMatch(host.textContent, /also remove all modules/);
-    await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === 'Delete').click());
+    await act(async () => [...document.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === 'Delete').click());
     assert.deepEqual(toasts, [['This subject still contains weeks or learning modules. Remove its content before deleting the subject.', 'error']]);
     assert.ok(host.querySelector('[aria-label="Delete subject"]'));
-    assert.ok([...host.querySelectorAll('button')].find(button => button.textContent === 'Delete'));
+    assert.ok([...document.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === 'Delete'));
   } finally { await act(async () => root.unmount()); host.remove(); api.defaults.adapter = adapter; }
 });

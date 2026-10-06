@@ -1,3 +1,4 @@
+import { adminErrorMessage } from '../../../utils/adminErrors';
 import { useState, useRef, useMemo } from 'react';
 import { Users, Search, Eye, Power, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
@@ -37,8 +38,8 @@ export default function StudentManagement() {
       setStudents((previous) => previous.map((item) => item.id === updated.id ? updated : item));
       setViewingStudent((previous) => previous?.id === updated.id ? updated : previous);
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
-    } catch {
-      showToast("Couldn't update the account status. Please try again.", 'error');
+    } catch (error) {
+      showToast(adminErrorMessage(error), 'error');
     } finally {
       toggleLock.current = false;
       setTogglingId(null);

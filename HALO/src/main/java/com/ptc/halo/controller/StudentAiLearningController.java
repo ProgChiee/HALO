@@ -60,6 +60,8 @@ public class StudentAiLearningController {
 
         response.setId(module.getId());
         response.setWeekId(module.getWeek().getId());
+        response.setSubjectId(module.getWeek().getSubject().getId());
+        response.setWeekNumber(module.getWeek().getWeekNumber());
 
         response.setYoutubeLink(
                 module.getYoutubeLink()

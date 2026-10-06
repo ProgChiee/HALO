@@ -2,14 +2,14 @@ import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ClipboardCheck, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
+import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
-import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getWeekLesson } from '../../../services/student/studentService';
 import { getAssessmentStatus, getAssessment, startAttempt, submitAttempt, getAttemptResult } from '../../../services/student/quizService';
 import { buildAssessmentAnswers } from '../../../utils/backendContract';
 import { shouldReconcileQuiz, isSavedQuizResult } from '../../../utils/quizReconciliation';
+import { validateLessonRoute } from '../../../utils/lessonLoader';
 import styles from '../styles/Quiz.module.css';
 
 // The server scores A/B/C/D answers and completes module progress on a passing attempt.
@@ -17,16 +17,17 @@ const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
 export default function Quiz() {
   const { topicId, weekId } = useParams();
-  return <WeekQuiz key={`${topicId}:${weekId}`} weekId={weekId} />;
+  return <WeekQuiz key={`${topicId}:${weekId}`} subjectId={topicId} weekId={weekId} />;
 }
 
-function WeekQuiz({ weekId }) {
+function WeekQuiz({ subjectId, weekId }) {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [moduleId, setModuleId] = useState(null);
+  const [weekNumber, setWeekNumber] = useState(null);
   const [status, setStatus] = useState(null); // AssessmentStatusResponse
   const [assessment, setAssessment] = useState(null);
   const [attemptId, setAttemptId] = useState(null);
@@ -56,6 +57,11 @@ function WeekQuiz({ weekId }) {
       try {
         const module = await getWeekLesson(weekId, config);
         if (!isMounted) return;
+        validateLessonRoute(module, weekId);
+        if (String(module.subjectId) !== String(subjectId)) {
+          navigate(`/student/quiz/${module.subjectId}/${module.weekId}`, { replace: true }); return;
+        }
+        setWeekNumber(module.weekNumber);
         setModuleId(module.id);
 
         const assessmentStatus = await getAssessmentStatus(module.id, config);
@@ -76,23 +82,21 @@ function WeekQuiz({ weekId }) {
 
     loadQuiz();
     return () => { isMounted = false; controller.abort(); };
-  }, [weekId]);
+  }, [subjectId, weekId, navigate]);
 
   if (isLoading) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading quiz...</p>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
   if (loadError) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <div className={styles.introCard}>
             <p className={styles.introDescription}>
@@ -101,18 +105,17 @@ function WeekQuiz({ weekId }) {
             <Button onClick={() => navigate(0)}>Retry</Button>
           </div>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
   if (!assessment?.questions?.length) {
-    return <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} />
+    return <StudentPageShell>
       <main className={styles.contentArea}>
         <p className={styles.loadingText}>This quiz is not available yet.</p>
         <Button onClick={() => navigate('/student/subjects')}>Back to Subjects</Button>
       </main>
-    </div>;
+    </StudentPageShell>;
   }
 
   const currentQuestion = assessment.questions[currentIndex];
@@ -211,8 +214,7 @@ function WeekQuiz({ weekId }) {
   }
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} />
+    <StudentPageShell>
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -220,7 +222,7 @@ function WeekQuiz({ weekId }) {
             <ClipboardCheck size={16} />
             {assessment.title}
           </div>
-          <span className={styles.lessonTag}>Week {weekId}</span>
+          <span className={styles.lessonTag}>Week {weekNumber}</span>
         </header>
 
         <main className={styles.main}>
@@ -278,6 +280,7 @@ function WeekQuiz({ weekId }) {
                     <button
                       key={letter}
                       className={`${styles.optionRow} ${isSelected ? styles.optionRowSelected : ''}`}
+                      aria-pressed={isSelected}
                       disabled={isSubmitting} onClick={() => handleSelectOption(letter)}
                     >
                       <span className={styles.optionMarker}>{letter}</span>
@@ -354,6 +357,6 @@ function WeekQuiz({ weekId }) {
           )}
         </main>
       </div>
-    </div>
+    </StudentPageShell>
   );
 }

@@ -1,9 +1,8 @@
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { User as UserIcon, KeyRound } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
+import StudentPageShell from './StudentPageShell';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
-import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getProfileData } from '../../../services/student/studentService';
 import styles from '../styles/Profile.module.css';
 
@@ -42,23 +41,21 @@ export default function Profile() {
 
   if (isLoading) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading your profile...</p>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
   if (loadError || !profile) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
@@ -66,8 +63,7 @@ export default function Profile() {
   const yearLevelLabel = YEAR_LEVEL_LABELS[profile.yearLevel] ?? profile.yearLevel;
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+    <StudentPageShell>
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -125,7 +121,7 @@ export default function Profile() {
         </main>
       </div>
 
-      <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
-    </div>
+      <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
+    </StudentPageShell>
   );
 }

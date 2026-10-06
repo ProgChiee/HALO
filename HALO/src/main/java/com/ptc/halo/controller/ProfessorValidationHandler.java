@@ -9,9 +9,9 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
-// Validation only: business errors and security handling remain unchanged.
-@RestControllerAdvice(assignableTypes = {ProfessorAcademicController.class, AiLearningModuleController.class})
-public class ProfessorValidationHandler {
+// Scoped Professor validation and safe request failures.
+@RestControllerAdvice(assignableTypes = {ProfessorAcademicController.class, AiLearningModuleController.class, ProfessorDashboardController.class, ProfessorProfileController.class, ProfessorStudentController.class})
+public class ProfessorValidationHandler extends ProfessorErrorResponses {
     private ResponseEntity<?> invalid(Map<String, String> fields) {
         return ResponseEntity.badRequest().body(Map.of("status", 400, "code", "VALIDATION_FAILED",
                 "message", "Please correct the invalid fields.", "errors", fields));

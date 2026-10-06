@@ -174,3 +174,9 @@
   font-size: var(--text-sm);
 }
 .emptyState { padding: var(--space-xl); text-align: center; color: var(--color-text-muted); }
+
+@media (max-width: 768px) {
+  .topbar, .main { padding: 1rem; }
+  .continueCard, .subjectRow { flex-wrap: wrap; }
+  .continueInfo { min-width: 0; }
+}

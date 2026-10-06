@@ -207,8 +207,14 @@
 }
 
 .modal {
+  box-sizing: border-box;
+  min-width: 0;
   width: 100%;
   max-width: 420px;
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-glow);
   border-radius: var(--radius-lg);
@@ -248,6 +254,7 @@
 
 .modalActions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-sm);
 }
@@ -285,6 +292,9 @@
 }
 
 .input {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
   background: var(--color-bg-input);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -300,4 +310,16 @@
 .formError {
   color: var(--color-error);
   font-size: var(--text-sm);
+}
+@media (max-width: 1024px) {
+  .contentArea { height: auto; min-height: 0; overflow-wrap: anywhere; }
+  .main { min-width: 0; overflow-wrap: anywhere; }
+}
+@media (max-width: 768px) {
+  .main, .topbar { padding: 1rem; }
+  .subjectHeader, .weekRow { flex-wrap: wrap; }
+  .modal { padding: 1rem; }
+}
+@media (max-height: 500px) {
+  .modal { padding: 1rem; }
 }

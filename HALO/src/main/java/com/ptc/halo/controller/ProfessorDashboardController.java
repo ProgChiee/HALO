@@ -32,9 +32,9 @@ public class ProfessorDashboardController {
     @GetMapping
     public ResponseEntity<ProfessorDashboardResponse>
     getDashboard(Authentication authentication) {
-        if (authentication == null) throw new AccessDeniedException("Authentication required");
+        if (authentication == null) throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
         var professor = users.findByEmail(authentication.getName())
-                .orElseThrow(() -> new AccessDeniedException("Authentication required"));
+                .orElseThrow(() -> new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required"));
 
         return ResponseEntity.ok(
                 professorDashboardService

@@ -2,8 +2,7 @@ import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { CheckCircle2, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import Sidebar from '../../../components/shared/Sidebar';
-import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
+import StudentPageShell from './StudentPageShell';
 import { getSubjectsData } from '../../../services/student/studentService';
 import styles from '../styles/Progress.module.css';
 
@@ -38,23 +37,21 @@ export default function Progress() {
 
   if (isLoading) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading your progress...</p>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
   if (loadError) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Couldn't load your progress. Please refresh and try again.</p>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
@@ -63,8 +60,7 @@ export default function Progress() {
   const overall = totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+    <StudentPageShell>
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -136,6 +132,6 @@ export default function Progress() {
           </div>
         </main>
       </div>
-    </div>
+    </StudentPageShell>
   );
 }

@@ -1,7 +1,8 @@
+import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useEffect } from 'react';
 import { User as UserIcon, KeyRound } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
+import PageShell from '../../../components/shared/PageShell';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { getProfessorProfile } from '../../../services/professor/professorService';
@@ -18,7 +19,8 @@ import styles from '../styles/ProfessorProfile.module.css';
 
 export default function ProfessorProfile() {
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const [retry, setRetry] = useState(0);
   const [profile, setProfile] = useState(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
@@ -30,42 +32,40 @@ export default function ProfessorProfile() {
         if (isMounted) setProfile(data);
       } catch (err) {
         logProfessorError('load-profile', err);
-        if (isMounted) setLoadError(true);
+        if (isMounted) setLoadError(err);
       } finally {
         if (isMounted) setIsLoading(false);
       }
     }
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [retry]);
 
   if (isLoading) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor" />
+      <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading profile...</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   if (loadError || !profile) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor" />
+      <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
         <div className={styles.contentArea}>
-          <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
+          <p className={styles.loadingText}>{professorErrorMessage(loadError, "Couldn't load your profile. Please try again.")}</p>
+          <button onClick={() => { setIsLoading(true); setLoadError(null); setRetry(value => value + 1); }}>Retry</button>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor" />
+    <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -118,7 +118,7 @@ export default function ProfessorProfile() {
         </main>
       </div>
 
-      <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
-    </div>
+      <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
+    </PageShell>
   );
 }

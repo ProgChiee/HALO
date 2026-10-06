@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Bot, Send, Volume2, VolumeX } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
+import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
-import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
 import { getWeekLesson } from '../../../services/student/studentService';
 import { openSession, getConversation, getExchange, sendMessage as sendMentorMessage } from '../../../services/student/aiMentorService';
 import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
@@ -34,6 +33,9 @@ function ModuleLessonChat({ topicId, weekId }) {
   const olderLock = useRef(false);
   const prepending = useRef(false);
   const [draft, setDraft] = useState('');
+  const draftError = draft.length > 4000
+    ? 'Your message is too long. Shorten it to 4,000 characters or fewer.'
+    : draft.length > 0 && !draft.trim() ? 'Enter a message; spaces alone cannot be sent.' : '';
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const requestScope = useRef(null);
@@ -51,7 +53,8 @@ function ModuleLessonChat({ topicId, weekId }) {
     requestScope.current = controller;
     sendLock.current = false;
     loadLessonChat({
-      weekId, signal: controller.signal, getLesson: getWeekLesson, openMentor: openSession,
+      subjectId: topicId, weekId, signal: controller.signal, getLesson: getWeekLesson, openMentor: openSession,
+      onCanonical: module => navigate(`/student/lesson/${module.subjectId}/${module.weekId}`, { replace: true }),
       onLesson: (module) => {
         setLesson(module);
         setIsLoading(false);
@@ -72,7 +75,7 @@ function ModuleLessonChat({ topicId, weekId }) {
       },
     });
     return () => { controller.abort(); };
-  }, [topicId, weekId, reloadKey]);
+  }, [topicId, weekId, reloadKey, navigate]);
 
   useEffect(() => {
     if (prepending.current) { prepending.current = false; return; }
@@ -81,12 +84,11 @@ function ModuleLessonChat({ topicId, weekId }) {
 
   if (isLoading) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading lesson...</p>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
@@ -107,8 +109,7 @@ function ModuleLessonChat({ topicId, weekId }) {
 
   if (loadError && !lesson) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <main className={styles.notFound}>
             <p role="alert">{loadError}</p>
@@ -116,7 +117,7 @@ function ModuleLessonChat({ topicId, weekId }) {
             <Button onClick={() => navigate('/student/subjects')}>Back to Subjects</Button>
           </main>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
@@ -150,7 +151,11 @@ function ModuleLessonChat({ topicId, weekId }) {
     if (sendLock.current) return;
 
     const text = draft.trim();
-    if (!text || !sessionId) return;
+    if (!text || draft.length > 4000) {
+      showToast(draftError || 'Enter a message before sending.', 'error');
+      return;
+    }
+    if (!sessionId) return;
 
     const scope = requestScope.current;
     if (!scope || scope.signal.aborted) return;
@@ -198,8 +203,7 @@ function ModuleLessonChat({ topicId, weekId }) {
   }
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} />
+    <StudentPageShell>
 
       <div className={styles.contentArea}>
         <header className={styles.topHeader}>
@@ -214,7 +218,7 @@ function ModuleLessonChat({ topicId, weekId }) {
           </div>
 
           <div className={styles.breadcrumb}>
-            <span className={styles.breadcrumbActive}>Week {weekId}</span>
+            <span className={styles.breadcrumbActive}>Week {lesson?.weekNumber}</span>
           </div>
         </header>
 
@@ -288,20 +292,24 @@ function ModuleLessonChat({ topicId, weekId }) {
           <div ref={messagesEndRef} />
         </main>
 
+        {draftError && <p id="mentor-draft-error" role="alert">{draftError}</p>}
         <form className={styles.inputRow} onSubmit={handleSend}>
           <input
             type="text"
             className={styles.chatInput}
+            aria-label="Message AI Mentor"
             placeholder={isAiTyping ? 'Waiting for AI Mentor to respond...' : 'Ask AI Mentor'}
             value={draft}
+            aria-invalid={Boolean(draftError)}
+            aria-describedby={draftError ? 'mentor-draft-error' : undefined}
             onChange={(e) => setDraft(e.target.value)}
             disabled={isAiTyping || !sessionId}
           />
-          <button type="submit" className={styles.sendBtn} aria-label="Send message" disabled={isAiTyping || !sessionId}>
+          <button type="submit" className={styles.sendBtn} aria-label="Send message" disabled={isAiTyping || !sessionId || !draft.trim() || draft.length > 4000}>
             <Send size={18} />
           </button>
         </form>
       </div>
-    </div>
+    </StudentPageShell>
   );
 }

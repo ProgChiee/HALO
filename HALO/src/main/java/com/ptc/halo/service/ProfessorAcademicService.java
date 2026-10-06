@@ -52,18 +52,14 @@ public class ProfessorAcademicService {
                 .findBySubjectCode(request.getSubjectCode())
                 .isPresent()) {
 
-            throw new RuntimeException(
-                    "Subject code already exists"
-            );
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "SUBJECT_CODE_ALREADY_EXISTS");
         }
 
         if (subjectRepository
                 .findBySubjectName(request.getSubjectName())
                 .isPresent()) {
 
-            throw new RuntimeException(
-                    "Subject name already exists"
-            );
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "SUBJECT_NAME_ALREADY_EXISTS");
         }
 
         SubjectEntity subject = new SubjectEntity();

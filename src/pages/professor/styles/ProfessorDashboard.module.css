@@ -166,3 +166,10 @@
   color: var(--color-accent-active);
   font-weight: 600;
 }
+@media (max-width: 1024px) {
+  .contentArea { height: auto; min-height: 0; overflow-wrap: anywhere; }
+  .main { min-width: 0; overflow-wrap: anywhere; }
+}
+@media (max-width: 768px) {
+  .main, .topbar { padding: 1rem; }
+}

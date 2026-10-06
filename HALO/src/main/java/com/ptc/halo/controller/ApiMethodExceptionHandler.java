@@ -12,6 +12,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 // Method mismatches happen before Spring can select a controller.
 @RestControllerAdvice
 public class ApiMethodExceptionHandler {
+    // Multipart parsing can fail before a controller is selected.
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    public ResponseEntity<Map<String, Object>> multipart(org.springframework.web.multipart.MultipartException error) {
+        boolean tooLarge = error instanceof org.springframework.web.multipart.MaxUploadSizeExceededException;
+        int status = tooLarge ? 413 : 400;
+        return ResponseEntity.status(status).body(Map.of("status", status,
+                "code", tooLarge ? "UPLOAD_FILE_TOO_LARGE" : "INVALID_MULTIPART_REQUEST",
+                "message", tooLarge ? "The upload exceeds the server size limit. Choose smaller files." : "The upload could not be parsed. Select the files again and retry."));
+    }
     private static final Logger log = LoggerFactory.getLogger(ApiMethodExceptionHandler.class);
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> method(HttpRequestMethodNotSupportedException error, HttpServletRequest request) {

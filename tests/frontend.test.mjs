@@ -132,8 +132,8 @@ test('lesson is displayed while mentor initialization is still pending', async (
   let finish;
   const pending = new Promise(resolve => { finish = resolve; });
   const controller = new AbortController();
-  const task = loadLessonChat({ weekId: '7', signal: controller.signal,
-    getLesson: async () => ({ id: 92, weekId: 7, status: 'APPROVED', aiGenerationStatus: 'COMPLETED' }),
+  const task = loadLessonChat({ subjectId: 1, weekId: '7', signal: controller.signal,
+    getLesson: async () => ({ id: 92, weekId: 7, subjectId: 1, weekNumber: 1, status: 'APPROVED', aiGenerationStatus: 'COMPLETED' }),
     openMentor: async id => { assert.equal(id, 92); return pending; },
     onLesson: () => events.push('lesson'), onMentor: () => events.push('mentor'), onError: assert.fail });
   await new Promise(resolve => setImmediate(resolve));
@@ -148,7 +148,7 @@ test('invalid, unpublished, forbidden, offline and timed-out lessons reach an er
   const { lessonErrorMessage } = await import('../src/utils/lessonErrors.js');
   for (const [weekId, result, error, expected] of [
     ['undefined', null, null, /not found/],
-    ['7', { id: 92, weekId: 7, status: 'PENDING' }, null, /published/],
+    ['7', { id: 92, weekId: 7, subjectId: 1, weekNumber: 1, status: 'PENDING' }, null, /published/],
     ['7', null, { response: { status: 403 } }, /access/],
     ['7', null, { response: { status: 401 } }, /sign in/],
     ['7', null, { code: 'ERR_NETWORK' }, /Backend unavailable/],
@@ -156,7 +156,7 @@ test('invalid, unpublished, forbidden, offline and timed-out lessons reach an er
     ['7', { id: 92, weekId: 8 }, null, /mismatched/],
   ]) {
     let reported = false;
-    await loadLessonChat({ weekId, signal: new AbortController().signal,
+    await loadLessonChat({ subjectId: 1, weekId, signal: new AbortController().signal,
       getLesson: async () => { if(error) throw error; return result; },
       openMentor: () => assert.fail('must not open'), onLesson: assert.fail, onMentor: assert.fail,
       onError: (failure, stage) => { reported = true; assert.equal(stage, 'lesson'); assert.match(lessonErrorMessage(failure, stage), expected); } });
@@ -168,8 +168,8 @@ test('mentor failure retains lesson; switching modules suppresses stale session 
   const { loadLessonChat } = await import('../src/utils/lessonLoader.js');
   for (const abort of [false, true]) {
     const controller = new AbortController(); const events = [];
-    await loadLessonChat({ weekId: 7, signal: controller.signal,
-      getLesson: async () => ({ id: 92, weekId: 7, status: 'APPROVED', aiGenerationStatus: 'COMPLETED' }),
+    await loadLessonChat({ subjectId: 1, weekId: 7, signal: controller.signal,
+      getLesson: async () => ({ id: 92, weekId: 7, subjectId: 1, weekNumber: 1, status: 'APPROVED', aiGenerationStatus: 'COMPLETED' }),
       onLesson: () => events.push('lesson'),
       openMentor: async () => { if(abort) controller.abort(); throw { code: 'ECONNABORTED' }; },
       onMentor: assert.fail, onError: (_, stage) => events.push(stage + '-error') });

@@ -49,4 +49,23 @@ class ProfessorDashboardScopeHttpTest {
   for(String role:List.of("ADMIN","STUDENT","SUPER_ADMIN")){token(role);mvc.perform(get("/api/professor/dashboard").header("Authorization","Bearer test-token")).andExpect(status().isForbidden());}
   verifyNoInteractions(service);
  }
+ @Test void failuresAreStructuredAndNeverExposeInternalMessages() throws Exception {
+  var actor = token("PROFESSOR");
+  for (var status : List.of(HttpStatus.BAD_REQUEST, HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND, HttpStatus.CONFLICT)) {
+   doThrow(new ResponseStatusException(status, "private SQL path token")).when(service).getDashboard(actor);
+   mvc.perform(get("/api/professor/dashboard").header("Authorization", "Bearer test-token"))
+    .andExpect(status().is(status.value())).andExpect(jsonPath("$.status").value(status.value()))
+    .andExpect(jsonPath("$.code").isString()).andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private"))));
+  }
+  doThrow(new RuntimeException("private SQL path token")).when(service).getDashboard(actor);
+  mvc.perform(get("/api/professor/dashboard").header("Authorization", "Bearer test-token"))
+   .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("PROFESSOR_REQUEST_FAILED"))
+   .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private"))));
+  doThrow(new org.springframework.web.multipart.MultipartException("private path")).when(service).getDashboard(actor);
+  mvc.perform(get("/api/professor/dashboard").header("Authorization", "Bearer test-token"))
+   .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_MULTIPART_REQUEST"));
+  doThrow(new org.springframework.web.multipart.MaxUploadSizeExceededException(3)).when(service).getDashboard(actor);
+  mvc.perform(get("/api/professor/dashboard").header("Authorization", "Bearer test-token"))
+   .andExpect(status().isPayloadTooLarge()).andExpect(jsonPath("$.code").value("UPLOAD_FILE_TOO_LARGE"));
+ }
 }

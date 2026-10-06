@@ -1,0 +1,13 @@
+/* Let each existing page own its scroll area within the responsive shell. */
+.shell > div > div:last-child {
+  min-height: 0;
+}
+
+@media (max-width: 1024px) {
+  .shell > div > div:last-child,
+  .shell > div > main:last-child {
+    height: auto;
+    min-height: 0;
+  }
+  .shell { overflow-wrap: anywhere; }
+}

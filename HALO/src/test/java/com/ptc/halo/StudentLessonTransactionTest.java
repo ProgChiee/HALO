@@ -52,13 +52,15 @@ class StudentLessonTransactionTest {
         when(module.getWeek()).thenAnswer(inv -> { requireSession(); return week; });
         when(week.getId()).thenReturn(2L);
         when(module.getGeneratedSummary()).thenReturn("Published summary");
+        var owner = mock(SubjectEntity.class); when(owner.getId()).thenReturn(9L);
+        when(week.getSubject()).thenReturn(owner); when(week.getWeekNumber()).thenReturn(1);
         when(access.requireStudent(null)).thenReturn(student);
         doAnswer(inv -> { requireSession(); return null; }).when(progression).validateModuleAccess(15L, student);
         var target = new StudentAiLearningController(modules, access, progression);
         assertThrows(LazyInitializationException.class, () -> target.getApprovedLesson(2L, null));
         var result = transactional(target).getApprovedLesson(2L, null).getBody();
         assertNotNull(result); assertEquals(15L, result.getId());
-        assertEquals(2L, result.getWeekId()); assertEquals("Published summary", result.getGeneratedSummary());
+        assertEquals(9L, result.getSubjectId()); assertEquals(1, result.getWeekNumber()); assertEquals(2L, result.getWeekId()); assertEquals("Published summary", result.getGeneratedSummary());
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
     }
     @Test void progressionReadKeepsSessionWhileNavigatingWeekAndSubject() {

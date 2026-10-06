@@ -298,6 +298,11 @@
     },
     {
       "method": "GET",
+      "path": "/api/student/mentor/message/{sessionId}/request/{requestId}",
+      "controller": "StudentMentorController.java"
+    },
+    {
+      "method": "GET",
       "path": "/api/student/mentor/session/{sessionId}",
       "controller": "StudentMentorController.java"
     },

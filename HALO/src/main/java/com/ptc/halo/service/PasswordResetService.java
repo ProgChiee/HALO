@@ -129,9 +129,7 @@ public class PasswordResetService {
                 currentPassword,
                 user.getPassword())) {
 
-            throw new RuntimeException(
-                    "Current password is incorrect"
-            );
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "INCORRECT_CURRENT_PASSWORD");
         }
 
         if (newPassword == null || newPassword.isBlank() || newPassword.length() < 8 || passwordEncoder.matches(newPassword, user.getPassword()))

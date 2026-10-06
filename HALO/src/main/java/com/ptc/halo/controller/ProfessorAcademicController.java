@@ -210,19 +210,7 @@ public class ProfessorAcademicController {
 
     @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
     public ResponseEntity<java.util.Map<String, Object>> scopedError(org.springframework.web.server.ResponseStatusException error) {
-        if (error.getStatusCode().value() == 409 && "WEEK_NUMBER_ALREADY_EXISTS".equals(error.getReason())) {
-            return ResponseEntity.status(409).body(java.util.Map.of(
-                    "status", 409, "code", "WEEK_NUMBER_ALREADY_EXISTS",
-                    "message", "This subject already has that week number. Choose another week number."));
-        }
-        if (error.getStatusCode().value() == 409 && "SUBJECT_HAS_CONTENT".equals(error.getReason())) {
-            return ResponseEntity.status(409).body(java.util.Map.of(
-                    "status", 409, "code", "SUBJECT_HAS_CONTENT",
-                    "message", "This subject still contains weeks or learning modules. Remove its content before deleting the subject."));
-        }
-        return ResponseEntity.status(error.getStatusCode()).body(java.util.Map.of(
-                "status", error.getStatusCode().value(), "code", "RESOURCE_NOT_FOUND",
-                "message", "The requested resource is unavailable."));
+        return ProfessorErrorResponses.status(error);
     }
 
     private UserEntity getCurrentProfessor(
@@ -231,9 +219,7 @@ public class ProfessorAcademicController {
         return userRepository
                 .findByEmail(authentication.getName())
                 .orElseThrow(() ->
-                        new RuntimeException(
-                                "Professor not found"
-                        )
+                        new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                 );
     }
 }

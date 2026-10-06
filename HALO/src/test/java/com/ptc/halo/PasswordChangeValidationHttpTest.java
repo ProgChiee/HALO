@@ -17,6 +17,16 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class})
 class PasswordChangeValidationHttpTest {
+ @Test void incorrectPasswordReturnsActionable400() throws Exception {
+  var account = new com.ptc.halo.entity.UserEntity();
+  org.mockito.Mockito.when(users.findByEmail("prof@example.test")).thenReturn(java.util.Optional.of(account));
+  org.mockito.Mockito.doThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "INCORRECT_CURRENT_PASSWORD"))
+   .when(passwords).changePassword(account, "wrong-password", "replacement-password");
+  mvc.perform(post("/api/auth/change-password").with(user("prof@example.test").roles("PROFESSOR"))
+   .contentType("application/json").content("{\"currentPassword\":\"wrong-password\",\"newPassword\":\"replacement-password\"}"))
+   .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INCORRECT_CURRENT_PASSWORD"))
+   .andExpect(jsonPath("$.message").value("Your current password is incorrect. Try again."));
+ }
  @Autowired MockMvc mvc;
  @MockBean AuthService auth;
  @MockBean PasswordResetService passwords;

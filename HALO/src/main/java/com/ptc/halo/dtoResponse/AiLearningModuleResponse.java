@@ -10,6 +10,12 @@ public class AiLearningModuleResponse {
     private Long id;
 
     private Long weekId;
+    private Long subjectId;
+    private Integer weekNumber;
+    public Long getSubjectId() { return subjectId; }
+    public void setSubjectId(Long subjectId) { this.subjectId = subjectId; }
+    public Integer getWeekNumber() { return weekNumber; }
+    public void setWeekNumber(Integer weekNumber) { this.weekNumber = weekNumber; }
 
     private List<AiLearningFileResponse> files;
 

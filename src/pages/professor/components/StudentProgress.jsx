@@ -1,3 +1,4 @@
+import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useCallback, useState } from 'react';
 import { TrendingUp, CheckCircle2, Award, Users } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
@@ -18,7 +19,7 @@ function StudentProgressPage({ page, onPageChange }) {
 
   if (isLoading) {
     return (
-      <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+      <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
         <p className={styles.loadingText}>Loading student progress...</p>
       </PageShell>
     );
@@ -26,8 +27,8 @@ function StudentProgressPage({ page, onPageChange }) {
 
   if (loadError) {
     return (
-      <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-        <p className={styles.loadingText}>Couldn't load student progress. Please try again.</p>
+      <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+        <p className={styles.loadingText}>{professorErrorMessage(loadError, "Couldn't load student progress. Please try again.")}</p>
         <button onClick={reload}>Retry</button>
         {page > 0 && <button onClick={() => onPageChange(page - 1)}>Previous page</button>}
       </PageShell>
@@ -40,7 +41,7 @@ function StudentProgressPage({ page, onPageChange }) {
   const totalPassedAssessments = rows.reduce((sum, r) => sum + (r.passedAssessments ?? 0), 0);
 
   return (
-    <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+    <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
       <header className={styles.topbar}>
         <div className={styles.breadcrumb}>
           <TrendingUp size={16} />
@@ -67,28 +68,29 @@ function StudentProgressPage({ page, onPageChange }) {
           </div>
         </div>
 
-        <div className={styles.tableCard}>
-          <div className={styles.tableHeaderRow}>
-            <span>Student</span>
-            <span>Section</span>
-            <span>Completed Modules</span>
-            <span>Assessments Passed</span>
-            <span>Institution-wide Achievements</span>
-          </div>
+        <div className={styles.tableCard} role="region" aria-label="Student progress table, scroll horizontally to view all columns" tabIndex={0}>
+          <table className={styles.progressTable} aria-label="Student progress"><thead><tr className={styles.tableHeaderRow}>
+            <th scope="col">Student</th>
+            <th scope="col">Section</th>
+            <th scope="col">Completed Modules</th>
+            <th scope="col">Assessments Passed</th>
+            <th scope="col">Institution-wide Achievements</th>
+          </tr></thead><tbody>
 
           {rows.map((student) => (
-            <div key={student.userId} className={styles.tableRow}>
-              <span className={styles.studentName}>{student.name}</span>
-              <span>{student.section || 'Not assigned'}</span>
-              <span className={styles.completedModules}>{student.completedModules ?? 'Unavailable'}</span>
-              <span>{student.passedAssessments ?? 'Unavailable'}</span>
-              <span>{student.totalBadges ?? 'Unavailable'}</span>
-            </div>
+            <tr key={student.userId} className={styles.tableRow}>
+              <td className={styles.studentName}>{student.name}</td>
+              <td>{student.section || 'Not assigned'}</td>
+              <td className={styles.completedModules}>{student.completedModules ?? 'Unavailable'}</td>
+              <td>{student.passedAssessments ?? 'Unavailable'}</td>
+              <td>{student.totalBadges ?? 'Unavailable'}</td>
+            </tr>
           ))}
 
           {rows.length === 0 && (
-            <p className={styles.emptyState}>No student accounts found.</p>
+            <tr><td colSpan={5} className={styles.emptyState}>No student accounts found.</td></tr>
           )}
+          </tbody></table>
         </div>
         <nav aria-label="Student progress pagination">
           <button disabled={data.first} onClick={() => onPageChange(page - 1)}>Previous</button>

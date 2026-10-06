@@ -147,4 +147,28 @@ class AdminValidationHttpTest {
         }
         verifyNoInteractions(admins);
     }
+    @Test void businessErrorsAreStructuredAndSafe() throws Exception {
+        for (var code : AdminApiException.Code.values()) {
+            doThrow(new AdminApiException(code)).when(admins).viewProfessorById(1L);
+            mvc.perform(get("/api/admin/professors/1").header("Authorization", "Bearer test-token"))
+                .andExpect(status().is(code.status)).andExpect(jsonPath("$.status").value(code.status))
+                .andExpect(jsonPath("$.code").value(code.name())).andExpect(jsonPath("$.message").value(code.message));
+        }
+        doThrow(new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)).when(admins).viewStudentById(1L);
+        mvc.perform(get("/api/admin/students/1").header("Authorization", "Bearer test-token"))
+            .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        for (RuntimeException error : List.of(new IllegalStateException("SECRET SQL path token"),
+                new org.springframework.dao.DataIntegrityViolationException("SECRET unrelated constraint"))) {
+            doThrow(error).when(admins).viewProfessorById(1L);
+            mvc.perform(get("/api/admin/professors/1").header("Authorization", "Bearer test-token"))
+                .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("ADMIN_REQUEST_FAILED"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("SECRET"))));
+        }
+        doThrow(new org.springframework.dao.DataIntegrityViolationException("SECRET",
+            new java.sql.SQLException("duplicate key uk_user_email_normalized SECRET"))).when(admins).updateProfessor(eq(1L), any(), any());
+        mvc.perform(put("/api/admin/professors/1").header("Authorization", "Bearer test-token")
+                .contentType("application/json").content(json.writeValueAsBytes(professor())))
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"))
+            .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("SECRET"))));
+    }
 }

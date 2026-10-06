@@ -1,3 +1,4 @@
+import { adminErrorMessage } from '../../../utils/adminErrors';
 import { validateProfessor, professorValidationError } from '../../../utils/adminProfessorValidation';
 import { useState, useRef, useMemo } from 'react';
 import { GraduationCap, Search, Plus, Eye, Pencil, Power, X } from 'lucide-react';
@@ -107,8 +108,8 @@ export default function ProfessorManagement() {
       setProfessors((previous) => previous.map((item) => item.id === updated.id ? updated : item));
       setViewingProfessor((previous) => previous?.id === updated.id ? updated : previous);
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
-    } catch {
-      showToast("Couldn't update the account status. Please try again.", 'error');
+    } catch (error) {
+      showToast(adminErrorMessage(error), 'error');
     } finally {
       toggleLock.current = false;
       setTogglingId(null);

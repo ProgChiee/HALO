@@ -1,8 +1,7 @@
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { Award } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
-import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
+import StudentPageShell from './StudentPageShell';
 import { getBadgesData } from '../../../services/student/studentService';
 import styles from '../styles/Badges.module.css';
 
@@ -40,31 +39,28 @@ export default function Badges() {
 
   if (isLoading) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading your badges...</p>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
   if (loadError) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+      <StudentPageShell>
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Couldn't load your badges. Please refresh and try again.</p>
         </div>
-      </div>
+      </StudentPageShell>
     );
   }
 
   const remaining = Math.max(TOTAL_POSSIBLE_BADGES - earnedBadges.length, 0);
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={STUDENT_NAV_ITEMS} progress={null} />
+    <StudentPageShell>
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -98,6 +94,6 @@ export default function Badges() {
           )}
         </main>
       </div>
-    </div>
+    </StudentPageShell>
   );
 }

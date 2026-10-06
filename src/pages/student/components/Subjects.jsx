@@ -2,8 +2,7 @@ import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronDown, ChevronUp, CheckCircle2, Play, Lock, BookOpen } from 'lucide-react';
-import PageShell from '../../../components/shared/PageShell';
-import { STUDENT_NAV_ITEMS } from '../../../data/navigationData';
+import StudentPageShell from './StudentPageShell';
 import { getSubjectsData, getSubjectWeeks } from '../../../services/student/studentService';
 import { useSubjectWeeks } from '../../../hooks/useSubjectWeeks';
 import styles from '../styles/Subjects.module.css';
@@ -76,22 +75,22 @@ export default function Subjects() {
 
   if (isLoading) {
     return (
-      <PageShell navItems={STUDENT_NAV_ITEMS}>
+      <StudentPageShell>
         <p className={styles.loadingText}>Loading subjects...</p>
-      </PageShell>
+      </StudentPageShell>
     );
   }
 
   if (loadError) {
     return (
-      <PageShell navItems={STUDENT_NAV_ITEMS}>
+      <StudentPageShell>
         <p className={styles.loadingText}>Couldn't load subjects. Please refresh and try again.</p>
-      </PageShell>
+      </StudentPageShell>
     );
   }
 
   return (
-    <PageShell navItems={STUDENT_NAV_ITEMS}>
+    <StudentPageShell>
       <main className={styles.main}>
         <div className={styles.headerRow}>
           <div>
@@ -118,6 +117,7 @@ export default function Subjects() {
             type="text"
             className={styles.searchInput}
             placeholder="Search subjects"
+            aria-label="Search subjects"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -133,6 +133,9 @@ export default function Subjects() {
               return (
                 <div key={subject.subjectId} className={styles.topicWrapper}>
                   <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    aria-controls={isExpanded ? `subject-weeks-${subject.subjectId}` : undefined}
                     className={`${styles.topicRow} ${isFullyCompleted ? styles.topicRowCompleted : ''} ${isExpanded ? styles.topicRowExpanded : ''}`}
                     onClick={() => toggleSubject(subject.subjectId)}
                   >
@@ -152,7 +155,7 @@ export default function Subjects() {
                   </button>
 
                   {isExpanded && (
-                    <div className={styles.weeksPanel}>
+                    <div id={`subject-weeks-${subject.subjectId}`} className={styles.weeksPanel}>
                       {weeksLoading[subject.subjectId] && !weeks && <p className={styles.loadingText}>Loading weeks...</p>}
 
                       {weekErrors[subject.subjectId] && <p className={styles.loadingText}>Couldn't load weeks. Collapse and reopen to retry.</p>}
@@ -196,6 +199,6 @@ export default function Subjects() {
           <p className={styles.emptyState}>No subjects match your search.</p>
         )}
       </main>
-    </PageShell>
+    </StudentPageShell>
   );
 }

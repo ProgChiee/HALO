@@ -1,3 +1,5 @@
+import { adminErrorMessage } from './adminErrors.js';
+
 export function validateProfessor({ name, email, professorId, password }, create = false) {
   if (!name.trim() || !email.trim() || !professorId.trim() || (create && !password.trim())) return 'Please fill in all fields.';
   if (name.trim().length > 100) return 'Name must be at most 100 characters.';
@@ -10,6 +12,6 @@ export function validateProfessor({ name, email, professorId, password }, create
 }
 
 export function professorValidationError(error) {
-  if (error?.response?.data?.code !== 'VALIDATION_FAILED') return 'Something went wrong. Please try again.';
+  if (error?.response?.data?.code !== 'VALIDATION_FAILED') return adminErrorMessage(error);
   return 'Please check all required fields, email format, field lengths, and the password limit (8 characters minimum, 72 UTF-8 bytes maximum).';
 }

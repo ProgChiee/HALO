@@ -1,7 +1,8 @@
+import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useEffect } from 'react';
 import { LayoutGrid, Users, BookOpen, FileText, CheckCircle2, ClipboardCheck, Award } from 'lucide-react';
-import Sidebar from '../../../components/shared/Sidebar';
+import PageShell from '../../../components/shared/PageShell';
 import { useAuth } from '../../../context/login/useAuth';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { getProfessorDashboardData } from '../../../services/professor/professorService';
@@ -15,7 +16,8 @@ export default function ProfessorDashboard() {
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const [retry, setRetry] = useState(0);
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function ProfessorDashboard() {
         if (isMounted) setData(result);
       } catch (err) {
         logProfessorError('load-dashboard', err);
-        if (isMounted) setLoadError(true);
+        if (isMounted) setLoadError(err);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -35,27 +37,26 @@ export default function ProfessorDashboard() {
 
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [retry]);
 
   if (isLoading) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor" />
+      <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading dashboard...</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   if (loadError || !data) {
     return (
-      <div className={styles.layout}>
-        <Sidebar navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor" />
+      <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
         <div className={styles.contentArea}>
-          <p className={styles.loadingText}>Couldn't load the dashboard. Please refresh and try again.</p>
+          <p className={styles.loadingText}>{professorErrorMessage(loadError, "Couldn't load the dashboard. Please try again.")}</p>
+          <button onClick={() => { setIsLoading(true); setLoadError(null); setRetry(value => value + 1); }}>Retry</button>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -69,8 +70,7 @@ export default function ProfessorDashboard() {
   ];
 
   return (
-    <div className={styles.layout}>
-      <Sidebar navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor" />
+    <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
 
       <div className={styles.contentArea}>
         <header className={styles.topbar}>
@@ -100,6 +100,6 @@ export default function ProfessorDashboard() {
           </div>
         </main>
       </div>
-    </div>
+    </PageShell>
   );
 }

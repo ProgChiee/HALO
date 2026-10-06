@@ -97,14 +97,11 @@ public class ProfessorStudentController {
         );
     }
     private UserEntity currentProfessor(Authentication authentication) {
-        if (authentication == null) throw new AccessDeniedException("Authentication required");
-        return users.findByEmail(authentication.getName()).orElseThrow(() -> new AccessDeniedException("Authentication required"));
+        if (authentication == null) throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
+        return users.findByEmail(authentication.getName()).orElseThrow(() -> new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required"));
     }
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> notFound(ResponseStatusException error) {
-        if ("INVALID_PAGINATION".equals(error.getReason())) return ResponseEntity.badRequest().body(Map.of(
-                "status", 400, "code", "INVALID_PAGINATION", "message", "Page must be non-negative and size must be positive."));
-        return ResponseEntity.status(error.getStatusCode()).body(Map.of(
-                "status", error.getStatusCode().value(), "code", "RESOURCE_NOT_FOUND", "message", "The requested resource is unavailable."));
+        return ProfessorErrorResponses.status(error);
     }
 }

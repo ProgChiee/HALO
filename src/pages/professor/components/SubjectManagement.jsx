@@ -1,5 +1,7 @@
+import Dialog from '../../../components/shared/Dialog';
+import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
@@ -47,11 +49,43 @@ export default function SubjectManagement() {
   const [weekNumber, setWeekNumber] = useState('');
   const [weekTitle, setWeekTitle] = useState('');
 
-  async function refetchSubjects() {
+  const modalIdentity = useRef(null);
+  const pendingOperation = useRef(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; modalIdentity.current = null; pendingOperation.current = null; };
+  }, []);
+
+  function beginModal() {
+    if (!mounted.current || pendingOperation.current || isDeleting) return false;
+    modalIdentity.current = Symbol('modal');
+    setSubjectModal(null);
+    setAddingWeekTo(null);
+    setDeletingSubject(null);
+    return true;
+  }
+
+  function closeModal() {
+    if (pendingOperation.current) return;
+    modalIdentity.current = null;
+    setSubjectModal(null);
+    setAddingWeekTo(null);
+  }
+
+  function startOperation() {
+    if (!mounted.current || !modalIdentity.current || pendingOperation.current) return null;
+    const operation = { modal: modalIdentity.current };
+    pendingOperation.current = operation;
+    return () => mounted.current && modalIdentity.current === operation.modal && pendingOperation.current === operation;
+  }
+
+  async function refetchSubjects(isCurrent = () => true) {
     try {
-      setSubjects(await getSubjects());
+      const updated = await getSubjects();
+      if (isCurrent()) setSubjects(updated);
     } catch {
-      showToast('Saved, but the subject list could not refresh. Reload the page.', 'error');
+      if (isCurrent()) showToast('Saved, but the subject list could not refresh. Reload the page.', 'error');
     }
   }
 
@@ -65,6 +99,7 @@ export default function SubjectManagement() {
   }
 
   function openCreateSubject() {
+    if (!beginModal()) return;
     setSubjectModal('create');
     setSubjectCode('');
     setSubjectName('');
@@ -74,6 +109,7 @@ export default function SubjectManagement() {
   }
 
   function openEditSubject(subject) {
+    if (!beginModal()) return;
     setSubjectModal({ editing: subject });
     setSubjectCode(subject.subjectCode);
     setSubjectName(subject.subjectName);
@@ -84,7 +120,7 @@ export default function SubjectManagement() {
 
   async function handleSaveSubject(e) {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (pendingOperation.current) return;
     setFormError('');
 
     if (!subjectCode.trim() || !subjectName.trim()) {
@@ -94,22 +130,27 @@ export default function SubjectManagement() {
 
     const payload = { subjectCode: subjectCode.trim(), subjectName: subjectName.trim(), description: description.trim(), yearLevel };
 
+    const isCurrent = startOperation();
+    if (!isCurrent) return;
     setIsSubmitting(true);
     try {
       if (subjectModal === 'create') {
         await createSubject(payload);
+        if (!isCurrent()) return;
         showToast('Subject created.', 'success');
       } else {
         await updateSubject(subjectModal.editing.id, payload);
+        if (!isCurrent()) return;
         showToast('Subject updated.', 'success');
       }
-      setSubjectModal(null);
-      await refetchSubjects();
+      await refetchSubjects(isCurrent);
+      if (isCurrent()) setSubjectModal(null);
     } catch (err) {
+      if (!isCurrent()) return;
       logProfessorError('save-subject', err);
-      setFormError('Something went wrong. Please try again.');
+      setFormError(professorErrorMessage(err));
     } finally {
-      setIsSubmitting(false);
+      if (isCurrent()) { pendingOperation.current = null; setIsSubmitting(false); }
     }
   }
 
@@ -123,15 +164,14 @@ export default function SubjectManagement() {
       await refetchSubjects();
     } catch (err) {
       logProfessorError('delete-subject', err);
-      showToast(err?.response?.data?.code === 'SUBJECT_HAS_CONTENT'
-        ? 'This subject still contains weeks or learning modules. Remove its content before deleting the subject.'
-        : 'Something went wrong. Please try again.', 'error');
+      showToast(professorErrorMessage(err), 'error');
     } finally {
       setIsDeleting(false);
     }
   }
 
   function openAddWeek(subject) {
+    if (!beginModal()) return;
     setAddingWeekTo(subject);
     setWeekNumber('');
     setWeekTitle('');
@@ -140,7 +180,7 @@ export default function SubjectManagement() {
 
   async function handleAddWeek(e) {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (pendingOperation.current) return;
     setFormError('');
 
     if (!Number.isInteger(Number(weekNumber)) || Number(weekNumber) < 1 || !weekTitle.trim()) {
@@ -148,22 +188,26 @@ export default function SubjectManagement() {
       return;
     }
 
+    const isCurrent = startOperation();
+    if (!isCurrent) return;
     setIsSubmitting(true);
     try {
       await addWeek(addingWeekTo.id, { weekNumber: Number(weekNumber), title: weekTitle.trim() });
+      if (!isCurrent()) return;
       showToast('Module added.', 'success');
+      const refreshed = await loadWeeks(addingWeekTo.id, true);
+      if (!isCurrent()) return;
       setAddingWeekTo(null);
-      if (!await loadWeeks(addingWeekTo.id, true)) {
+      if (!refreshed) {
         showToast('Module added, but the week list could not refresh.', 'error');
       }
       setExpandedId(addingWeekTo.id);
     } catch (err) {
+      if (!isCurrent()) return;
       logProfessorError('create-week', err);
-      setFormError(err?.response?.data?.code === 'WEEK_NUMBER_ALREADY_EXISTS'
-        ? 'This subject already has that week number. Choose another week number.'
-        : 'Something went wrong. Please try again.');
+      setFormError(professorErrorMessage(err));
     } finally {
-      setIsSubmitting(false);
+      if (isCurrent()) { pendingOperation.current = null; setIsSubmitting(false); }
     }
   }
 
@@ -172,13 +216,13 @@ export default function SubjectManagement() {
   }
 
   return (
-    <PageShell navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+    <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
       <header className={styles.topbar}>
         <div className={styles.breadcrumb}>
           <BookOpen size={16} />
           Subjects
         </div>
-        <Button onClick={openCreateSubject}>
+        <Button onClick={openCreateSubject} disabled={isSubmitting}>
           <Plus size={16} style={{ marginRight: 6 }} />
           Create Subject
         </Button>
@@ -189,7 +233,7 @@ export default function SubjectManagement() {
           <p className={styles.loadingText}>Loading subjects...</p>
         ) : loadError ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
-            <p className={styles.loadingText}>Couldn't load subjects. Please check your connection.</p>
+            <p className={styles.loadingText}>{professorErrorMessage(loadError, "Couldn't load subjects. Please try again.")}</p>
             <button
               onClick={loadSubjects}
               style={{ marginTop: '12px', color: 'var(--color-accent-active)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
@@ -214,12 +258,12 @@ export default function SubjectManagement() {
                     </button>
 
                     <div className={styles.subjectActions}>
-                      <button className={styles.iconBtn} onClick={() => openEditSubject(subject)} aria-label="Edit subject">
+                      <button className={styles.iconBtn} disabled={isSubmitting} onClick={() => openEditSubject(subject)} aria-label="Edit subject">
                         <Pencil size={14} />
                       </button>
                       <button
                         className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-                        onClick={() => setDeletingSubject(subject)}
+                        disabled={isSubmitting} onClick={() => { if (beginModal()) setDeletingSubject(subject); }}
                         aria-label="Delete subject"
                       >
                         <Trash2 size={14} />
@@ -243,7 +287,7 @@ export default function SubjectManagement() {
                         </div>
                       ))}
 
-                      <button className={styles.addWeekBtn} onClick={() => openAddWeek(subject)}>
+                      <button className={styles.addWeekBtn} disabled={isSubmitting} onClick={() => openAddWeek(subject)}>
                         <Plus size={14} />
                         Add New Module
                       </button>
@@ -261,73 +305,69 @@ export default function SubjectManagement() {
       </main>
 
       {subjectModal && (
-        <div className={styles.modalOverlay} onClick={() => setSubjectModal(null)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <Dialog labelledBy="subject-dialog" busy={isSubmitting} onClose={closeModal} className={styles.modal}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>{subjectModal === 'create' ? 'Create Subject' : 'Edit Subject'}</h3>
-              <button className={styles.closeBtn} onClick={() => setSubjectModal(null)} aria-label="Close">
+              <h3 id="subject-dialog" className={styles.modalTitle}>{subjectModal === 'create' ? 'Create Subject' : 'Edit Subject'}</h3>
+              <button className={styles.closeBtn} disabled={isSubmitting} onClick={closeModal} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleSaveSubject} className={styles.form}>
               <div className={styles.field}>
-                <label className={styles.label}>Subject code</label>
+                <label htmlFor="subject-code" className={styles.label}>Subject code</label>
                 <input
                   type="text"
                   className={styles.input}
-                  value={subjectCode}
+                  id="subject-code" aria-describedby={formError ? 'academic-form-error' : undefined} value={subjectCode}
                   onChange={(e) => setSubjectCode(e.target.value)}
                   placeholder="e.g. HRM101"
-                  autoFocus
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Subject name</label>
+                <label htmlFor="subject-name" className={styles.label}>Subject name</label>
                 <input
                   type="text"
                   className={styles.input}
-                  value={subjectName}
+                  id="subject-name" aria-describedby={formError ? 'academic-form-error' : undefined} value={subjectName}
                   onChange={(e) => setSubjectName(e.target.value)}
                   placeholder="e.g. Front Office Operations"
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Description</label>
+                <label htmlFor="subject-description" className={styles.label}>Description</label>
                 <textarea
                   className={styles.input}
                   rows={3}
-                  value={description}
+                  id="subject-description" aria-describedby={formError ? 'academic-form-error' : undefined} value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Short description of this subject"
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Year level</label>
-                <select className={styles.input} value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}>
+                <label htmlFor="subject-year" className={styles.label}>Year level</label>
+                <select className={styles.input} id="subject-year" aria-describedby={formError ? 'academic-form-error' : undefined} value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}>
                   {YEAR_LEVELS.map((yl) => (
                     <option key={yl.value} value={yl.value}>{yl.label}</option>
                   ))}
                 </select>
               </div>
 
-              {formError && <p className={styles.formError}>{formError}</p>}
+              {formError && <p id="academic-form-error" role="alert" className={styles.formError}>{formError}</p>}
 
               <Button type="submit" isLoading={isSubmitting}>
                 {subjectModal === 'create' ? 'Create Subject' : 'Save Changes'}
               </Button>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {deletingSubject && (
-        <div className={styles.modalOverlay} onClick={() => setDeletingSubject(null)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Delete "{deletingSubject.subjectName}"?</h3>
+        <Dialog labelledBy="delete-subject-dialog" busy={isDeleting} onClose={() => { if (!isDeleting) setDeletingSubject(null); }} className={styles.modal} initialFocus="button">
+            <h3 id="delete-subject-dialog" className={styles.modalTitle}>Delete "{deletingSubject.subjectName}"?</h3>
             <p className={styles.modalWarning}>
               Only an empty subject can be deleted. Remove its weeks and learning modules first. Deleting an empty subject cannot be undone.
             </p>
@@ -335,16 +375,14 @@ export default function SubjectManagement() {
               <Button variant="secondary" onClick={() => setDeletingSubject(null)} disabled={isDeleting}>Cancel</Button>
               <Button variant="danger" onClick={handleConfirmDelete} isLoading={isDeleting}>Delete</Button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {addingWeekTo && (
-        <div className={styles.modalOverlay} onClick={() => setAddingWeekTo(null)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <Dialog labelledBy="week-dialog" busy={isSubmitting} onClose={closeModal} className={styles.modal}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Add New Module</h3>
-              <button className={styles.closeBtn} onClick={() => setAddingWeekTo(null)} aria-label="Close">
+              <h3 id="week-dialog" className={styles.modalTitle}>Add New Module</h3>
+              <button className={styles.closeBtn} disabled={isSubmitting} onClick={closeModal} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
@@ -352,35 +390,33 @@ export default function SubjectManagement() {
 
             <form onSubmit={handleAddWeek} className={styles.form}>
               <div className={styles.field}>
-                <label className={styles.label}>Week number</label>
+                <label htmlFor="week-number" className={styles.label}>Week number</label>
                 <input
                   type="number"
                   min="1"
                   className={styles.input}
-                  value={weekNumber}
+                  id="week-number" aria-describedby={formError ? 'academic-form-error' : undefined} value={weekNumber}
                   onChange={(e) => setWeekNumber(e.target.value)}
                   placeholder="e.g. 4"
-                  autoFocus
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Module title</label>
+                <label htmlFor="week-title" className={styles.label}>Module title</label>
                 <input
                   type="text"
                   className={styles.input}
-                  value={weekTitle}
+                  id="week-title" aria-describedby={formError ? 'academic-form-error' : undefined} value={weekTitle}
                   onChange={(e) => setWeekTitle(e.target.value)}
                   placeholder="e.g. Guest Relations"
                 />
               </div>
 
-              {formError && <p className={styles.formError}>{formError}</p>}
+              {formError && <p id="academic-form-error" role="alert" className={styles.formError}>{formError}</p>}
 
               <Button type="submit" isLoading={isSubmitting}>Add Module</Button>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
     </PageShell>
   );

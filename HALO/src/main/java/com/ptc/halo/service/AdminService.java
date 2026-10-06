@@ -50,10 +50,12 @@ public class AdminService {
 
 
 
+    @org.springframework.transaction.annotation.Transactional
     public ProfessorsResponse createProfessor(ProfessorRequest request, UserEntity admin){
 
-        if(userRepository.existsByEmail(request.getEmail())){
-            throw new RuntimeException("Email already exists");
+        request.setEmail(request.getEmail()); // Normalize at the service boundary as well as DTO binding.
+        if(userRepository.existsNormalizedEmail(request.getEmail(), null)){
+            throw new AdminApiException(AdminApiException.Code.EMAIL_ALREADY_EXISTS);
         }
         
         UserEntity professor = new UserEntity();
@@ -123,7 +125,7 @@ public class AdminService {
         ProfessorEntity professor = professorRepository
                 .findByUserId(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Professor not found")
+                        new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                 );
 
         ProfessorResponse response = new ProfessorResponse();
@@ -136,6 +138,7 @@ public class AdminService {
 
         return response;
     }
+    @org.springframework.transaction.annotation.Transactional
     public ProfessorResponse updateProfessor(
             Long id,
             ProfessorUpdateRequest request,
@@ -144,42 +147,50 @@ public class AdminService {
         ProfessorEntity professor = professorRepository
                 .findByUserId(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Professor not found")
+                        new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                 );
 
-        professor.getUser().setName(request.getName());
-        professor.getUser().setEmail(request.getEmail());
+        UserEntity user = professor.getUser();
+        request.setEmail(request.getEmail());
+        if (userRepository.existsNormalizedEmail(request.getEmail(), user.getId()))
+            throw new AdminApiException(AdminApiException.Code.EMAIL_ALREADY_EXISTS);
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
         professor.setProfessorId(request.getProfessorId());
 
-        professorRepository.save(professor);
+        // Both entities are managed in this transaction; save explicitly rather than
+        // depending on cascade merge from a detached ProfessorEntity.
+        UserEntity savedUser = userRepository.saveAndFlush(user);
+        professorRepository.saveAndFlush(professor);
 
         activityLogService.createLog(
                 admin,
                 ActivityType.ACCOUNT,
                 "Updated Professor account: "
-                        + professor.getUser().getEmail()
+                        + savedUser.getEmail()
         );
 
         ProfessorResponse response = new ProfessorResponse();
 
-        response.setId(professor.getUser().getId());
-        response.setName(professor.getUser().getName());
-        response.setEmail(professor.getUser().getEmail());
+        response.setId(savedUser.getId());
+        response.setName(savedUser.getName());
+        response.setEmail(savedUser.getEmail());
         response.setProfessorId(professor.getProfessorId());
-        response.setStatus(professor.getUser().getStatus());
+        response.setStatus(savedUser.getStatus());
 
         return response;
     }
+    @org.springframework.transaction.annotation.Transactional
     public ProfessorResponse changeProfessorStatus(Long id, UserEntity admin){
 
         UserEntity professorUser = userRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Professor not found")
+                        new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                 );
 
 
         if(professorUser.getRole() != Role.PROFESSOR){
-            throw new RuntimeException("User is not a Professor");
+            throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
         }
 
         if(professorUser.getStatus() == Status.ACTIVE){
@@ -202,7 +213,7 @@ public class AdminService {
 
         ProfessorEntity professor = professorRepository.findByUserId(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Professor profile not found")
+                        new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                 );
 
         ProfessorResponse response = new ProfessorResponse();
@@ -243,7 +254,7 @@ public class AdminService {
         StudentProfileEntity student =
                 studentProfileRepository.findByUserId(id)
                         .orElseThrow(() ->
-                                new RuntimeException("Student not found")
+                                new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                         );
 
 
@@ -260,15 +271,16 @@ public class AdminService {
 
         return response;
     }
+    @org.springframework.transaction.annotation.Transactional
     public StudentListResponse changeStudentStatus(Long id, UserEntity admin){
 
         UserEntity student = userRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Student not found")
+                        new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                 );
 
         if(student.getRole() != Role.STUDENT){
-            throw new RuntimeException("User is not a Student");
+            throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
         }
 
         if(student.getStatus() == Status.ACTIVE){
@@ -292,7 +304,7 @@ public class AdminService {
         StudentProfileEntity studentProfile =
                 studentProfileRepository.findByUserId(id)
                         .orElseThrow(() ->
-                                new RuntimeException("Student profile not found")
+                                new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                         );
 
         StudentListResponse response = new StudentListResponse();
@@ -307,13 +319,14 @@ public class AdminService {
 
         return response;
     }
+    @org.springframework.transaction.annotation.Transactional
     public StudentListResponse updateStudent(
             Long id,
             StudentUpdateRequest request,
             UserEntity admin){
 
         StudentProfileEntity studentProfile = studentProfileRepository.findByUserId(id)
-                        .orElseThrow(() -> new RuntimeException("Student not found"));
+                        .orElseThrow(() -> new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND));
 
 
         UserEntity user = studentProfile.getUser();

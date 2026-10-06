@@ -473,3 +473,16 @@
   margin-top: var(--space-md);
   flex-wrap: wrap;
 }
+@media (max-width: 1024px) {
+  .contentArea { height: auto; min-height: 0; overflow-wrap: anywhere; }
+  .main { min-width: 0; overflow-wrap: anywhere; }
+}
+@media (max-width: 768px) {
+  .main, .topbar { padding: 1rem; }
+  .fieldRow, .fileUploadRow { grid-template-columns: minmax(0, 1fr); }
+  .topHeader, .topHeaderLeft, .aiReviewHeader, .aiReviewActions, .methodTabs { flex-wrap: wrap; }
+  .panelCard, .aiReviewCard { padding: 1rem; min-width: 0; }
+  .input, .textarea, .objectiveInput { min-width: 0; max-width: 100%; }
+  .aiGeneratedText { max-width: 100%; overflow-x: auto; overflow-wrap: anywhere; }
+  .fileListName { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+}

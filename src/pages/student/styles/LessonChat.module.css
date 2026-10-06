@@ -242,3 +242,10 @@
   font-size: var(--text-sm);
 }
 .tabsRowActions { display: flex; align-items: center; gap: var(--space-sm); }
+
+@media (max-width: 768px) {
+  .topHeader, .tabsRow, .chatArea, .inputRow { padding: 1rem; }
+  .topHeader, .breadcrumb { flex-wrap: wrap; gap: 0.5rem; }
+  .chatInput { min-width: 0; }
+  .messageBlock { max-width: 100%; }
+}

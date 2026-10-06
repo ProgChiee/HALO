@@ -1,4 +1,6 @@
 const SAFE_MESSAGES = {
+  INCORRECT_CURRENT_PASSWORD: 'Your current password is incorrect. Try again.',
+  INVALID_NEW_PASSWORD: 'Choose a different password with at least 8 characters, within 72 UTF-8 bytes.',
   EMAIL_ALREADY_EXISTS: 'An account with this email already exists.',
   ADMIN_NOT_FOUND: 'Admin account not found.',
   VALIDATION_FAILED: 'Please check the required fields, email format, password length, and selected values.',

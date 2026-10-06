@@ -34,6 +34,59 @@ before(async () => {
 });
 after(async () => { await server?.close(); dom?.window.close(); });
 
+test('Student Profile uses the labeled Dialog with focus handling and Escape dismissal', async () => {
+  const Profile = (await server.ssrLoadModule('/src/pages/student/components/Profile.jsx')).default;
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const adapter = api.defaults.adapter;
+  api.defaults.adapter = async config => ({ status: 200, headers: {}, config, data: { name: 'Student', email: 'student@example.test', yearLevel: 'FIRST_YEAR' } });
+  try {
+    await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, logout() {} } },
+      React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Profile))))));
+    const opener = [...host.querySelectorAll('button')].find(button => /change password/i.test(button.textContent));
+    opener.focus();
+    await act(async () => opener.click());
+    const dialog = document.querySelector('[role="dialog"]');
+    assert.ok(dialog);
+    assert.equal(dialog.getAttribute('aria-modal'), 'true');
+    assert.equal(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent, 'Change Password');
+    assert.equal(document.activeElement.id, 'current-password');
+    await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+    assert.equal(document.activeElement.id, 'new-password');
+    await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    assert.equal(document.querySelector('[role="dialog"]'), null);
+    assert.equal(document.activeElement, opener);
+    assert.equal(host.hasAttribute('inert'), false);
+    await act(async () => opener.click());
+    await act(async () => [...document.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === 'Cancel').click());
+    assert.equal(document.querySelector('[role="dialog"]'), null);
+    assert.equal(document.activeElement, opener);
+  } finally { await act(async () => root.unmount()); host.remove(); api.defaults.adapter = adapter; }
+});
+
+test('Subjects exposes search label and current expansion state with an existing controlled region', async () => {
+  const Subjects = (await server.ssrLoadModule('/src/pages/student/components/Subjects.jsx')).default;
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const adapter = api.defaults.adapter;
+  api.defaults.adapter = async config => ({ status: 200, headers: {}, config, data: config.url.endsWith('/subjects')
+    ? [{ subjectId: 7, subjectName: 'Hospitality', totalWeeks: 1, completedWeeks: 0 }] : [] });
+  try {
+    await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, logout() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Subjects)))));
+    assert.ok(host.querySelector('input[aria-label="Search subjects"]'));
+    const toggle = host.querySelector('button[aria-expanded]');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+    assert.equal(toggle.getAttribute('aria-controls'), null);
+    toggle.focus();
+    await act(async () => toggle.click());
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+    assert.ok(document.getElementById(toggle.getAttribute('aria-controls')));
+    assert.equal(document.activeElement, toggle);
+    await act(async () => toggle.click());
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+    assert.equal(document.getElementById('subject-weeks-7'), null);
+    assert.equal(document.activeElement, toggle);
+  } finally { await act(async () => root.unmount()); host.remove(); api.defaults.adapter = adapter; }
+});
+
 test('dashboard and profile retain error UI while logging only sanitized diagnostics', async () => {
   for (const name of ['StudentDashboard', 'Subjects', 'Quiz', 'Progress', 'Badges', 'Profile']) {
     const Component = (await server.ssrLoadModule(`/src/pages/student/components/${name}.jsx`)).default;
@@ -80,7 +133,7 @@ test('LessonChat prepends older messages without duplicates and keeps new replie
   api.defaults.adapter = async config => {
     calls.push(config);
     let data;
-    if (config.url.includes('/week/')) data = { id: 10, weekId: 1, status: 'APPROVED', aiGenerationStatus: 'COMPLETED' };
+    if (config.url.includes('/week/')) data = { id: 10, weekId: 1, subjectId: 1, weekNumber: 1, status: 'APPROVED', aiGenerationStatus: 'COMPLETED' };
     else if (config.url.includes('/open/')) data = { sessionId: 20, moduleId: 10, hasOlder: true, nextBeforeId: 30, messages: [{ id: 30, sender: 'HALO', message: 'Recent message' }] };
     else if (config.url.includes('/message/')) data = { sessionId: 20, moduleId: 10, haloMessage: 'New reply' };
     else data = { sessionId: 20, moduleId: 10, hasOlder: false, nextBeforeId: null, messages: [{ id: 1, sender: 'HALO', message: 'Older message' }, { id: 30, sender: 'HALO', message: 'Recent message' }] };
@@ -189,7 +242,7 @@ test('Quiz recovers uncertain and already-submitted results without another POST
   const adapter=api.defaults.adapter,calls=[],toasts=[];let finish;let unmounted=false;
   api.defaults.adapter=async config=>{
    calls.push(config.url);let data;
-   if(config.url.includes('/week/')) data={id:10};
+   if(config.url.includes('/week/')) data={id:10,weekId:1,subjectId:1,weekNumber:1,status:'APPROVED',aiGenerationStatus:'COMPLETED'};
    else if(config.url.includes('/status/')) data={assessmentExists:true,assessmentAvailable:true,canTakeAssessment:true};
    else if(config.url.includes('/start/')) data={attemptId:20};
    else if(config.url.includes('/submit/')) {
@@ -201,13 +254,21 @@ test('Quiz recovers uncertain and already-submitted results without another POST
     if(mode==='unsubmitted') throw {response:{status:409,data:{code:'ASSESSMENT_NOT_SUBMITTED'}}};
     if(mode==='unmount') await new Promise(resolve=>{finish=resolve;});
     data={attemptId:20,score:100,passed:true,feedback:[]};
-   } else data={title:'Quiz',passingScore:70,questions:[{id:1,questionText:'Question',optionA:'Answer'}]};
+   } else data={title:'Quiz',passingScore:70,questions:[{id:1,questionText:'Question',optionA:'Answer',optionB:'Alternative'}]};
    return {status:200,headers:{},config,data};
   };
   try {
-   await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast:(...args)=>toasts.push(args)}},React.createElement(Router.MemoryRouter,{},React.createElement(Component))))));
+   await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast:(...args)=>toasts.push(args)}},React.createElement(Router.MemoryRouter,{initialEntries:['/student/quiz/1/1']},React.createElement(Router.Routes,{},React.createElement(Router.Route,{path:'/student/quiz/:topicId/:weekId',element:React.createElement(Component)})))))));
    await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Start quiz').click());
-   await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent.includes('Answer')).click());
+   const options = [...host.querySelectorAll('button[aria-pressed]')];
+   assert.equal(options.length, 2);
+   assert.ok(options.every(option => option.getAttribute('aria-pressed') === 'false'));
+   options[1].focus();
+   await act(async () => options[1].click());
+   assert.equal(options[1].getAttribute('aria-pressed'), 'true');
+   await act(async () => options[0].click());
+   assert.equal(options[0].getAttribute('aria-pressed'), 'true');
+   assert.equal(options[1].getAttribute('aria-pressed'), 'false');
    await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Submit quiz').click());
    assert.equal(calls.filter(url=>url.includes('/submit/')).length,1);
    if(mode==='unmount') {
@@ -228,7 +289,7 @@ test('Mentor reconciles lost responses and reuses request ID for manual retry', 
   const keys=[],toasts=[];let finish,unmounted=false;
   api.defaults.adapter=async config=>{
    let data;
-   if(config.url.includes('/week/'))data={id:10,weekId:1,status:'APPROVED',aiGenerationStatus:'COMPLETED'};
+   if(config.url.includes('/week/'))data={id:10,weekId:1,subjectId:1,weekNumber:1,status:'APPROVED',aiGenerationStatus:'COMPLETED'};
    else if(config.url.includes('/open/'))data={sessionId:20,moduleId:10,messages:[]};
    else if(config.method==='post') {keys.push(JSON.parse(config.data).requestId);if(keys.length===1)throw {code:'ECONNABORTED'};data={sessionId:20,moduleId:10,haloMessage:'Saved reply'};}
    else {if(mode==='unmount')await new Promise(resolve=>{finish=resolve;});if(mode==='pending')throw {response:{status:404,data:{code:'EXCHANGE_NOT_FOUND'}}};data={sessionId:20,moduleId:10,haloMessage:'Saved reply'};}
@@ -246,5 +307,56 @@ test('Mentor reconciles lost responses and reuses request ID for manual retry', 
     if(mode==='committed')assert.equal(toasts.length,0);
    }
   }finally{if(!unmounted)await act(async()=>root.unmount());host.remove();api.defaults.adapter=adapter;}
+ }
+});
+
+test('LessonChat enforces message boundaries without discarding the draft', async () => {
+ dom.window.HTMLElement.prototype.scrollIntoView=()=>{};
+ const Component=(await server.ssrLoadModule('/src/pages/student/components/LessonChat.jsx')).default;
+ const { lessonErrorMessage }=await import('../src/utils/lessonErrors.js');
+ assert.match(lessonErrorMessage({response:{status:400,data:{code:'MESSAGE_REQUIRED'}}}),/1 and 4,000 characters/);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const adapter=api.defaults.adapter;
+ const sent=[];
+ api.defaults.adapter=async config=>{
+  let data;
+  if(config.url.includes('/week/'))data={id:10,weekId:1,subjectId:1,weekNumber:1,status:'APPROVED',aiGenerationStatus:'COMPLETED'};
+  else if(config.url.includes('/open/'))data={sessionId:20,moduleId:10,messages:[]};
+  else {sent.push(JSON.parse(config.data));data={sessionId:20,moduleId:10,haloMessage:'Valid reply'};}
+  return {status:200,headers:{},config,data};
+ };
+ try {
+  await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{initialEntries:['/student/lesson/1/1']},React.createElement(Router.Routes,{},React.createElement(Router.Route,{path:'/student/lesson/:topicId/:weekId',element:React.createElement(Component)})))))));
+  const input=host.querySelector('input'),button=host.querySelector('button[aria-label="Send message"]');
+  assert.equal(input.getAttribute('aria-label'), 'Message AI Mentor');
+  const enter=async value=>act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
+  for(const value of ['', '   ', 'a'.repeat(4001)]){
+   await enter(value);assert.ok(button.disabled);
+   await act(async()=>host.querySelector('form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));
+   assert.equal(sent.length,0);assert.equal(input.value,value);
+  }
+  assert.match(host.textContent,/Shorten it to 4,000/);
+  await enter('a'.repeat(4000));assert.equal(button.disabled,false);
+  await act(async()=>button.click());assert.equal(sent.length,1);assert.equal(sent[0].message.length,4000);assert.ok(sent[0].requestId);assert.match(host.textContent,/Valid reply/);
+ }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=adapter;}
+});
+
+test('lesson and quiz show academic week and canonicalize mismatched Subject URLs', async () => {
+ dom.window.HTMLElement.prototype.scrollIntoView=()=>{};
+ for(const page of ['lesson','quiz'])for(const subject of [2,99]){
+  const Component=(await server.ssrLoadModule(`/src/pages/student/components/${page==='lesson'?'LessonChat':'Quiz'}.jsx`)).default;
+  function Location(){return React.createElement('output',{id:'route'},Router.useLocation().pathname);}
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const adapter=api.defaults.adapter;
+  api.defaults.adapter=async config=>{
+   const data=config.url.includes('/week/')?{id:10,weekId:37,weekNumber:1,subjectId:2,status:'APPROVED',aiGenerationStatus:'COMPLETED'}
+    :config.url.includes('/open/')?{sessionId:20,moduleId:10,messages:[]}
+    :config.url.includes('/status/')?{assessmentExists:true,assessmentAvailable:true,canTakeAssessment:true}
+    :{title:'Quiz',passingScore:70,questions:[{id:1,questionText:'Question',optionA:'Answer'}]};
+   return {status:200,headers:{},config,data};
+  };
+  try{
+   await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{initialEntries:[`/student/${page}/${subject}/37`]},React.createElement(Router.Routes,{},React.createElement(Router.Route,{path:`/student/${page}/:topicId/:weekId`,element:React.createElement(Component)})),React.createElement(Location))))));
+   assert.match(host.textContent,/Week 1/);assert.doesNotMatch(host.textContent,/Week 37/);
+   assert.equal(host.querySelector('#route').textContent,`/student/${page}/2/37`);
+  }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=adapter;}
  }
 });

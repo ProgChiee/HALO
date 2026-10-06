@@ -156,3 +156,20 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
+@media (max-width: 1024px) {
+  .contentArea { height: auto; min-height: 0; overflow-wrap: anywhere; }
+  .main { min-width: 0; overflow-wrap: anywhere; }
+}
+@media (max-width: 768px) {
+  .main, .topbar { padding: 1rem; }
+}
+
+.tableCard { overflow-x: auto; max-width: 100%; }
+.tableHeaderRow, .tableRow { min-width: 720px; overflow-wrap: anywhere; }
+.tableCard:focus-visible { outline: 2px solid var(--color-accent-active); outline-offset: 2px; }
+
+.progressTable { width: 100%; min-width: 720px; table-layout: fixed; border-collapse: collapse; text-align: left; }
+.progressTable .tableHeaderRow, .progressTable .tableRow { display: table-row; }
+.progressTable th, .progressTable td { padding: var(--space-md) var(--space-lg); vertical-align: middle; overflow-wrap: anywhere; }
+.progressTable th { font-weight: inherit; }
+.progressTable th:nth-child(3) { width: 23%; }

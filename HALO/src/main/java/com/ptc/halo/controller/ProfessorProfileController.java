@@ -31,9 +31,7 @@ public class ProfessorProfileController {
                 userRepository
                         .findByEmail(authentication.getName())
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Professor not found"
-                                )
+                                new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                         );
 
         return ResponseEntity.ok(
@@ -52,9 +50,7 @@ public class ProfessorProfileController {
                 userRepository
                         .findByEmail(authentication.getName())
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Professor not found"
-                                )
+                                new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                         );
 
         return ResponseEntity.ok(
@@ -75,9 +71,7 @@ public ResponseEntity<ProfessorProfileResponse> updateProfile(
             userRepository
                     .findByEmail(authentication.getName())
                     .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Professor not found"
-                            )
+                            new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                     );
 
     return ResponseEntity.ok(
