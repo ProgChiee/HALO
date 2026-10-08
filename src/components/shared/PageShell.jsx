@@ -48,7 +48,7 @@ function ResponsiveLayout({ compact, sidebarProps, children, className, navigati
   </div>;
 }
 
-export default function PageShell({ navItems, progress, sectionLabel, roleBadge, children, responsive = false, className = '', navigationLabel = roleBadge ? `HALO ? ${roleBadge}` : 'HALO' }) {
+export default function PageShell({ navItems, progress, sectionLabel, roleBadge, children, responsive = false, className = '', navigationLabel = roleBadge ? `HALO · ${roleBadge}` : 'HALO' }) {
   const sidebarProps = { navItems, progress, sectionLabel, roleBadge };
   if (responsive) return <ResponsiveShell {...sidebarProps} className={className} navigationLabel={navigationLabel}>{children}</ResponsiveShell>;
   return <div className={styles.shell}>

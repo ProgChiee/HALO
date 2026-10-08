@@ -22,12 +22,14 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(AdminController.class)
+@WebMvcTest({AdminController.class, com.ptc.halo.controller.AdminProfessorMonitoringController.class, com.ptc.halo.controller.AdminStudentMonitoringController.class})
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class})
 class AdminValidationHttpTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @MockBean AdminService admins;
+    @MockBean AdminProfessorMonitoringService professorMonitoring;
+    @MockBean AdminStudentMonitoringService studentMonitoring;
     @MockBean UserRepository users;
     @MockBean ActivityLogService logs;
     @MockBean ProfileService profiles;
@@ -170,5 +172,56 @@ class AdminValidationHttpTest {
                 .contentType("application/json").content(json.writeValueAsBytes(professor())))
             .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"))
             .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("SECRET"))));
+    }
+
+    @Test void statusRequiresExplicitSupportedValue() throws Exception {
+        for (String resource : List.of("professors", "students")) {
+            for (String body : List.of("{}", "{\"status\":null}", "{\"status\":\"BLOCKED\"}", "{\"status\":\"INVALID\"}")) {
+                mvc.perform(patch("/api/admin/" + resource + "/1/status")
+                        .header("Authorization", "Bearer test-token").contentType("application/json").content(body))
+                        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+            }
+            for (String desired : List.of("ACTIVE", "INACTIVE")) {
+                mvc.perform(patch("/api/admin/" + resource + "/1/status")
+                        .header("Authorization", "Bearer test-token").contentType("application/json")
+                        .content("{\"status\":\"" + desired + "\"}"))
+                        .andExpect(status().isOk());
+            }
+        }
+        for (Status desired : List.of(Status.ACTIVE, Status.INACTIVE)) {
+            verify(admins).changeProfessorStatus(1L, desired, actor);
+            verify(admins).changeStudentStatus(1L, desired, actor);
+        }
+    }
+
+
+    @Test void professorIdDatabaseConflictIsSafe409() throws Exception {
+        when(admins.createProfessor(any(), any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                "private SQL", new java.sql.SQLException("duplicate uk_professor_id_normalized secret")));
+        mvc.perform(post("/api/admin/create-professor").header("Authorization", "Bearer test-token")
+                .contentType("application/json").content(json.writeValueAsBytes(professor())))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.code").value("PROFESSOR_ID_CONFLICT"))
+                .andExpect(jsonPath("$.message").value("This Professor ID is already in use. Enter a different Professor ID."));
+    }
+
+
+    @Test void monitoringPagingValidationAndAuthorization() throws Exception {
+        for (String path : List.of("/api/admin/activity-logs", "/api/admin/professors/monitoring", "/api/admin/students/monitoring")) {
+            for (String query : List.of("?page=-1", "?size=0", "?size=101"))
+                mvc.perform(get(path+query).header("Authorization", "Bearer test-token"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+            mvc.perform(get(path)).andExpect(status().isUnauthorized());
+            role("STUDENT");
+            mvc.perform(get(path).header("Authorization", "Bearer test-token")).andExpect(status().isForbidden());
+            role("ADMIN");
+            mvc.perform(get(path+"?page=1&size=20").header("Authorization", "Bearer test-token")).andExpect(status().isOk());
+        }
+        verify(professorMonitoring).getProfessorMonitoring(1,20);
+        verify(studentMonitoring).getStudentMonitoring(1,20);
+        verify(logs).getLogs(null,null,1,20,"");
+        mvc.perform(get("/api/admin/activity-logs?role=SUPER_ADMIN&type=ACCOUNT&search=Created")
+            .header("Authorization", "Bearer test-token")).andExpect(status().isOk());
+        verify(logs).getLogs(Role.SUPER_ADMIN,ActivityType.ACCOUNT,0,20,"Created");
     }
 }

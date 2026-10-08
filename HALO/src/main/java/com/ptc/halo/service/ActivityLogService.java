@@ -20,6 +20,33 @@ public class ActivityLogService {
         this.activityLogRepository = activityLogRepository;
     }
 
+    // Must participate in the mutation transaction; the session supplies immutable provenance.
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void createActingLog(com.ptc.halo.entity.AdminActingSessionEntity session, String action) {
+        createActingLog(session, ActivityType.ACCOUNT, action);
+    }
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void createActingLog(com.ptc.halo.entity.AdminActingSessionEntity session, ActivityType type, String action) {
+        ActivityLogEntity log = new ActivityLogEntity();
+        log.setUser(session.getAdmin());
+        log.setActingTarget(session.getTarget());
+        log.setActingTargetRole(session.getTargetRole());
+        log.setActingSession(session);
+        log.setActivityType(type);
+        log.setAction(action + " by Admin " + session.getAdmin().getId() + " acting as "
+                + session.getTargetRole() + " " + session.getTarget().getId());
+        log.setCreatedAt(LocalDateTime.now());
+        activityLogRepository.save(log);
+    }
+
+    public void createProfessorLog(UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting,
+            ActivityType type, String action) {
+        if (acting == null) { createLog(professor, type, action); return; }
+        if (acting.getTargetRole() != Role.PROFESSOR || !acting.getTarget().getId().equals(professor.getId()))
+            throw new org.springframework.security.access.AccessDeniedException("Invalid acting target");
+        createActingLog(acting, type, action);
+    }
+
     public void createLog(
             UserEntity user,
             ActivityType activityType,
@@ -103,39 +130,13 @@ public class ActivityLogService {
                 .toList();
     }
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public List<ActivityLogResponse> getLogs(
-            Role role,
-            ActivityType activityType) {
-
-        List<ActivityLogEntity> logs;
-
-        if (role != null && activityType != null) {
-
-            logs = activityLogRepository
-                    .findByUser_RoleAndActivityTypeOrderByCreatedAtDesc(
-                            role,
-                            activityType
-                    );
-
-        } else if (role != null) {
-
-            logs = activityLogRepository
-                    .findByUser_RoleOrderByCreatedAtDesc(role);
-
-        } else if (activityType != null) {
-
-            logs = activityLogRepository
-                    .findByActivityTypeOrderByCreatedAtDesc(
-                            activityType
-                    );
-
-        } else {
-
-            logs = activityLogRepository
-                    .findAllByOrderByCreatedAtDesc();
-        }
-
-        return logs.stream()
+    public org.springframework.data.domain.Page<ActivityLogResponse> getLogs(
+            Role role, ActivityType activityType, int page, int size, String search) {
+        var logs = activityLogRepository.findAdminLogs(role, activityType,
+                search.toLowerCase(java.util.Locale.ROOT),
+                org.springframework.data.domain.PageRequest.of(page, Math.min(size, 100),
+                    org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt", "id")));
+        return logs
                 .map(log -> {
 
                     ActivityLogResponse response =
@@ -162,7 +163,6 @@ public class ActivityLogService {
                     );
 
                     return response;
-                })
-                .toList();
+                });
     }
 }

@@ -44,9 +44,11 @@ public class ProfessorAcademicService {
     // =========================
 
     @Transactional
-    public SubjectResponse createSubject(
-            SubjectRequest request,
-            UserEntity professor) {
+    public SubjectResponse createSubject(SubjectRequest request, UserEntity professor) {
+        return createSubject(request, professor, null);
+    }
+    @Transactional
+    public SubjectResponse createSubject(SubjectRequest request, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         if (subjectRepository
                 .findBySubjectCode(request.getSubjectCode())
@@ -74,8 +76,8 @@ public class ProfessorAcademicService {
         SubjectEntity savedSubject =
                 subjectRepository.save(subject);
 
-        activityLogService.createLog(
-                professor,
+        log(
+                professor, acting,
                 ActivityType.MODULE,
                 "Created subject: "
                         + savedSubject.getSubjectName()
@@ -103,10 +105,11 @@ public class ProfessorAcademicService {
 
 
     @Transactional
-    public SubjectResponse updateSubject(
-            Long id,
-            SubjectUpdateRequest request,
-            UserEntity professor) {
+    public SubjectResponse updateSubject(Long id, SubjectUpdateRequest request, UserEntity professor) {
+        return updateSubject(id, request, professor, null);
+    }
+    @Transactional
+    public SubjectResponse updateSubject(Long id, SubjectUpdateRequest request, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         SubjectEntity subject = requireSubject(id, professor);
 
@@ -118,8 +121,8 @@ public class ProfessorAcademicService {
         SubjectEntity updatedSubject =
                 subjectRepository.save(subject);
 
-        activityLogService.createLog(
-                professor,
+        log(
+                professor, acting,
                 ActivityType.MODULE,
                 "Updated subject: "
                         + updatedSubject.getSubjectName()
@@ -130,9 +133,11 @@ public class ProfessorAcademicService {
 
 
     @Transactional
-    public void deleteSubject(
-            Long id,
-            UserEntity professor) {
+    public void deleteSubject(Long id, UserEntity professor) {
+        deleteSubject(id, professor, null);
+    }
+    @Transactional
+    public void deleteSubject(Long id, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         SubjectEntity subject = requireSubject(id, professor);
 
@@ -151,8 +156,8 @@ public class ProfessorAcademicService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "SUBJECT_HAS_CONTENT");
         }
 
-        activityLogService.createLog(
-                professor,
+        log(
+                professor, acting,
                 ActivityType.MODULE,
                 "Deleted subject: " + subjectName
         );
@@ -164,10 +169,11 @@ public class ProfessorAcademicService {
     // =========================
 
     @Transactional
-    public WeekResponse createWeek(
-            Long subjectId,
-            WeekRequest request,
-            UserEntity professor) {
+    public WeekResponse createWeek(Long subjectId, WeekRequest request, UserEntity professor) {
+        return createWeek(subjectId, request, professor, null);
+    }
+    @Transactional
+    public WeekResponse createWeek(Long subjectId, WeekRequest request, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         SubjectEntity subject = requireSubject(subjectId, professor);
 
@@ -183,8 +189,8 @@ public class ProfessorAcademicService {
         WeekEntity savedWeek =
                 saveWeek(week);
 
-        activityLogService.createLog(
-                professor,
+        log(
+                professor, acting,
                 ActivityType.MODULE,
                 "Created Week "
                         + savedWeek.getWeekNumber()
@@ -218,10 +224,11 @@ public class ProfessorAcademicService {
 
 
     @Transactional
-    public WeekResponse updateWeek(
-            Long id,
-            WeekUpdateRequest request,
-            UserEntity professor) {
+    public WeekResponse updateWeek(Long id, WeekUpdateRequest request, UserEntity professor) {
+        return updateWeek(id, request, professor, null);
+    }
+    @Transactional
+    public WeekResponse updateWeek(Long id, WeekUpdateRequest request, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         WeekEntity week = requireWeek(id, professor);
 
@@ -234,8 +241,8 @@ public class ProfessorAcademicService {
         WeekEntity updatedWeek =
                 saveWeek(week);
 
-        activityLogService.createLog(
-                professor,
+        log(
+                professor, acting,
                 ActivityType.MODULE,
                 "Updated Week "
                         + updatedWeek.getWeekNumber()
@@ -248,9 +255,11 @@ public class ProfessorAcademicService {
 
 
     @Transactional
-    public void deleteWeek(
-            Long id,
-            UserEntity professor) {
+    public void deleteWeek(Long id, UserEntity professor) {
+        deleteWeek(id, professor, null);
+    }
+    @Transactional
+    public void deleteWeek(Long id, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         WeekEntity week = requireWeek(id, professor);
 
@@ -262,8 +271,8 @@ public class ProfessorAcademicService {
 
         weekRepository.delete(week);
 
-        activityLogService.createLog(
-                professor,
+        log(
+                professor, acting,
                 ActivityType.MODULE,
                 "Deleted Week "
                         + weekNumber
@@ -345,5 +354,9 @@ public class ProfessorAcademicService {
         );
 
         return response;
+    }
+    private void log(UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting, ActivityType type, String action) {
+        if (acting == null) activityLogService.createLog(professor, type, action);
+        else activityLogService.createProfessorLog(professor, acting, type, action);
     }
 }

@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest({AiLearningModuleController.class, ProfessorAcademicController.class})
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class})
+@Import({com.ptc.halo.service.ProfessorModuleService.class,SecurityConfig.class, JwtAuthenticationFilter.class})
 class ProfessorInputValidationTest {
  @Autowired MockMvc mvc;
  @MockBean ProfessorAcademicService academic;

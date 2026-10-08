@@ -53,25 +53,38 @@ test('Admin profile automatically exposes password form and keeps close/reopen b
     await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { role: 'admin', user: { name: 'Admin', mustChangePassword: true }, logout() { logoutCount++; } } },
       React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Profile), React.createElement(Location))))));
     assert.match(host.textContent, /Change your temporary password/);
-    assert.ok(host.querySelector('#current-password'));
-    assert.ok(host.querySelector('#new-password'));
+    assert.ok(document.querySelector('#current-password'));
+    assert.ok(document.querySelector('#new-password'));
     assert.deepEqual(calls, ['/admin/profile']);
-    await act(async () => host.querySelector('button[aria-label="Close"]').click());
-    assert.equal(host.querySelector('#current-password'), null);
-    await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent.trim() === 'Change password').click());
-    assert.ok(host.querySelector('#current-password'));
+    await act(async () => document.querySelector('button[aria-label="Close"]').click());
+    assert.equal(document.querySelector('#current-password'), null);
+    await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Change password').click());
+    const opener = [...host.querySelectorAll('button')].find(button => button.textContent.trim() === 'Change password');
+    await act(async () => document.querySelector('[role="dialog"]').dispatchEvent(new dom.window.KeyboardEvent('keydown', {key:'Escape',bubbles:true})));
+    await act(async () => { opener.focus(); opener.click(); });
+    const dialog = document.querySelector('[role="dialog"]');
+    assert.equal(dialog.getAttribute('aria-labelledby'), 'change-password-title');
+    assert.equal(document.activeElement.id, 'current-password');
+    for (let i=0;i<9;i++) await act(async () => {
+      dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', {key:'Tab',bubbles:true}));
+      assert.ok(dialog.contains(document.activeElement));
+    });
+    await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', {key:'Escape',bubbles:true})));
+    assert.equal(document.querySelector('[role="dialog"]'),null);
+    assert.equal(document.activeElement,opener);
+    await act(async () => opener.click());
     for (const [id, value] of [['current-password', 'Temporary-test-123'], ['new-password', 'Replacement-test-123'], ['confirm-password', 'Replacement-test-123']]) {
       await act(async () => {
-        const input = host.querySelector('#' + id);
+        const input = document.querySelector('#' + id);
         Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, value);
         input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
       });
     }
-    await act(async () => host.querySelector('form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })));
+    await act(async () => document.querySelector('form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })));
     assert.deepEqual(submitted, { currentPassword: 'Temporary-test-123', newPassword: 'Replacement-test-123' });
     assert.equal(calls.at(-1), '/auth/change-password');
     assert.equal(logoutCount, 1);
-    assert.equal(host.querySelector('#location').textContent, '/login');
-    assert.equal(host.querySelector('#current-password'), null);
+    assert.equal(document.querySelector('#location').textContent, '/login');
+    assert.equal(document.querySelector('#current-password'), null);
   } finally { await act(async () => root.unmount()); host.remove(); }
 });

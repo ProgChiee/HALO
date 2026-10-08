@@ -77,7 +77,12 @@ public class AssessmentService {
             );
         }
 
-        GeneratedAssessment generated =
+        return persistGeneratedAssessment(module, prepareAssessment(module));
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public GeneratedAssessment prepareAssessment(AiLearningModuleEntity module) {
+        return
                 assessmentAiService.generateAssessment(
                         module.getLessonText(),
                         module.getGeneratedObjectives(),
@@ -86,6 +91,14 @@ public class AssessmentService {
                         module.getGeneratedSummary()
                 );
 
+    }
+
+    @Transactional
+    public AssessmentEntity persistGeneratedAssessment(AiLearningModuleEntity module, GeneratedAssessment generated) {
+        if (module.getStatus() != LessonStatus.APPROVED)
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "MODULE_GENERATION_REQUIRED");
+        if (assessmentRepository.findByModuleId(module.getId()).isPresent())
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "RESOURCE_CONFLICT");
         if (generated == null ||
                 generated.getQuestions() == null ||
                 generated.getQuestions().isEmpty()) {

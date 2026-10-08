@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 @Import({AdminService.class, ActivityLogService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AdminProfessorUpdateTransactionTest {
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired AdminService service;
     @Autowired UserRepository users;
     @SpyBean ProfessorRepository professors;
@@ -64,8 +65,8 @@ class AdminProfessorUpdateTransactionTest {
     @Test void missingResourcesAndWrongRolesHaveTypedErrors() {
         assertEquals(AdminApiException.Code.RESOURCE_NOT_FOUND, assertThrows(AdminApiException.class, () -> service.viewProfessorById(Long.MAX_VALUE)).code);
         assertEquals(AdminApiException.Code.RESOURCE_NOT_FOUND, assertThrows(AdminApiException.class, () -> service.viewStudentById(Long.MAX_VALUE)).code);
-        assertEquals(AdminApiException.Code.INVALID_TARGET_ROLE, assertThrows(AdminApiException.class, () -> service.changeProfessorStatus(admin.getId(), admin)).code);
-        assertEquals(AdminApiException.Code.INVALID_TARGET_ROLE, assertThrows(AdminApiException.class, () -> service.changeStudentStatus(account.getId(), admin)).code);
+        assertEquals(AdminApiException.Code.INVALID_TARGET_ROLE, assertThrows(AdminApiException.class, () -> service.changeProfessorStatus(admin.getId(), Status.ACTIVE, admin)).code);
+        assertEquals(AdminApiException.Code.INVALID_TARGET_ROLE, assertThrows(AdminApiException.class, () -> service.changeStudentStatus(account.getId(), Status.ACTIVE, admin)).code);
         assertEquals(0, logs.count());
     }
     UserEntity student() {
@@ -90,9 +91,9 @@ class AdminProfessorUpdateTransactionTest {
         assertThrows(IllegalStateException.class, () -> {
             switch (operation) {
                 case "create" -> service.createProfessor(createRequest(), admin);
-                case "professorStatus" -> service.changeProfessorStatus(account.getId(), admin);
+                case "professorStatus" -> service.changeProfessorStatus(account.getId(), Status.ACTIVE, admin);
                 case "studentUpdate" -> service.updateStudent(student.getId(), studentRequest(), admin);
-                case "studentStatus" -> service.changeStudentStatus(student.getId(), admin);
+                case "studentStatus" -> service.changeStudentStatus(student.getId(), Status.ACTIVE, admin);
             }
         });
         assertEquals(userCount, users.count()); assertEquals(profileCount, professors.count());
@@ -125,8 +126,8 @@ class AdminProfessorUpdateTransactionTest {
     void missingProfileAfterStatusMutationRollsBackStatusAndAudit(String role) {
         var target = user("No profile", "orphan@example.test", role.equals("professor") ? Role.PROFESSOR : Role.STUDENT);
         assertThrows(RuntimeException.class, () -> {
-            if (role.equals("professor")) service.changeProfessorStatus(target.getId(), admin);
-            else service.changeStudentStatus(target.getId(), admin);
+            if (role.equals("professor")) service.changeProfessorStatus(target.getId(), Status.ACTIVE, admin);
+            else service.changeStudentStatus(target.getId(), Status.ACTIVE, admin);
         });
         assertEquals(Status.INACTIVE, users.findById(target.getId()).orElseThrow().getStatus());
         assertEquals(0, logs.count());
@@ -137,14 +138,14 @@ class AdminProfessorUpdateTransactionTest {
         var stored = users.findByEmail(created.getEmail()).orElseThrow();
         assertEquals("NEW", professors.findByUserId(stored.getId()).orElseThrow().getProfessorId());
         assertEquals(Status.ACTIVE, stored.getStatus()); assertEquals("encoded-test-password", stored.getPassword());
-        assertEquals(Status.ACTIVE, service.changeProfessorStatus(account.getId(), admin).getStatus());
+        assertEquals(Status.ACTIVE, service.changeProfessorStatus(account.getId(), Status.ACTIVE, admin).getStatus());
         assertEquals(Status.ACTIVE, users.findById(account.getId()).orElseThrow().getStatus());
         var student = student();
         var response = service.updateStudent(student.getId(), studentRequest(), admin);
         assertEquals(response.getName(), users.findById(student.getId()).orElseThrow().getName());
         var profile = students.findByUserId(student.getId()).orElseThrow();
         assertEquals("ST-2", profile.getStudentId()); assertEquals("B", profile.getSection()); assertEquals(YearLevel.SECOND_YEAR, profile.getYearLevel());
-        assertEquals(Status.ACTIVE, service.changeStudentStatus(student.getId(), admin).getStatus());
+        assertEquals(Status.ACTIVE, service.changeStudentStatus(student.getId(), Status.ACTIVE, admin).getStatus());
         assertEquals(Status.ACTIVE, users.findById(student.getId()).orElseThrow().getStatus());
         assertEquals(4, logs.count());
     }
@@ -194,5 +195,63 @@ class AdminProfessorUpdateTransactionTest {
         assertEquals("Original", stored.getName()); assertEquals("original@example.test", stored.getEmail());
         assertEquals("PROF-1", professors.findByUserId(account.getId()).orElseThrow().getProfessorId());
         assertEquals(0, logs.count());
+    }
+
+    @ParameterizedTest @ValueSource(strings={"professor", "student"})
+    void explicitStatusIsIdempotentAndAudited(String role) {
+        var target = role.equals("professor") ? account : student();
+        for (Status desired : new Status[]{Status.ACTIVE, Status.ACTIVE, Status.INACTIVE, Status.INACTIVE}) {
+            Status actual = role.equals("professor")
+                    ? service.changeProfessorStatus(target.getId(), desired, admin).getStatus()
+                    : service.changeStudentStatus(target.getId(), desired, admin).getStatus();
+            assertEquals(desired, actual);
+            assertEquals(desired, users.findById(target.getId()).orElseThrow().getStatus());
+            verify(audit, atLeastOnce()).createLog(eq(admin), eq(ActivityType.ACCOUNT),
+                    eq("Set " + (role.equals("professor") ? "Professor" : "Student") + " status to " + desired + ": " + target.getEmail()));
+        }
+        assertEquals(4, logs.count());
+    }
+
+
+    @ParameterizedTest @ValueSource(strings={"PROF-1", "  PROF-1  "})
+    void duplicateProfessorIdIsRejectedWithoutPartialWrites(String id) {
+        var create = createRequest(); create.setProfessorId(id);
+        assertEquals(AdminApiException.Code.PROFESSOR_ID_CONFLICT,
+                assertThrows(AdminApiException.class, () -> service.createProfessor(create, admin)).code);
+        assertEquals(2, users.count()); assertEquals(1, professors.count()); assertEquals(0, logs.count());
+        var other = user("Other", "other@example.test", Role.PROFESSOR);
+        var profile = new ProfessorEntity(); profile.setUser(other); profile.setProfessorId("OTHER"); professors.saveAndFlush(profile);
+        assertEquals(AdminApiException.Code.PROFESSOR_ID_CONFLICT,
+                assertThrows(AdminApiException.class, () -> service.updateProfessor(other.getId(), request("Changed", "changed@example.test", id), admin)).code);
+        assertEquals("Other", users.findById(other.getId()).orElseThrow().getName());
+        assertEquals("OTHER", professors.findByUserId(other.getId()).orElseThrow().getProfessorId());
+        assertEquals(0, logs.count());
+    }
+    @Test void professorIdPreservesCaseAndTrimsAndAllowsUnchangedUpdate() {
+        when(passwords.encode(anyString())).thenReturn("encoded");
+        var create = createRequest(); create.setProfessorId("  prof-1  ");
+        assertEquals("prof-1", service.createProfessor(create, admin).getProfessorId());
+        assertEquals("PROF-1", service.updateProfessor(account.getId(), request("Original", account.getEmail(), "  PROF-1  "), admin).getProfessorId());
+    }
+
+
+    @Test void databaseUniquenessRejectsRaceAndRollsBackAccount() {
+        // H2 equivalent of the production migration's binary normalized key.
+        jdbc.execute("ALTER TABLE professor_entity ADD COLUMN professor_id_normalized VARBINARY(1020) GENERATED ALWAYS AS (CAST(TRIM(professor_id) AS VARBINARY))");
+        jdbc.execute("ALTER TABLE professor_entity ADD CONSTRAINT uk_professor_id_normalized UNIQUE(professor_id_normalized)");
+        try {
+            // Simulate another writer winning after the application pre-check.
+            doReturn(false).when(professors).existsNormalizedProfessorId(anyString(), isNull());
+            when(passwords.encode(anyString())).thenReturn("encoded");
+            var create = createRequest(); create.setProfessorId("  PROF-1  ");
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> service.createProfessor(create, admin));
+            assertEquals(2, users.count()); assertEquals(1, professors.count()); assertEquals(0, logs.count());
+            // Distinct case is allowed by the database as well as the application.
+            create.setProfessorId("prof-1");
+            assertEquals("prof-1", service.createProfessor(create, admin).getProfessorId());
+        } finally {
+            jdbc.execute("ALTER TABLE professor_entity DROP CONSTRAINT uk_professor_id_normalized");
+            jdbc.execute("ALTER TABLE professor_entity DROP COLUMN professor_id_normalized");
+        }
     }
 }

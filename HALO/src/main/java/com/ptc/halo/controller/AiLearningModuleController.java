@@ -1,15 +1,8 @@
 package com.ptc.halo.controller;
 
 import com.ptc.halo.dtoRequest.AiLearningModuleUpdateRequest;
-import com.ptc.halo.dtoResponse.AiLearningFileResponse;
 import com.ptc.halo.dtoResponse.AiLearningModuleResponse;
-import com.ptc.halo.entity.AiLearningFileEntity;
-import com.ptc.halo.entity.AiLearningModuleEntity;
 import com.ptc.halo.entity.UserEntity;
-import com.ptc.halo.entity.WeekEntity;
-import com.ptc.halo.enums.ActivityType;
-import com.ptc.halo.enums.AiGenerationStatus;
-import com.ptc.halo.enums.LessonStatus;
 import com.ptc.halo.repository.AiLearningFileRepository;
 import com.ptc.halo.repository.AiLearningModuleRepository;
 import com.ptc.halo.repository.UserRepository;
@@ -33,23 +26,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/professor/ai-learning-modules")
 @PreAuthorize("hasRole('PROFESSOR')")
 public class AiLearningModuleController {
 
-    private final AiLearningModuleRepository aiLearningModuleRepository;
-    private final WeekRepository weekRepository;
-    private final FileUploadService fileUploadService;
-    private final AiGenerationService aiGenerationService;
-    private final AiLearningFileRepository aiLearningFileRepository;
-    private final AssessmentService assessmentService;
-    private final ActivityLogService activityLogService;
+    private final com.ptc.halo.service.ProfessorModuleService workflows;
     private final UserRepository userRepository;
-    private final com.ptc.halo.component.ModuleMaterialIndex materialIndex;
 
+    // Retained for direct construction in existing controller tests. Spring uses the service constructor below.
     public AiLearningModuleController(
             AiLearningModuleRepository aiLearningModuleRepository,
             WeekRepository weekRepository,
@@ -60,15 +46,13 @@ public class AiLearningModuleController {
             ActivityLogService activityLogService,
             UserRepository userRepository, com.ptc.halo.component.ModuleMaterialIndex materialIndex
     ) {
-        this.aiLearningModuleRepository = aiLearningModuleRepository;
-        this.weekRepository = weekRepository;
-        this.fileUploadService = fileUploadService;
-        this.aiGenerationService = aiGenerationService;
-        this.aiLearningFileRepository = aiLearningFileRepository;
-        this.assessmentService = assessmentService;
-        this.activityLogService = activityLogService;
         this.userRepository = userRepository;
-        this.materialIndex = materialIndex;
+        this.workflows = new com.ptc.halo.service.ProfessorModuleService(aiLearningModuleRepository, weekRepository, fileUploadService, aiGenerationService, aiLearningFileRepository, assessmentService, activityLogService, userRepository, materialIndex);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AiLearningModuleController(com.ptc.halo.service.ProfessorModuleService workflows, UserRepository users) {
+        this.workflows = workflows; this.userRepository = users;
     }
 
     @InitBinder
@@ -83,15 +67,7 @@ public class AiLearningModuleController {
     public ResponseEntity<AiLearningModuleResponse> getModuleByWeek(
             @PathVariable("weekId") @Positive Long weekId, Authentication authentication
     ) {
-        requireWeek(weekId, getCurrentUser(authentication));
-
-        return aiLearningModuleRepository.findByWeekId(weekId)
-                .map(module ->
-                        ResponseEntity.ok(convertToResponse(module))
-                )
-                .orElseGet(() ->
-                        ResponseEntity.noContent().build()
-                );
+        return workflows.getModuleByWeek(weekId, getCurrentUser(authentication), null);
     }
 
     @PostMapping(consumes = "multipart/form-data")
@@ -112,54 +88,7 @@ public class AiLearningModuleController {
             List<MultipartFile> files,
             Authentication authentication
     ) throws Exception {
-
-        UserEntity professor = getCurrentUser(authentication);
-
-        WeekEntity week = requireWeek(weekId, professor);
-
-        // Check before writing any uploaded files.
-        if (aiLearningModuleRepository.findByWeekId(weekId).isPresent()) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "This week already has a module. Open the existing module."
-            );
-        }
-
-        var validatedFiles = fileUploadService.validateFiles(files);
-
-        boolean hasFiles = files != null
-                && files.stream().anyMatch(file ->
-                file != null && !file.isEmpty()
-        );
-
-        if (!hasText(lessonText) && !hasText(youtubeLink) && !hasFiles) {
-            throw new ProfessorInputException("sources", "Add lesson text, a valid link, or a file.");
-        }
-
-        AiLearningModuleEntity module = new AiLearningModuleEntity();
-
-        module.setWeek(week);
-        module.setLessonText(lessonText == null ? null : lessonText.strip());
-        module.setYoutubeLink(youtubeLink == null ? null : youtubeLink.strip());
-        module.setAiNotes(aiNotes == null ? null : aiNotes.strip());
-        module.setStatus(LessonStatus.PENDING);
-        module.setAiGenerationStatus(AiGenerationStatus.PENDING);
-
-        for (var file : validatedFiles) {
-            module.addFile(fileUploadService.uploadValidated(file, module));
-        }
-
-        // Flush here so database conflicts are raised before returning.
-        AiLearningModuleEntity savedModule =
-                aiLearningModuleRepository.saveAndFlush(module);
-
-        activityLogService.createLog(
-                professor,
-                ActivityType.MODULE,
-                "Created learning module ID " + savedModule.getId()
-        );
-
-        return ResponseEntity.ok(convertToResponse(savedModule));
+        return workflows.createModule(weekId, lessonText, youtubeLink, aiNotes, files, getCurrentUser(authentication), null);
     }
 
     @PostMapping("/{id}/generate")
@@ -167,23 +96,7 @@ public class AiLearningModuleController {
             @PathVariable("id") @Positive Long id,
             Authentication authentication
     ) {
-        UserEntity professor = getCurrentUser(authentication);
-        AiLearningModuleEntity module = findModule(id, professor);
-
-        requireEditable(module);
-
-        AiLearningModuleEntity generatedModule =
-                aiGenerationService.generateLesson(id);
-
-        activityLogService.createLog(
-                professor,
-                ActivityType.MODULE,
-                "Generated AI lesson for module ID " + id
-        );
-
-        return ResponseEntity.ok(
-                convertToResponse(generatedModule)
-        );
+        return workflows.generateLesson(id, getCurrentUser(authentication), null);
     }
 
     @PutMapping("/{id}/approve")
@@ -192,43 +105,7 @@ public class AiLearningModuleController {
             @PathVariable("id") @Positive Long id,
             Authentication authentication
     ) {
-        UserEntity professor = getCurrentUser(authentication);
-        AiLearningModuleEntity module = findModule(id, professor);
-
-        if (module.getStatus() == LessonStatus.APPROVED) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "MODULE_ALREADY_APPROVED"
-            );
-        }
-
-        if (module.getAiGenerationStatus() != AiGenerationStatus.COMPLETED) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "MODULE_GENERATION_REQUIRED"
-            );
-        }
-
-        if (module.getFiles() == null || module.getFiles().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "MODULE_MATERIALS_REQUIRED");
-        }
-        // Same module-only readiness checks as Mentor, before approval or assessment writes.
-        materialIndex.getOrBuild(module);
-        module.setStatus(LessonStatus.APPROVED);
-
-        AiLearningModuleEntity savedModule =
-                aiLearningModuleRepository.save(module);
-
-        // If this throws, participating database changes roll back.
-        assessmentService.generateAssessment(savedModule.getId());
-
-        activityLogService.createLog(
-                professor,
-                ActivityType.MODULE,
-                "Approved AI lesson for module ID " + id
-        );
-
-        return ResponseEntity.ok(convertToResponse(savedModule));
+        return workflows.approveLesson(id, getCurrentUser(authentication), null);
     }
 
     @PutMapping("/{id}/decline")
@@ -237,30 +114,7 @@ public class AiLearningModuleController {
             @PathVariable("id") @Positive Long id,
             Authentication authentication
     ) {
-        UserEntity professor = getCurrentUser(authentication);
-        AiLearningModuleEntity module = findModule(id, professor);
-
-        requireEditable(module);
-
-        if (module.getAiGenerationStatus() != AiGenerationStatus.COMPLETED) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "MODULE_GENERATION_REQUIRED"
-            );
-        }
-
-        module.setStatus(LessonStatus.DECLINED);
-
-        AiLearningModuleEntity savedModule =
-                aiLearningModuleRepository.save(module);
-
-        activityLogService.createLog(
-                professor,
-                ActivityType.MODULE,
-                "Declined AI lesson for module ID " + id
-        );
-
-        return ResponseEntity.ok(convertToResponse(savedModule));
+        return workflows.declineLesson(id, getCurrentUser(authentication), null);
     }
 
     @PostMapping(
@@ -273,31 +127,7 @@ public class AiLearningModuleController {
             @RequestParam("file") MultipartFile file,
             Authentication authentication
     ) throws Exception {
-        UserEntity professor = getCurrentUser(authentication);
-        AiLearningModuleEntity module = findModule(moduleId, professor);
-
-        requireEditable(module);
-
-        AiLearningFileEntity fileEntity =
-                fileUploadService.uploadFile(file, module);
-
-        module.addFile(fileEntity);
-        aiLearningFileRepository.save(fileEntity);
-
-        // Materials changed: regenerate before approving.
-        invalidateGeneratedLesson(module);
-        // Force a versioned row update even if the module was already pending.
-        // Concurrent uploads based on the same attachment count cannot both commit.
-        module.setGenerationToken(java.util.UUID.randomUUID().toString());
-        aiLearningModuleRepository.saveAndFlush(module);
-
-        activityLogService.createLog(
-                professor,
-                ActivityType.MODULE,
-                "Uploaded file to learning module ID " + moduleId
-        );
-
-        return ResponseEntity.ok(convertToResponse(module));
+        return workflows.uploadFile(moduleId, file, getCurrentUser(authentication), null);
     }
 
     @DeleteMapping("/files/{fileId}")
@@ -306,28 +136,7 @@ public class AiLearningModuleController {
             @PathVariable("fileId") @Positive Long fileId,
             Authentication authentication
     ) throws Exception {
-        UserEntity professor = getCurrentUser(authentication);
-
-        AiLearningFileEntity file = aiLearningFileRepository
-                .findByIdAndModule_Week_Subject_Professor_User_Id(fileId, professor.getId())
-                .orElseThrow(this::resourceNotFound);
-
-        AiLearningModuleEntity module = file.getModule();
-        requireEditable(module);
-
-        fileUploadService.deleteFile(file.getFilePath());
-
-        module.removeFile(file);
-        invalidateGeneratedLesson(module);
-        aiLearningModuleRepository.saveAndFlush(module);
-
-        activityLogService.createLog(
-                professor,
-                ActivityType.MODULE,
-                "Removed file from learning module ID " + module.getId()
-        );
-
-        return ResponseEntity.ok("File deleted successfully");
+        return workflows.deleteFile(fileId, getCurrentUser(authentication), null);
     }
 
     @PutMapping("/{id}")
@@ -337,74 +146,14 @@ public class AiLearningModuleController {
             @Valid @RequestBody AiLearningModuleUpdateRequest request,
             Authentication authentication
     ) {
-        UserEntity professor = getCurrentUser(authentication);
-        AiLearningModuleEntity module = findModule(id, professor);
-
-        requireEditable(module);
-
-        if (!hasText(request.getLessonText()) && !hasText(request.getYoutubeLink()) && module.getFiles().isEmpty()) {
-            throw new ProfessorInputException("sources", "Keep lesson text, a valid link, or an attached file.");
-        }
-        module.setLessonText(request.getLessonText());
-        module.setYoutubeLink(request.getYoutubeLink());
-        module.setAiNotes(request.getAiNotes());
-
-        invalidateGeneratedLesson(module);
-
-        AiLearningModuleEntity updatedModule =
-                aiLearningModuleRepository.save(module);
-
-        activityLogService.createLog(
-                professor,
-                ActivityType.MODULE,
-                "Updated learning module ID " + id
-        );
-
-        return ResponseEntity.ok(convertToResponse(updatedModule));
+        return workflows.updateModule(id, request, getCurrentUser(authentication), null);
     }
 
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public ResponseEntity<AiLearningModuleResponse> getModuleById(
             @PathVariable("id") @Positive Long id, Authentication authentication) {
-        return ResponseEntity.ok(convertToResponse(findModule(id, getCurrentUser(authentication))));
-    }
-
-    private WeekEntity requireWeek(Long id, UserEntity professor) {
-        return weekRepository.findByIdAndSubject_Professor_User_Id(id, professor.getId())
-                .orElseThrow(this::resourceNotFound);
-    }
-
-    private AiLearningModuleEntity findModule(Long id, UserEntity professor) {
-        return aiLearningModuleRepository.findByIdAndWeek_Subject_Professor_User_Id(id, professor.getId())
-                .orElseThrow(this::resourceNotFound);
-    }
-
-    private ResponseStatusException resourceNotFound() {
-        return new ResponseStatusException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND");
-    }
-
-    private void requireEditable(AiLearningModuleEntity module) {
-        if (module.getStatus() == LessonStatus.APPROVED) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "MODULE_NOT_EDITABLE"
-            );
-        }
-    }
-
-    private void invalidateGeneratedLesson(AiLearningModuleEntity module) {
-        module.setGenerationToken(null);
-        module.setStatus(LessonStatus.PENDING);
-        module.setAiGenerationStatus(AiGenerationStatus.PENDING);
-        module.setGeneratedObjectives(null);
-        module.setGeneratedKnowledge(null);
-        module.setGeneratedExamples(null);
-        module.setGeneratedSummary(null);
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
+        return workflows.getModuleById(id, getCurrentUser(authentication), null);
     }
 
     private UserEntity getCurrentUser(Authentication authentication) {
@@ -422,48 +171,6 @@ public class AiLearningModuleController {
                                 "User not found"
                         )
                 );
-    }
-
-    private AiLearningModuleResponse convertToResponse(
-            AiLearningModuleEntity module
-    ) {
-        AiLearningModuleResponse response =
-                new AiLearningModuleResponse();
-
-        response.setId(module.getId());
-        response.setWeekId(module.getWeek().getId());
-        response.setYoutubeLink(module.getYoutubeLink());
-        response.setAiNotes(module.getAiNotes());
-        response.setLessonText(module.getLessonText());
-        response.setGeneratedObjectives(module.getGeneratedObjectives());
-        response.setGeneratedKnowledge(module.getGeneratedKnowledge());
-        response.setGeneratedExamples(module.getGeneratedExamples());
-        response.setGeneratedSummary(module.getGeneratedSummary());
-        response.setStatus(module.getStatus());
-        response.setAiGenerationStatus(module.getAiGenerationStatus());
-
-        response.setFiles(
-                module.getFiles().stream()
-                        .map(file -> {
-                            AiLearningFileResponse fileResponse =
-                                    new AiLearningFileResponse();
-
-                            fileResponse.setId(file.getId());
-                            fileResponse.setOriginalFileName(
-                                    file.getOriginalFileName()
-                            );
-                            fileResponse.setStoredFileName(
-                                    file.getStoredFileName()
-                            );
-                            fileResponse.setFileType(file.getFileType());
-                            fileResponse.setFilePath(file.getFilePath());
-
-                            return fileResponse;
-                        })
-                        .collect(Collectors.toList())
-        );
-
-        return response;
     }
 
     // Return explicit JSON errors instead of forwarding these failures

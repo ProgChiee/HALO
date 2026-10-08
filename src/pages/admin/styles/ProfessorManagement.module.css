@@ -75,7 +75,7 @@
 
 .tableHeaderRow {
   display: grid;
-  grid-template-columns: 1.3fr 1.6fr 0.7fr 0.7fr 1.3fr 0.9fr;
+  grid-template-columns: 1.3fr 1.6fr 0.7fr 0.7fr 0.9fr;
   gap: var(--space-md);
   padding: var(--space-md) var(--space-lg);
   background: var(--color-bg-topbar);
@@ -87,7 +87,7 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 1.3fr 1.6fr 0.7fr 0.7fr 1.3fr 0.9fr;
+  grid-template-columns: 1.3fr 1.6fr 0.7fr 0.7fr 0.9fr;
   gap: var(--space-md);
   align-items: center;
   padding: var(--space-md) var(--space-lg);
@@ -186,6 +186,13 @@
 }
 
 .modal {
+  box-sizing: border-box;
+  min-width: 0;
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
   width: 100%;
   max-width: 440px;
   background: var(--color-bg-card);
@@ -342,3 +349,20 @@
   font-weight: 600;
   color: var(--color-text-primary);
 }
+/* Keep wide account rows within a local scroll region. */
+.tableCard { max-width: 100%; overflow-x: auto; }
+.tableHeaderRow, .tableRow { min-width: 760px; }
+.tableHeaderRow > *, .tableRow > * { min-width: 0; overflow-wrap: anywhere; }
+.main, .searchWrapper { min-width: 0; }
+.searchInput { box-sizing: border-box; min-width: 0; }
+@media (max-width: 768px) {
+ .toolbarRow { flex-wrap: wrap; gap: 1rem; }
+ .searchWrapper { width: 100%; max-width: 100%; }
+}
+
+@media (max-width: 480px), (max-height: 500px) {
+  .modal { padding: 1rem; }
+  .detailRow { flex-wrap: wrap; gap: 0.5rem; }
+}
+
+.modal .input { box-sizing: border-box; min-width: 0; width: 100%; }

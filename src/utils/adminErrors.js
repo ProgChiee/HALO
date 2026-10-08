@@ -1,6 +1,7 @@
 const MESSAGES = {
   RESOURCE_NOT_FOUND: 'This account or resource no longer exists. Reload the list.',
   INVALID_TARGET_ROLE: 'This account does not have the required role for this action. Reload the list.',
+  PROFESSOR_ID_CONFLICT: 'This Professor ID is already in use. Enter a different Professor ID.',
   EMAIL_ALREADY_EXISTS: 'An account with this email already exists. Use a different email address.',
   VALIDATION_FAILED: 'Check the required fields, email format, and field lengths.',
   ADMIN_REQUEST_FAILED: 'The server could not complete the request. Please try again later.',

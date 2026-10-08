@@ -40,7 +40,7 @@ export default function AdminProfile() {
 
   if (isLoading) {
     return (
-      <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+      <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
         <p className={styles.loadingText}>Loading profile...</p>
       </PageShell>
     );
@@ -48,7 +48,7 @@ export default function AdminProfile() {
 
   if (loadError || !profile) {
     return (
-      <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+      <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
         <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
       </PageShell>
     );
@@ -57,7 +57,7 @@ export default function AdminProfile() {
   const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
 
   return (
-    <PageShell navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+    <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
       <header className={styles.topbar}>
         <div className={styles.breadcrumb}>
           <UserIcon size={16} />
@@ -103,7 +103,7 @@ export default function AdminProfile() {
         </button>
       </main>
 
-      <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
+      <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
     </PageShell>
   );
 }

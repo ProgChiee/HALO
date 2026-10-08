@@ -1,3 +1,4 @@
+import { accountDisplay, accountTick } from '../../../utils/adminAccountDisplay';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState, useMemo, useCallback } from 'react';
 import { Activity, Search, Bot, MessageSquare, Users, TrendingUp, GraduationCap, AlertTriangle } from 'lucide-react';
@@ -48,7 +49,7 @@ function UsageChartTooltip({ active, payload }) {
 
   return (
     <div className={styles.chartTooltip}>
-      <p className={styles.chartTooltipTitle}>{item.name}</p>
+      <p className={styles.chartTooltipTitle}>{accountDisplay(item.name)}</p>
       <p className={styles.chartTooltipRow}>{item.moduleActivities ?? 0} module activities</p>
     </div>
   );
@@ -60,7 +61,7 @@ function QuizChartTooltip({ active, payload }) {
 
   return (
     <div className={styles.chartTooltip}>
-      <p className={styles.chartTooltipTitle}>{item.name}</p>
+      <p className={styles.chartTooltipTitle}>{accountDisplay(item.name)}</p>
       <p className={styles.chartTooltipRow}>{item.latestAssessmentScore}% latest score</p>
     </div>
   );
@@ -74,7 +75,7 @@ export default function Monitoring() {
 
   return (
     <PageShell
-      responsive={isSuperAdmin}
+      responsive
       navItems={isSuperAdmin ? SUPERADMIN_NAV_ITEMS : ADMIN_NAV_ITEMS}
       sectionLabel={isSuperAdmin ? 'Superadmin' : 'Admin'}
       roleBadge={isSuperAdmin ? 'Superadmin' : 'Admin'}
@@ -90,6 +91,7 @@ export default function Monitoring() {
       <div className={`${styles.tabRow} ${isSuperAdmin ? styles.superAdminTabs : ''}`}>
         {tabs.map((tab) => (
           <button
+            aria-pressed={activeTab === tab.id}
             key={tab.id}
             className={`${styles.tabBtn} ${activeTab === tab.id ? styles.tabBtnActive : ''}`}
             onClick={() => setActiveTab(tab.id)}
@@ -99,7 +101,7 @@ export default function Monitoring() {
         ))}
       </div>
 
-      {activeTab === 'activity' && <ActivityLogTab loader={isSuperAdmin ? getActivityLogs : getActivityLog} paginated={isSuperAdmin} />}
+      {activeTab === 'activity' && <ActivityLogTab loader={isSuperAdmin ? getActivityLogs : getActivityLog} paginated />}
       {!isSuperAdmin && activeTab === 'ai-usage' && <AiUsageTab />}
       {!isSuperAdmin && activeTab === 'quiz-performance' && <QuizPerformanceTab />}
       {activeTab === 'admin-activity' && isSuperAdmin && <AdminActivityTab />}
@@ -184,6 +186,7 @@ function ActivityLogTab({ loader, paginated = false }) {
           <input
             type="text"
             className={styles.searchInput}
+            aria-label="Search activity log"
             placeholder="Search activity log"
             maxLength={paginated ? 200 : undefined}
             value={searchQuery}
@@ -194,6 +197,7 @@ function ActivityLogTab({ loader, paginated = false }) {
         <div className={styles.filterRow}>
           {MONITORING_CATEGORIES.map((cat) => (
             <button
+              aria-pressed={activeCategory === cat.id}
               key={cat.id}
               className={`${styles.filterChip} ${activeCategory === cat.id ? styles.filterChipActive : ''}`}
               onClick={() => { setActiveCategory(cat.id); setPage(0); }}
@@ -214,7 +218,7 @@ function ActivityLogTab({ loader, paginated = false }) {
           <div key={log.id} className={styles.logRow}>
             <div className={styles.logContent}>
               <p className={styles.logText}>
-                <span className={styles.activityActor}>{log.userName}</span> {log.action}
+                <span className={styles.activityActor}>{accountDisplay(log.userName)}</span> {log.action}
               </p>
               <p className={styles.logTime}>{new Date(log.createdAt).toLocaleString()}</p>
             </div>
@@ -239,18 +243,17 @@ function ActivityLogTab({ loader, paginated = false }) {
 // Tab 2: AI Usage
 // ---------------------------------------------------------------------------
 function AiUsageTab() {
-  const { data: professors, isLoading, error: loadError, reload: loadData } = useRemoteData(getProfessorMonitoring, []);
+  const [page, setPage] = useState(0);
+  const loader = useCallback(async config => ({ ...await getProfessorMonitoring({ ...config, params: { page, size: 25 } }), requestPage: page }), [page]);
+  const { data, isLoading: loading, error: loadError, reload: loadData } = useRemoteData(loader, { content: [], summary: {}, highlights: [] });
+  const isLoading = loading || (!loadError && data.requestPage !== page);
+  const professors = data.content;
 
   const sortedByActivity = useMemo(() => {
     return [...professors].sort((a, b) => (b.moduleActivities ?? 0) - (a.moduleActivities ?? 0));
   }, [professors]);
 
-  const mostRecentlyActive = useMemo(() => {
-    return [...professors]
-      .filter((p) => p.lastActivity)
-      .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity))
-      .slice(0, 8);
-  }, [professors]);
+  const mostRecentlyActive = data.highlights.filter(p => p.lastActivity);
 
   if (isLoading) {
     return <div className={styles.main}><p className={styles.loadingText}>Loading professor activity...</p></div>;
@@ -267,16 +270,16 @@ function AiUsageTab() {
     );
   }
 
-  const activeCount = professors.filter((p) => p.status === 'ACTIVE').length;
-  const totalActivities = professors.reduce((sum, p) => sum + (p.moduleActivities ?? 0), 0);
-  const avgActivities = professors.length > 0 ? Math.round(totalActivities / professors.length) : 0;
+  const activeCount = data.summary.active ?? 0;
+  const totalActivities = data.summary.moduleActivities ?? 0;
+  const avgActivities = data.totalElements > 0 ? Math.round(totalActivities / data.totalElements) : 0;
 
   return (
     <main className={styles.main}>
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><Users size={18} /></div>
-          <p className={styles.statValue}>{professors.length}</p>
+          <p className={styles.statValue}>{data.totalElements}</p>
           <p className={styles.statLabel}>Total professors</p>
         </div>
         <div className={styles.statCard}>
@@ -298,8 +301,8 @@ function AiUsageTab() {
 
       <div className={styles.bottomGrid}>
         <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Module Activities by Professor (top 25)</h2>
-          <ResponsiveContainer width="100%" height={Math.max(Math.min(sortedByActivity.length, 25) * 42, 200)}>
+          <h2 className={styles.panelTitle}>Module Activities by Professor (ranked page)</h2>
+          <div className={styles.chartScroll} role="region" aria-label="Monitoring chart, scroll horizontally" tabIndex={0}><div className={styles.chartCanvas}><ResponsiveContainer width="100%" height={Math.max(Math.min(sortedByActivity.length, 25) * 42, 200)}>
             <BarChart
               data={sortedByActivity.slice(0, 25)}
               layout="vertical"
@@ -322,7 +325,7 @@ function AiUsageTab() {
                 fontSize={11}
                 tickLine={false}
                 axisLine={{ stroke: CHART_COLORS.grid }}
-                tickFormatter={(name) => (name.length > 22 ? `${name.slice(0, 22)}…` : name)}
+                tickFormatter={accountTick}
               />
               <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<UsageChartTooltip />} />
               <Bar dataKey="moduleActivities" radius={[0, 4, 4, 0]} maxBarSize={18}>
@@ -334,7 +337,7 @@ function AiUsageTab() {
                 ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer></div></div>
         </div>
 
         <div className={styles.panelCard}>
@@ -344,7 +347,7 @@ function AiUsageTab() {
               <div key={prof.userId} className={styles.topicRow}>
                 <div className={styles.topicRank}>{prof.moduleActivities}</div>
                 <div>
-                  <p className={styles.topicText}>{prof.name}</p>
+                  <p className={styles.topicText}>{accountDisplay(prof.name)}</p>
                   <p className={styles.topicSubject}>{new Date(prof.lastActivity).toLocaleString()}</p>
                 </div>
               </div>
@@ -355,6 +358,12 @@ function AiUsageTab() {
           </div>
         </div>
       </div>
+      {!data.content.length && <p className={styles.emptyState}>No monitoring records on this page.</p>}
+      <nav aria-label="Monitoring pages" className={styles.toolbarRow}>
+        <button className={styles.retryBtn} disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button>
+        <span>Page {data.totalPages === 0 ? 0 : data.number + 1} of {data.totalPages}</span>
+        <button className={styles.retryBtn} disabled={page + 1 >= data.totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+      </nav>
     </main>
   );
 }
@@ -363,7 +372,11 @@ function AiUsageTab() {
 // Tab 3: Quiz Performance
 // ---------------------------------------------------------------------------
 function QuizPerformanceTab() {
-  const { data: students, isLoading, error: loadError, reload: loadData } = useRemoteData(getStudentMonitoring, []);
+  const [page, setPage] = useState(0);
+  const loader = useCallback(async config => ({ ...await getStudentMonitoring({ ...config, params: { page, size: 25 } }), requestPage: page }), [page]);
+  const { data, isLoading: loading, error: loadError, reload: loadData } = useRemoteData(loader, { content: [], summary: {}, highlights: [] });
+  const isLoading = loading || (!loadError && data.requestPage !== page);
+  const students = data.content;
 
   // Only students with at least one scored assessment show up in the chart
   const scoredStudents = useMemo(
@@ -375,9 +388,7 @@ function QuizPerformanceTab() {
     return [...scoredStudents].sort((a, b) => b.latestAssessmentScore - a.latestAssessmentScore);
   }, [scoredStudents]);
 
-  const lowestScoring = useMemo(() => {
-    return [...scoredStudents].sort((a, b) => a.latestAssessmentScore - b.latestAssessmentScore).slice(0, 8);
-  }, [scoredStudents]);
+  const lowestScoring = data.highlights;
 
   if (isLoading) {
     return <div className={styles.main}><p className={styles.loadingText}>Loading quiz performance data...</p></div>;
@@ -400,10 +411,8 @@ function QuizPerformanceTab() {
     return CHART_COLORS.bar;
   }
 
-  const avgScoreOverall = scoredStudents.length > 0
-    ? Math.round(scoredStudents.reduce((sum, s) => sum + s.latestAssessmentScore, 0) / scoredStudents.length)
-    : 0;
-  const totalPassedAssessments = students.reduce((sum, s) => sum + (s.passedAssessments ?? 0), 0);
+  const avgScoreOverall = Math.round(data.summary.averageScore ?? 0);
+  const totalPassedAssessments = data.summary.passedAssessments ?? 0;
 
   return (
     <main className={styles.main}>
@@ -420,20 +429,20 @@ function QuizPerformanceTab() {
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><Users size={18} /></div>
-          <p className={styles.statValue}>{scoredStudents.length}</p>
+          <p className={styles.statValue}>{data.summary.scored ?? 0}</p>
           <p className={styles.statLabel}>Students with a scored attempt</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><MessageSquare size={18} /></div>
-          <p className={styles.statValue}>{students.length}</p>
+          <p className={styles.statValue}>{data.totalElements}</p>
           <p className={styles.statLabel}>Total students</p>
         </div>
       </div>
 
       <div className={styles.bottomGrid}>
         <div className={styles.panelCard}>
-          <h2 className={styles.panelTitle}>Latest Score by Student (top 25)</h2>
-          <ResponsiveContainer width="100%" height={Math.max(Math.min(sortedByScore.length, 25) * 42, 200)}>
+          <h2 className={styles.panelTitle}>Latest Score by Student (ranked page)</h2>
+          <div className={styles.chartScroll} role="region" aria-label="Monitoring chart, scroll horizontally" tabIndex={0}><div className={styles.chartCanvas}><ResponsiveContainer width="100%" height={Math.max(Math.min(sortedByScore.length, 25) * 42, 200)}>
             <BarChart
               data={sortedByScore.slice(0, 25)}
               layout="vertical"
@@ -458,7 +467,7 @@ function QuizPerformanceTab() {
                 fontSize={11}
                 tickLine={false}
                 axisLine={{ stroke: CHART_COLORS.grid }}
-                tickFormatter={(name) => (name.length > 22 ? `${name.slice(0, 22)}…` : name)}
+                tickFormatter={accountTick}
               />
               <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<QuizChartTooltip />} />
               <Bar dataKey="latestAssessmentScore" radius={[0, 4, 4, 0]} maxBarSize={18}>
@@ -467,7 +476,7 @@ function QuizPerformanceTab() {
                 ))}
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer></div></div>
           <div className={styles.legendRow}>
             <span className={styles.legendItem}><span className={`${styles.legendDot} ${styles.legendDotGood}`} /> 75%+</span>
             <span className={styles.legendItem}><span className={`${styles.legendDot} ${styles.legendDotMid}`} /> 60–74%</span>
@@ -485,7 +494,7 @@ function QuizPerformanceTab() {
                   <AlertTriangle size={14} />
                 </div>
                 <div>
-                  <p className={styles.topicText}>{student.name}</p>
+                  <p className={styles.topicText}>{accountDisplay(student.name)}</p>
                   <p className={styles.topicSubject}>
                     {student.section} · {student.latestAssessmentScore}% latest score
                   </p>
@@ -498,6 +507,12 @@ function QuizPerformanceTab() {
           </div>
         </div>
       </div>
+      {!data.content.length && <p className={styles.emptyState}>No monitoring records on this page.</p>}
+      <nav aria-label="Monitoring pages" className={styles.toolbarRow}>
+        <button className={styles.retryBtn} disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button>
+        <span>Page {data.totalPages === 0 ? 0 : data.number + 1} of {data.totalPages}</span>
+        <button className={styles.retryBtn} disabled={page + 1 >= data.totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+      </nav>
     </main>
   );
 }
@@ -515,7 +530,7 @@ function AdminActivityTab() {
     <div className={styles.logCard}>
       {admins.map((admin) => <div key={admin.adminId} className={styles.logRow}>
         <div className={styles.logContent}>
-          <p className={styles.logText}>{admin.name}: {admin.accountActivities ?? 0} account activities</p>
+          <p className={styles.logText}>{accountDisplay(admin.name)}: {admin.accountActivities ?? 0} account activities</p>
           <p className={styles.logTime}>{admin.lastActivity ? new Date(admin.lastActivity).toLocaleString() : 'No activity yet'}</p>
         </div>
         <span className={styles.logCategoryTag}>{admin.status}</span>

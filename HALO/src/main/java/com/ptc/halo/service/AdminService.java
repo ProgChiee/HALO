@@ -58,6 +58,9 @@ public class AdminService {
             throw new AdminApiException(AdminApiException.Code.EMAIL_ALREADY_EXISTS);
         }
         
+        request.setProfessorId(request.getProfessorId());
+        if (professorRepository.existsNormalizedProfessorId(request.getProfessorId(), null))
+            throw new AdminApiException(AdminApiException.Code.PROFESSOR_ID_CONFLICT);
         UserEntity professor = new UserEntity();
 
         professor.setName(request.getName());
@@ -150,6 +153,9 @@ public class AdminService {
                         new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                 );
 
+        request.setProfessorId(request.getProfessorId());
+        if (professorRepository.existsNormalizedProfessorId(request.getProfessorId(), professor.getId()))
+            throw new AdminApiException(AdminApiException.Code.PROFESSOR_ID_CONFLICT);
         UserEntity user = professor.getUser();
         request.setEmail(request.getEmail());
         if (userRepository.existsNormalizedEmail(request.getEmail(), user.getId()))
@@ -181,7 +187,7 @@ public class AdminService {
         return response;
     }
     @org.springframework.transaction.annotation.Transactional
-    public ProfessorResponse changeProfessorStatus(Long id, UserEntity admin){
+    public ProfessorResponse changeProfessorStatus(Long id, Status desiredStatus, UserEntity admin){
 
         UserEntity professorUser = userRepository.findById(id)
                 .orElseThrow(() ->
@@ -193,11 +199,7 @@ public class AdminService {
             throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
         }
 
-        if(professorUser.getStatus() == Status.ACTIVE){
-            professorUser.setStatus(Status.INACTIVE);
-        }else{
-            professorUser.setStatus(Status.ACTIVE);
-        }
+        professorUser.setStatus(desiredStatus);
 
 
         UserEntity updatedUser = userRepository.save(professorUser);
@@ -205,7 +207,7 @@ public class AdminService {
         activityLogService.createLog(
                 admin,
                 ActivityType.ACCOUNT,
-                "Changed Professor status to "
+                "Set Professor status to "
                         + updatedUser.getStatus()
                         + ": "
                         + updatedUser.getEmail()
@@ -272,7 +274,7 @@ public class AdminService {
         return response;
     }
     @org.springframework.transaction.annotation.Transactional
-    public StudentListResponse changeStudentStatus(Long id, UserEntity admin){
+    public StudentListResponse changeStudentStatus(Long id, Status desiredStatus, UserEntity admin){
 
         UserEntity student = userRepository.findById(id)
                 .orElseThrow(() ->
@@ -283,11 +285,7 @@ public class AdminService {
             throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
         }
 
-        if(student.getStatus() == Status.ACTIVE){
-            student.setStatus(Status.INACTIVE);
-        }else{
-            student.setStatus(Status.ACTIVE);
-        }
+        student.setStatus(desiredStatus);
 
 
         UserEntity updatedStudent = userRepository.save(student);
@@ -295,7 +293,7 @@ public class AdminService {
         activityLogService.createLog(
                 admin,
                 ActivityType.ACCOUNT,
-                "Changed Student status to "
+                "Set Student status to "
                         + updatedStudent.getStatus()
                         + ": "
                         + updatedStudent.getEmail()

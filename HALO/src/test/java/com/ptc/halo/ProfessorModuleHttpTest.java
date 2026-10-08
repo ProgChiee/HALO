@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AiLearningModuleController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class})
+@Import({com.ptc.halo.service.ProfessorModuleService.class,SecurityConfig.class, JwtAuthenticationFilter.class})
 class ProfessorModuleHttpTest {
  @Autowired MockMvc mvc;
  @MockBean AiLearningModuleRepository modules;

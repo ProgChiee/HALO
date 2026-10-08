@@ -56,7 +56,15 @@ public class AiGenerationService {
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public AiLearningModuleEntity generateLesson(Long moduleId) {
 
-        AiLearningModuleEntity module = generationState.begin(moduleId);
+        var module = generatePrepared(moduleId, generationState.begin(moduleId));
+        var saved = generationState.finish(moduleId, module);
+        if (module.getAiGenerationStatus() == AiGenerationStatus.FAILED) throw generationFailed();
+        return saved;
+    }
+
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public AiLearningModuleEntity generatePrepared(Long moduleId, AiLearningModuleEntity module) {
+
 
         try {
 
@@ -157,7 +165,7 @@ public class AiGenerationService {
                         moduleId
                 );
 
-                return generationState.finish(moduleId, module);
+                return module;
             }
 
             // =====================================================
@@ -200,7 +208,7 @@ public class AiGenerationService {
                     moduleId
             );
 
-            return generationState.finish(moduleId, module);
+            return module;
 
         } catch (org.springframework.dao.OptimisticLockingFailureException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "STALE_MODULE_OPERATION");
@@ -219,20 +227,14 @@ public class AiGenerationService {
                     AiGenerationStatus.FAILED
             );
 
-            try {
-                generationState.finish(moduleId, module);
-            } catch (org.springframework.dao.OptimisticLockingFailureException stale) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "STALE_MODULE_OPERATION");
-            }
-
-            log.error("AI lesson generation FAILED moduleId={} exceptionType={}",
-                    moduleId, e.getClass().getSimpleName());
-
-            // This method intentionally has no encompassing transaction: the FAILED
-            // repository save must persist even though the request returns an error.
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "AI generation failed. Check the backend AI configuration and uploaded files, then retry.", e);
+            log.error("AI lesson generation FAILED moduleId={} exceptionType={}", moduleId, e.getClass().getSimpleName());
+            return module;
         }
+    }
+
+    public ResponseStatusException generationFailed() {
+        return new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+            "AI generation failed. Check the backend AI configuration and uploaded files, then retry.");
     }
 
     // =========================================================

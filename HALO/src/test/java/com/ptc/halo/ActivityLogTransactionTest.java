@@ -16,17 +16,17 @@ class ActivityLogTransactionTest {
  @Test void lazyUserMappingOccursInsideReadOnlyTransaction() {
   var repository = mock(ActivityLogRepository.class); var log = mock(ActivityLogEntity.class);
   var user = new UserEntity(); user.setName("Admin"); user.setEmail("test@example.test"); user.setRole(Role.ADMIN);
-  when(repository.findByUser_RoleOrderByCreatedAtDesc(Role.ADMIN)).thenReturn(java.util.List.of(log));
+  when(repository.findAdminLogs(eq(Role.ADMIN), isNull(), eq(""), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(log)));
   when(log.getUser()).thenAnswer(inv -> {
    if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new LazyInitializationException("no persistence context");
    return user;
   });
   var service = new ActivityLogService(repository);
-  assertThrows(LazyInitializationException.class, () -> service.getLogs(Role.ADMIN, null));
+  assertThrows(LazyInitializationException.class, () -> service.getLogs(Role.ADMIN, null, 0, 20, ""));
   var factory = new ProxyFactory(service); factory.setProxyTargetClass(true);
   factory.addAdvice(new TransactionInterceptor(new StudentLessonTransactionTest.TestTransactions(), new AnnotationTransactionAttributeSource()));
-  var results = ((ActivityLogService) factory.getProxy()).getLogs(Role.ADMIN, null);
-  assertEquals("Admin", results.get(0).getUserName()); assertEquals("test@example.test", results.get(0).getUserEmail());
+  var results = ((ActivityLogService) factory.getProxy()).getLogs(Role.ADMIN, null, 0, 20, "");
+  assertEquals("Admin", results.getContent().get(0).getUserName()); assertEquals("test@example.test", results.getContent().get(0).getUserEmail());
   assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
  }
 }

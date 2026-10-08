@@ -10,7 +10,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
 // Scoped Professor validation and safe request failures.
-@RestControllerAdvice(assignableTypes = {ProfessorAcademicController.class, AiLearningModuleController.class, ProfessorDashboardController.class, ProfessorProfileController.class, ProfessorStudentController.class})
+@RestControllerAdvice(assignableTypes = {AdminProfessorModeController.class, ProfessorAcademicController.class, AiLearningModuleController.class, ProfessorDashboardController.class, ProfessorProfileController.class, ProfessorStudentController.class})
 public class ProfessorValidationHandler extends ProfessorErrorResponses {
     private ResponseEntity<?> invalid(Map<String, String> fields) {
         return ResponseEntity.badRequest().body(Map.of("status", 400, "code", "VALIDATION_FAILED",

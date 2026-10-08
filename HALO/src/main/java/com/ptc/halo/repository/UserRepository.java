@@ -13,6 +13,17 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     @org.springframework.data.jpa.repository.Query("select u from UserEntity u where u.id = :id")
     Optional<UserEntity> findForAssessmentLifecycle(@org.springframework.data.repository.query.Param("id") Long id);
 
+    @org.springframework.data.jpa.repository.Query("""
+        select new com.ptc.halo.dtoResponse.AdminActingTargetResponse(u.id, u.name, u.email, u.role)
+        from UserEntity u where u.role = :role and u.status = com.ptc.halo.enums.Status.ACTIVE
+        and (:search = '' or locate(:search, lower(coalesce(u.name, ''))) > 0
+             or locate(:search, lower(coalesce(u.email, ''))) > 0)
+        """)
+    org.springframework.data.domain.Page<com.ptc.halo.dtoResponse.AdminActingTargetResponse> findActingTargets(
+        @org.springframework.data.repository.query.Param("role") Role role,
+        @org.springframework.data.repository.query.Param("search") String search,
+        org.springframework.data.domain.Pageable pageable);
+
     // Scalar aggregates avoid multiplying counts across progress, attempts, and badges.
     // No lazy entities or per-student repository calls are used by the summary page.
     @org.springframework.data.jpa.repository.Query(value = """

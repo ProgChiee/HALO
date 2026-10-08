@@ -488,3 +488,15 @@
   .superAdminActivity .summaryCard { min-width: 0; }
   .superAdminActivity .logRow { flex-wrap: wrap; }
 }
+
+.main, .panelCard { min-width: 0; overflow-wrap: anywhere; }
+.bottomGrid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.chartScroll { max-width: 100%; overflow-x: auto; }
+.chartCanvas { min-width: 420px; }
+@media (max-width: 768px) {
+ .tabRow, .summaryRow { flex-wrap: wrap; }
+ .tabRow { padding: 1rem 1rem 0; }
+ .summaryCard { min-width: 0; flex: 1 1 140px; }
+ .logRow { flex-wrap: wrap; }
+ .logText, .topicText { overflow-wrap: anywhere; }
+}

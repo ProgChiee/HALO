@@ -191,3 +191,9 @@
 .subtext { color: var(--color-text-muted); margin-bottom: var(--space-lg); }
 .sectionTitle { font-size: var(--text-base); margin-bottom: var(--space-md); }
 .activityActor { font-weight: 600; }
+
+.main, .statCard { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 768px) {
+ .activityRow { flex-wrap: wrap; }
+ .activityText { min-width: 0; overflow-wrap: anywhere; }
+}

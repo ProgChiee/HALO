@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect","spring.jpa.open-in-view=false"},showSql=false)
-@Import({AiLearningModuleController.class,ModuleFileTransactionTest.Config.class})
+@Import({com.ptc.halo.service.ProfessorModuleService.class,AiLearningModuleController.class,ModuleFileTransactionTest.Config.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class ModuleFileTransactionTest {
  static Path directory;

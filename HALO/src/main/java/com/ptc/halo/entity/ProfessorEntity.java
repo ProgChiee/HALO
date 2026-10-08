@@ -27,7 +27,7 @@ public class ProfessorEntity {
     }
 
     public void setProfessorId(String professorId) {
-        this.professorId = professorId;
+        this.professorId = professorId == null ? null : professorId.trim();
     }
 
     public UserEntity getUser() {

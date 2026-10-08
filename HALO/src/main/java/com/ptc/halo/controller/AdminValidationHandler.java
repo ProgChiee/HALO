@@ -9,7 +9,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
-@RestControllerAdvice(assignableTypes = {AdminController.class, AdminDashboardController.class,
+@RestControllerAdvice(assignableTypes = {AdminActingController.class, AdminController.class, AdminDashboardController.class,
         AdminProfessorMonitoringController.class, AdminStudentMonitoringController.class})
 public class AdminValidationHandler {
     private ResponseEntity<?> response(int status, String code, String message) {
@@ -22,6 +22,8 @@ public class AdminValidationHandler {
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ResponseEntity<?> integrity(org.springframework.dao.DataIntegrityViolationException error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause.getMessage() != null && cause.getMessage().toLowerCase(java.util.Locale.ROOT).contains("uk_professor_id_normalized"))
+                return business(new com.ptc.halo.service.AdminApiException(com.ptc.halo.service.AdminApiException.Code.PROFESSOR_ID_CONFLICT));
             if (cause.getMessage() != null && cause.getMessage().toLowerCase(java.util.Locale.ROOT).contains("uk_user_email_normalized"))
                 return business(new com.ptc.halo.service.AdminApiException(com.ptc.halo.service.AdminApiException.Code.EMAIL_ALREADY_EXISTS));
         }

@@ -23,6 +23,18 @@ public interface ActivityLogRepository
         @org.springframework.data.repository.query.Param("type") ActivityType type,
         @org.springframework.data.repository.query.Param("search") String search,
         org.springframework.data.domain.Pageable pageable);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "user")
+    @org.springframework.data.jpa.repository.Query("""
+        select l from ActivityLogEntity l join l.user u
+        where (:role is null or u.role = :role) and (:type is null or l.activityType = :type)
+        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0)
+        """)
+    org.springframework.data.domain.Page<ActivityLogEntity> findAdminLogs(
+        @org.springframework.data.repository.query.Param("role") Role role,
+        @org.springframework.data.repository.query.Param("type") ActivityType type,
+        @org.springframework.data.repository.query.Param("search") String search,
+        org.springframework.data.domain.Pageable pageable);
+
     interface AdminActivitySummary {
         Long getAdminId(); Long getAccountActivities(); java.time.LocalDateTime getLastActivity();
     }

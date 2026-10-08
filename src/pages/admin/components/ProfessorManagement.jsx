@@ -1,6 +1,8 @@
+import Dialog from '../../../components/shared/Dialog';
+import { accountText, accountDisplay, accountInitial } from '../../../utils/adminAccountDisplay';
 import { adminErrorMessage } from '../../../utils/adminErrors';
 import { validateProfessor, professorValidationError } from '../../../utils/adminProfessorValidation';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { GraduationCap, Search, Plus, Eye, Pencil, Power, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
@@ -10,7 +12,7 @@ import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationD
 import {
   getProfessors,
   createProfessor,
-  toggleProfessorStatus,
+  setProfessorStatus,
   updateProfessor,
 } from '../../../services/admin/adminService';
 import { useRemoteData } from '../../../hooks/useRemoteData';
@@ -37,7 +39,19 @@ export default function ProfessorManagement() {
   const { role } = useAuth();
   const isSuperAdmin = role === 'superadmin';
 
-  const { data: professors, setData: setProfessors, isLoading, error: loadError, reload: loadProfessors } = useRemoteData(getProfessors, []);
+  const mutationVersion = useRef(0);
+  const [statusUpdates, setStatusUpdates] = useState({});
+  const fetchProfessors = useCallback(async (config) => {
+    const version = mutationVersion.current;
+    return { rows: await getProfessors(config), version };
+  }, []);
+  const { data: snapshot, isLoading, error: loadError, reload: loadProfessors } = useRemoteData(fetchProfessors, { rows: [], version: 0 });
+  // A GET started before a committed status mutation cannot replace that status.
+  // Preserve the GET's other fields (for example a freshly edited name/email).
+  const professors = useMemo(() => snapshot.rows.map(professor => {
+    const update = statusUpdates[professor.id];
+    return update && update.version > snapshot.version ? { ...professor, status: update.status } : professor;
+  }), [snapshot, statusUpdates]);
   const toggleLock = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -52,24 +66,52 @@ export default function ProfessorManagement() {
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function refetchProfessors() {
-    try {
-    const data = await getProfessors();
-    setProfessors(data);
-    return data;
-    } catch {
-      showToast("Saved, but the list could not refresh. Reload the page.", 'error');
-    }
+  const mounted = useRef(false);
+  const modalIdentity = useRef(null);
+  const pendingOperation = useRef(null);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; modalIdentity.current = null; pendingOperation.current = null; };
+  }, []);
+
+  function closeModal() {
+    if (pendingOperation.current) return;
+    modalIdentity.current = null;
+    setShowCreateModal(false);
+    setEditingProfessor(null);
+    setViewingProfessor(null);
+  }
+  function beginModal() {
+    if (!mounted.current || pendingOperation.current) return false;
+    closeModal();
+    modalIdentity.current = Symbol('professor-modal');
+    return true;
+  }
+  function openViewModal(professor) {
+    if (beginModal()) setViewingProfessor(professor);
+  }
+  function startOperation() {
+    if (!mounted.current || pendingOperation.current || !modalIdentity.current) return null;
+    const operation = { modal: modalIdentity.current };
+    pendingOperation.current = operation;
+    setIsSubmitting(true);
+    return () => mounted.current && pendingOperation.current === operation && modalIdentity.current === operation.modal;
+  }
+
+  async function refetchProfessors(isCurrent) {
+    const refreshed = await loadProfessors();
+    if (!refreshed && isCurrent()) showToast("Saved, but the list could not refresh. Reload the page.", 'error');
   }
 
   const filteredProfessors = useMemo(() => {
     return professors.filter((p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.email.toLowerCase().includes(searchQuery.toLowerCase())
+      accountText(p.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      accountText(p.email).toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [professors, searchQuery]);
 
   function openCreateModal() {
+    if (!beginModal()) return;
     setName('');
     setEmail('');
     setPassword('');
@@ -80,22 +122,24 @@ export default function ProfessorManagement() {
 
   async function handleCreate(e) {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (pendingOperation.current || !modalIdentity.current) return;
     setFormError('');
 
     const validationError = validateProfessor({ name, email, password, professorId }, true);
     if (validationError) { setFormError(validationError); return; }
 
-    setIsSubmitting(true);
+    const isCurrent = startOperation();
+    if (!isCurrent) return;
     try {
       await createProfessor({ name: name.trim(), email: email.trim().toLowerCase(), password, professorId: professorId.trim() });
+      if (!isCurrent()) return;
       showToast('Professor account created.', 'success');
-      setShowCreateModal(false);
-      await refetchProfessors();
+      await refetchProfessors(isCurrent);
+      if (isCurrent()) setShowCreateModal(false);
     } catch (error) {
-      setFormError(professorValidationError(error));
+      if (isCurrent()) setFormError(professorValidationError(error));
     } finally {
-      setIsSubmitting(false);
+      if (isCurrent()) { pendingOperation.current = null; setIsSubmitting(false); }
     }
   }
 
@@ -104,49 +148,54 @@ export default function ProfessorManagement() {
     toggleLock.current = true;
     setTogglingId(professor.id);
     try {
-      const updated = await toggleProfessorStatus(professor.id);
-      setProfessors((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+      const updated = await setProfessorStatus(professor.id, professor.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
+      if (!mounted.current) return;
+      const version = ++mutationVersion.current;
+      setStatusUpdates(previous => ({ ...previous, [updated.id]: { status: updated.status, version } }));
       setViewingProfessor((previous) => previous?.id === updated.id ? updated : previous);
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
     } catch (error) {
-      showToast(adminErrorMessage(error), 'error');
+      if (mounted.current) showToast(adminErrorMessage(error), 'error');
     } finally {
       toggleLock.current = false;
-      setTogglingId(null);
+      if (mounted.current) setTogglingId(null);
     }
   }
 
   function openEditModal(professor) {
+    if (!beginModal()) return;
     setEditingProfessor(professor);
-    setName(professor.name);
-    setEmail(professor.email);
-    setProfessorId(professor.professorId);
+    setName(accountText(professor.name));
+    setEmail(accountText(professor.email));
+    setProfessorId(accountText(professor.professorId));
     setFormError('');
   }
 
   async function handleSaveEdit(e) {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (pendingOperation.current || !modalIdentity.current) return;
     setFormError('');
 
     const validationError = validateProfessor({ name, email, professorId });
     if (validationError) { setFormError(validationError); return; }
 
-    setIsSubmitting(true);
+    const isCurrent = startOperation();
+    if (!isCurrent) return;
     try {
       await updateProfessor(editingProfessor.id, { name: name.trim(), email: email.trim().toLowerCase(), professorId: professorId.trim() });
+      if (!isCurrent()) return;
       showToast('Professor info updated.', 'success');
-      setEditingProfessor(null);
-      await refetchProfessors();
+      await refetchProfessors(isCurrent);
+      if (isCurrent()) setEditingProfessor(null);
     } catch (error) {
-      setFormError(professorValidationError(error));
+      if (isCurrent()) setFormError(professorValidationError(error));
     } finally {
-      setIsSubmitting(false);
+      if (isCurrent()) { pendingOperation.current = null; setIsSubmitting(false); }
     }
   }
 
   return (
-    <PageShell
+    <PageShell responsive
       navItems={isSuperAdmin ? SUPERADMIN_NAV_ITEMS : ADMIN_NAV_ITEMS}
       sectionLabel={isSuperAdmin ? 'Superadmin' : 'Admin'}
       roleBadge={isSuperAdmin ? 'Superadmin' : 'Admin'}
@@ -165,12 +214,13 @@ export default function ProfessorManagement() {
             <input
               type="text"
               className={styles.searchInput}
+              aria-label="Search professors"
               placeholder="Search professors"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button onClick={openCreateModal}>
+          <Button onClick={openCreateModal} disabled={isSubmitting}>
             <Plus size={16} style={{ marginRight: 6 }} />
             Create Professor
           </Button>
@@ -189,31 +239,34 @@ export default function ProfessorManagement() {
             </button>
           </div>
         ) : (
-          <div className={styles.tableCard}>
-            <div className={styles.tableHeaderRow}>
-              <span>Name</span>
-              <span>Email</span>
-              <span>Professor ID</span>
-              <span>Status</span>
-              <span>Actions</span>
+          <div className={styles.tableCard} role="region" aria-label="Accounts table, scroll horizontally" tabIndex={0}>
+            <div role="table" aria-label="Professors">
+            <div role="row" className={styles.tableHeaderRow}>
+              <span role="columnheader" id="professor-column-1">Name</span>
+              <span role="columnheader" id="professor-column-2">Email</span>
+              <span role="columnheader" id="professor-column-3">Professor ID</span>
+              <span role="columnheader" id="professor-column-4">Status</span>
+              <span role="columnheader" id="professor-column-5">Actions</span>
             </div>
 
             {filteredProfessors.map((prof) => (
               <div
+                role="row"
                 key={prof.id}
                 className={`${styles.tableRow} ${styles.tableRowClickable}`}
-                onClick={() => setViewingProfessor(prof)}
+                onClick={() => openViewModal(prof)}
               >
-                <span className={styles.profName}>{prof.name}</span>
-                <span className={styles.profEmail}>{prof.email}</span>
-                <span className={styles.profCount}>{prof.professorId}</span>
-                <span className={`${styles.statusText} ${styles[`status_${prof.status?.toLowerCase()}`]}`}>
+                <span role="cell" aria-describedby="professor-column-1" className={styles.profName}>{accountDisplay(prof.name)}</span>
+                <span role="cell" aria-describedby="professor-column-2" className={styles.profEmail}>{accountDisplay(prof.email, 'Email not provided')}</span>
+                <span role="cell" aria-describedby="professor-column-3" className={styles.profCount}>{prof.professorId}</span>
+                <span role="cell" aria-describedby="professor-column-4" className={`${styles.statusText} ${styles[`status_${prof.status?.toLowerCase()}`]}`}>
                   {STATUS_LABELS[prof.status] ?? prof.status}
                 </span>
-                <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
+                <span role="cell" aria-describedby="professor-column-5" className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
                     className={styles.actionBtn}
-                    onClick={() => setViewingProfessor(prof)}
+                    onClick={() => openViewModal(prof)}
+                    disabled={isSubmitting}
                     aria-label="View"
                   >
                     <Eye size={15} />
@@ -221,6 +274,7 @@ export default function ProfessorManagement() {
                   <button
                     className={styles.actionBtn}
                     onClick={() => openEditModal(prof)}
+                    disabled={isSubmitting}
                     aria-label="Edit"
                   >
                     <Pencil size={15} />
@@ -240,16 +294,16 @@ export default function ProfessorManagement() {
             {filteredProfessors.length === 0 && (
               <p className={styles.emptyState}>No professors match your search.</p>
             )}
+            </div>
           </div>
         )}
       </main>
 
       {showCreateModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <Dialog labelledBy="professor-create-title" onClose={closeModal} busy={isSubmitting} className={styles.modal}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Create Professor Account</h3>
-              <button className={styles.closeBtn} onClick={() => setShowCreateModal(false)} aria-label="Close">
+              <h3 id="professor-create-title" className={styles.modalTitle}>Create Professor Account</h3>
+              <button disabled={isSubmitting} className={styles.closeBtn} onClick={closeModal} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
@@ -259,40 +313,44 @@ export default function ProfessorManagement() {
 
             <form onSubmit={handleCreate} className={styles.form}>
               <div className={styles.field}>
-                <label className={styles.label}>Fullname</label>
+                <label htmlFor="professor-name" className={styles.label}>Fullname</label>
                 <input
                   type="text"
                   className={styles.input}
+                  id="professor-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Email</label>
+                <label htmlFor="professor-email" className={styles.label}>Email</label>
                 <input
                   type="email"
                   className={styles.input}
+                  id="professor-email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Professor ID</label>
+                <label htmlFor="professor-professorId" className={styles.label}>Professor ID</label>
                 <input
                   type="text"
                   className={styles.input}
+                  id="professor-professorId"
                   value={professorId}
                   onChange={(e) => setProfessorId(e.target.value)}
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Initial password</label>
+                <label htmlFor="professor-password" className={styles.label}>Initial password</label>
                 <input
                   type="password"
                   className={styles.input}
+                  id="professor-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 8 characters"
@@ -303,24 +361,22 @@ export default function ProfessorManagement() {
 
               <Button type="submit" isLoading={isSubmitting}>Create Professor</Button>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {viewingProfessor && (
-        <div className={styles.modalOverlay} onClick={() => setViewingProfessor(null)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <Dialog labelledBy="professor-view-title" onClose={closeModal} busy={isSubmitting} className={styles.modal}>
             <div className={styles.modalHeader}>
               <div className={styles.profileHeaderRow}>
                 <div className={styles.profileAvatar}>
-                  {viewingProfessor.name.replace(/^(Dr\.|Prof\.)\s*/, '').charAt(0)}
+                  {accountInitial(viewingProfessor.name, true)}
                 </div>
                 <div>
-                  <h3 className={styles.modalTitle}>{viewingProfessor.name}</h3>
-                  <p className={styles.profileEmail}>{viewingProfessor.email}</p>
+                  <h3 id="professor-view-title" className={styles.modalTitle}>{accountDisplay(viewingProfessor.name)}</h3>
+                  <p className={styles.profileEmail}>{accountDisplay(viewingProfessor.email, 'Email not provided')}</p>
                 </div>
               </div>
-              <button className={styles.closeBtn} onClick={() => setViewingProfessor(null)} aria-label="Close">
+              <button disabled={isSubmitting} className={styles.closeBtn} onClick={closeModal} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
@@ -337,54 +393,55 @@ export default function ProfessorManagement() {
                 </span>
               </div>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {editingProfessor && (
-        <div className={styles.modalOverlay} onClick={() => setEditingProfessor(null)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <Dialog labelledBy="professor-edit-title" onClose={closeModal} busy={isSubmitting} className={styles.modal}>
             <div className={styles.modalHeader}>
               <div className={styles.profileHeaderRow}>
                 <div className={styles.profileAvatar}>
-                  {editingProfessor.name.replace(/^(Dr\.|Prof\.)\s*/, '').charAt(0)}
+                  {accountInitial(editingProfessor.name, true)}
                 </div>
                 <div>
-                  <h3 className={styles.modalTitle}>Edit Professor Account</h3>
-                  <p className={styles.profileEmail}>{editingProfessor.email}</p>
+                  <h3 id="professor-edit-title" className={styles.modalTitle}>Edit Professor Account</h3>
+                  <p className={styles.profileEmail}>{accountDisplay(editingProfessor.email, 'Email not provided')}</p>
                 </div>
               </div>
-              <button className={styles.closeBtn} onClick={() => setEditingProfessor(null)} aria-label="Close">
+              <button disabled={isSubmitting} className={styles.closeBtn} onClick={closeModal} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleSaveEdit} className={styles.form}>
               <div className={styles.field}>
-                <label className={styles.label}>Fullname</label>
+                <label htmlFor="professor-name" className={styles.label}>Fullname</label>
                 <input
                   type="text"
                   className={styles.input}
+                  id="professor-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Email</label>
+                <label htmlFor="professor-email" className={styles.label}>Email</label>
                 <input
                   type="email"
                   className={styles.input}
+                  id="professor-email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Professor ID</label>
+                <label htmlFor="professor-professorId" className={styles.label}>Professor ID</label>
                 <input
                   type="text"
                   className={styles.input}
+                  id="professor-professorId"
                   value={professorId}
                   onChange={(e) => setProfessorId(e.target.value)}
                 />
@@ -394,8 +451,7 @@ export default function ProfessorManagement() {
 
               <Button type="submit" isLoading={isSubmitting}>Save Changes</Button>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
     </PageShell>
   );

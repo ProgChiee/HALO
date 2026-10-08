@@ -93,6 +93,7 @@ public class AdminController {
     @PatchMapping("/professors/{id}/status")
     public ResponseEntity<ProfessorResponse> changeProfessorStatus(
             @Positive @PathVariable Long id,
+            @Valid @RequestBody AdminStatusRequest request,
             Authentication authentication
     ){
 
@@ -102,6 +103,7 @@ public class AdminController {
         return ResponseEntity.ok(
                 adminService.changeProfessorStatus(
                         id,
+                        request.status(),
                         admin
                 )
         );
@@ -128,6 +130,7 @@ public class AdminController {
     @PatchMapping("/students/{id}/status")
     public ResponseEntity<StudentListResponse> changeStudentStatus(
             @Positive @PathVariable Long id,
+            @Valid @RequestBody AdminStatusRequest request,
             Authentication authentication
     ){
 
@@ -137,6 +140,7 @@ public class AdminController {
         return ResponseEntity.ok(
                 adminService.changeStudentStatus(
                         id,
+                        request.status(),
                         admin
                 )
         );
@@ -163,7 +167,7 @@ public class AdminController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/activity-logs")
-    public ResponseEntity<List<ActivityLogResponse>>
+    public ResponseEntity<?>
     getActivityLogs(
 
             @RequestParam(required = false)
@@ -173,13 +177,16 @@ public class AdminController {
                     name = "type",
                     required = false
             )
-            ActivityType activityType
+            ActivityType activityType,
+            @RequestParam(defaultValue = "0") @jakarta.validation.constraints.Min(0) int page,
+            @RequestParam(defaultValue = "20") @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) int size,
+            @RequestParam(defaultValue = "") @jakarta.validation.constraints.Size(max = 200) String search
     ){
 
         return ResponseEntity.ok(
                 activityLogService.getLogs(
                         role,
-                        activityType
+                        activityType, page, size, search
                 )
         );
     }

@@ -26,8 +26,8 @@ export async function updateProfessor(id, { name, email, professorId }) {
   return res.data;
 }
 
-export async function toggleProfessorStatus(id) {
-  const res = await apiClient.patch(`/admin/professors/${id}/status`);
+export async function setProfessorStatus(id, status) {
+  const res = await apiClient.patch(`/admin/professors/${id}/status`, { status });
   return res.data;
 }
 
@@ -41,8 +41,8 @@ export async function getStudentById(id) {
   return res.data;
 }
 
-export async function toggleStudentStatus(id) {
-  const res = await apiClient.patch(`/admin/students/${id}/status`);
+export async function setStudentStatus(id, status) {
+  const res = await apiClient.patch(`/admin/students/${id}/status`, { status });
   return res.data;
 }
 
@@ -81,9 +81,9 @@ export async function getAdminProfile(config = {}) {
   return res.data;
 }
 
-export async function getActivityLog({ role, activityType, signal } = {}) {
+export async function getActivityLog({ role, activityType, signal, params = {} } = {}) {
   const res = await apiClient.get('/admin/activity-logs', {
-    params: { role, type: activityType },
+    params: { page: 0, size: 20, ...params, role, type: activityType ?? params.activityType, activityType: undefined },
     signal,
   });
   return res.data;

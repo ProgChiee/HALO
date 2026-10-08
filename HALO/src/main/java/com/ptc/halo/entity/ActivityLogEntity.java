@@ -26,6 +26,22 @@ public class ActivityLogEntity {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "acting_target_id")
+    private UserEntity actingTarget;
+    @Enumerated(EnumType.STRING) @Column(length = 32)
+    private com.ptc.halo.enums.Role actingTargetRole;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "acting_session_id")
+    private AdminActingSessionEntity actingSession;
+
+    public UserEntity getActingTarget() { return actingTarget; }
+    public void setActingTarget(UserEntity value) { actingTarget = value; }
+    public com.ptc.halo.enums.Role getActingTargetRole() { return actingTargetRole; }
+    public void setActingTargetRole(com.ptc.halo.enums.Role value) { actingTargetRole = value; }
+    public AdminActingSessionEntity getActingSession() { return actingSession; }
+    public void setActingSession(AdminActingSessionEntity value) { actingSession = value; }
+
     public ActivityLogEntity() {
     }
 

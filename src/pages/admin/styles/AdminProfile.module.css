@@ -226,3 +226,5 @@
   color: var(--color-error);
   font-size: var(--text-sm);
 }
+.profileHeader > div, .infoValue { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 768px) { .infoValueRow { flex-wrap: wrap; gap: 0.5rem; } }

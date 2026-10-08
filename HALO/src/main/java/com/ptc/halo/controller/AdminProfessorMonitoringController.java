@@ -26,12 +26,14 @@ public class AdminProfessorMonitoringController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/monitoring")
-    public ResponseEntity<List<AdminProfessorMonitoringResponse>>
-    getProfessorMonitoring() {
+    public ResponseEntity<?>
+    getProfessorMonitoring(
+        @RequestParam(defaultValue="0") @jakarta.validation.constraints.Min(0) int page,
+        @RequestParam(defaultValue="20") @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) int size) {
 
         return ResponseEntity.ok(
                 adminProfessorMonitoringService
-                        .getProfessorMonitoring()
+                        .getProfessorMonitoring(page, size)
         );
     }
 }

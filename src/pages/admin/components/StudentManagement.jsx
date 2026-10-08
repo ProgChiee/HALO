@@ -1,3 +1,5 @@
+import Dialog from '../../../components/shared/Dialog';
+import { accountText, accountDisplay, accountInitial } from '../../../utils/adminAccountDisplay';
 import { adminErrorMessage } from '../../../utils/adminErrors';
 import { useState, useRef, useMemo } from 'react';
 import { Users, Search, Eye, Power, X } from 'lucide-react';
@@ -5,10 +7,16 @@ import PageShell from '../../../components/shared/PageShell';
 import { useToast } from '../../../context/notifications/useToast';
 import { useAuth } from '../../../context/login/useAuth';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getStudents, toggleStudentStatus } from '../../../services/admin/adminService';
+import { getStudents, setStudentStatus } from '../../../services/admin/adminService';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/StudentManagement.module.css';
+
+function yearLevelLabel(value) {
+  if (value === 'FIRST_YEAR') return '1st Year';
+  if (value === 'SECOND_YEAR') return '2nd Year';
+  return 'Not specified';
+}
 
 export default function StudentManagement() {
   const { showToast } = useToast();
@@ -24,8 +32,8 @@ export default function StudentManagement() {
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) =>
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.email.toLowerCase().includes(searchQuery.toLowerCase())
+      accountText(s.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      accountText(s.email).toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [students, searchQuery]);
 
@@ -34,7 +42,7 @@ export default function StudentManagement() {
     toggleLock.current = true;
     setTogglingId(student.id);
     try {
-      const updated = await toggleStudentStatus(student.id);
+      const updated = await setStudentStatus(student.id, student.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
       setStudents((previous) => previous.map((item) => item.id === updated.id ? updated : item));
       setViewingStudent((previous) => previous?.id === updated.id ? updated : previous);
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
@@ -47,7 +55,7 @@ export default function StudentManagement() {
   }
 
   return (
-    <PageShell
+    <PageShell responsive
       navItems={isSuperAdmin ? SUPERADMIN_NAV_ITEMS : ADMIN_NAV_ITEMS}
       sectionLabel={isSuperAdmin ? 'Superadmin' : 'Admin'}
       roleBadge={isSuperAdmin ? 'Superadmin' : 'Admin'}
@@ -65,7 +73,8 @@ export default function StudentManagement() {
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Search students"
+            aria-label="Search students"
+              placeholder="Search students"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -84,30 +93,32 @@ export default function StudentManagement() {
             </button>
           </div>
         ) : (
-          <div className={styles.tableCard}>
-            <div className={styles.tableHeaderRow}>
-              <span>Name</span>
-              <span>Email</span>
-              <span>Year</span>
-              <span>Progress</span>
-              <span>Status</span>
-              <span>Actions</span>
+          <div className={styles.tableCard} role="region" aria-label="Accounts table, scroll horizontally" tabIndex={0}>
+            <div role="table" aria-label="Students">
+            <div role="row" className={styles.tableHeaderRow}>
+              <span role="columnheader" id="student-column-1">Name</span>
+              <span role="columnheader" id="student-column-2">Email</span>
+              <span role="columnheader" id="student-column-3">Year</span>
+              <span role="columnheader" id="student-column-4">Progress</span>
+              <span role="columnheader" id="student-column-5">Status</span>
+              <span role="columnheader" id="student-column-6">Actions</span>
             </div>
 
             {filteredStudents.map((student) => (
               <div
+                role="row"
                 key={student.id}
                 className={`${styles.tableRow} ${styles.tableRowClickable}`}
                 onClick={() => setViewingStudent(student)}
               >
-                <span className={styles.studentName}>{student.name}</span>
-                <span className={styles.studentEmail}>{student.email}</span>
-                <span className={styles.studentYear}>{student.yearLevel === 'FIRST_YEAR' ? '1st Year' : '2nd Year'}</span>
-                <span className={styles.studentProgress}>—</span>
-                <span className={`${styles.statusText} ${styles[`status_${student.status?.toLowerCase()}`]}`}>
+                <span role="cell" aria-describedby="student-column-1" className={styles.studentName}>{accountDisplay(student.name)}</span>
+                <span role="cell" aria-describedby="student-column-2" className={styles.studentEmail}>{accountDisplay(student.email, 'Email not provided')}</span>
+                <span role="cell" aria-describedby="student-column-3" className={styles.studentYear}>{yearLevelLabel(student.yearLevel)}</span>
+                <span role="cell" aria-describedby="student-column-4" className={styles.studentProgress}>—</span>
+                <span role="cell" aria-describedby="student-column-5" className={`${styles.statusText} ${styles[`status_${student.status?.toLowerCase()}`]}`}>
                   {STATUS_LABELS[student.status] ?? student.status}
                 </span>
-                <span className={styles.actions} onClick={(e) => e.stopPropagation()}>
+                <span role="cell" aria-describedby="student-column-6" className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
                     className={styles.actionBtn}
                     onClick={() => setViewingStudent(student)}
@@ -130,19 +141,19 @@ export default function StudentManagement() {
             {filteredStudents.length === 0 && (
               <p className={styles.emptyState}>No students match your search.</p>
             )}
+            </div>
           </div>
         )}
       </main>
 
       {viewingStudent && (
-        <div className={styles.modalOverlay} onClick={() => setViewingStudent(null)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <Dialog labelledBy="student-details-title" onClose={() => setViewingStudent(null)} className={styles.modal} initialFocus="button">
             <div className={styles.modalHeader}>
               <div className={styles.profileHeaderRow}>
-                <div className={styles.profileAvatar}>{viewingStudent.name.charAt(0)}</div>
+                <div className={styles.profileAvatar}>{accountInitial(viewingStudent.name)}</div>
                 <div>
-                  <h3 className={styles.modalTitle}>{viewingStudent.name}</h3>
-                  <p className={styles.profileEmail}>{viewingStudent.email}</p>
+                  <h3 id="student-details-title" className={styles.modalTitle}>{accountDisplay(viewingStudent.name)}</h3>
+                  <p className={styles.profileEmail}>{accountDisplay(viewingStudent.email, 'Email not provided')}</p>
                 </div>
               </div>
               <button className={styles.closeBtn} onClick={() => setViewingStudent(null)} aria-label="Close">
@@ -153,7 +164,7 @@ export default function StudentManagement() {
             <div className={styles.detailList}>
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Year Level</span>
-                <span className={styles.detailValue}>{viewingStudent.yearLevel === 'FIRST_YEAR' ? '1st Year' : '2nd Year'}</span>
+                <span className={styles.detailValue}>{yearLevelLabel(viewingStudent.yearLevel)}</span>
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Overall Progress</span>
@@ -166,8 +177,7 @@ export default function StudentManagement() {
                 </span>
               </div>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </PageShell>
   );

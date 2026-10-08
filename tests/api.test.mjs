@@ -34,7 +34,7 @@ test('Admin request failures log only safe diagnostics and preserve errors for t
       () => admin.getProfessors(),
       () => admin.createProfessor({ name: 'Fixture', email: 'fixture@example.test', password: 'PRIVATE_PASSWORD', professorId: 'P1' }),
       () => admin.updateProfessor(1, { name: 'Fixture', email: 'fixture@example.test', professorId: 'P1' }),
-      () => admin.toggleProfessorStatus(1), () => admin.getAdminProfile(),
+      () => admin.setProfessorStatus(1, 'ACTIVE'), () => admin.getAdminProfile(),
       () => auth.changePassword('PRIVATE_CURRENT', 'PRIVATE_PASSWORD'),
     ];
     const { apiErrorMessage } = await server.ssrLoadModule('/src/utils/apiErrors.js');
@@ -109,7 +109,7 @@ test('monitoring uses the type query parameter and forwards cancellation', async
   const signal = new AbortController().signal;
   await admin.getActivityLog({ role: 'PROFESSOR', activityType: 'MODULE', signal });
   assert.equal(captured.url, '/admin/activity-logs');
-  assert.deepEqual(captured.params, { role: 'PROFESSOR', type: 'MODULE' });
+  assert.deepEqual(captured.params, { page: 0, size: 20, role: 'PROFESSOR', type: 'MODULE', activityType: undefined });
   assert.equal(captured.signal, signal);
 });
 
@@ -363,3 +363,20 @@ test('Super Admin errors display safe specific messages without exposing arbitra
  assert.equal(apiErrorMessage({ response: { data: { code: 'EMAIL_ALREADY_EXISTS', message: 'private SQL' } } }), 'An account with this email already exists.');
  assert.equal(apiErrorMessage({ response: { data: { message: 'private SQL' } } }), 'The request failed. Please try again.');
 });
+
+ test('Admin status requests send explicit desired values without toggling or automatic retry', async () => {
+  const previous = api.defaults.adapter;
+  const requests = [];
+  api.defaults.adapter = async config => { requests.push(config); return { data: {}, status: 200, headers: {}, config }; };
+  try {
+   for (const [resource, send] of [['professors', admin.setProfessorStatus], ['students', admin.setStudentStatus]]) {
+    for (const status of ['ACTIVE', 'ACTIVE', 'INACTIVE', 'INACTIVE']) {
+     await send(7, status);
+     assert.equal(requests.at(-1).url, '/admin/' + resource + '/7/status');
+     assert.equal(requests.at(-1).method, 'patch');
+     assert.deepEqual(JSON.parse(requests.at(-1).data), { status });
+    }
+   }
+   assert.equal(requests.length, 8);
+  } finally { api.defaults.adapter = previous; }
+ });

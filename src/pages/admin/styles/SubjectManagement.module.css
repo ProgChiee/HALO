@@ -301,3 +301,5 @@
   color: var(--color-error);
   font-size: var(--text-sm);
 }
+.subjectTitle, .weekTitle { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 768px) { .subjectHeader, .weekRow { flex-wrap: wrap; gap: 0.5rem; } }
