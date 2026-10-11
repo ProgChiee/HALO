@@ -18,25 +18,17 @@
 }
 
 .topbar {
-  display: flex;
-  align-items: center;
+ composes: topbar from "../../../components/shared/Navigation.module.css";
   padding: var(--space-md) var(--space-xl);
-  border-bottom: 1px solid var(--color-border-panel);
 }
 
 .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  font-size: var(--text-sm);
+ composes: breadcrumb from "../../../components/shared/Navigation.module.css";
 }
 
 .main {
+  composes: regular from "../../../components/shared/PageLayout.module.css";
   padding: var(--space-xl);
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .overviewRow {
@@ -54,10 +46,10 @@
 }
 
 .overallPercent {
-  font-size: 1.75rem;
-  font-weight: 700;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
   color: var(--color-accent-active);
-  line-height: 1;
+  line-height: var(--line-height-tight);
 }
 
 .overallLabel {
@@ -85,19 +77,15 @@
 }
 
 .statsGrid {
+  composes: metrics from "../../../components/shared/PageLayout.module.css";
   flex: 1;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-md);
 }
 
 .statCard {
+  composes: surface from "../../../components/shared/UIPrimitives.module.css";
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-stat-card);
-  border-radius: var(--radius-stat-card);
   padding: var(--space-md) var(--space-lg);
 }
 
@@ -108,14 +96,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 212, 92, 0.1);
+  background: var(--color-primary-soft);
   border-radius: var(--radius-sm);
   color: var(--color-accent-active);
 }
 
 .statValue {
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }
 
@@ -132,15 +120,19 @@
 }
 
 .sectionTitle {
-  font-size: var(--text-lg);
+  font-size: var(--font-size-2xl);
   color: var(--color-accent-active);
   margin-bottom: var(--space-md);
+
+  font-weight: var(--font-weight-semibold);
+
+  line-height: var(--line-height-heading);
 }
 
 .viewAllLink {
   font-size: var(--text-sm);
   color: var(--color-accent-active);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .rowsList {
@@ -164,14 +156,14 @@
 .subjectName,
 .quizTitle {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
 .subjectProgress {
   font-size: var(--text-sm);
   color: var(--color-accent-active);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .quizScoreGroup {
@@ -183,39 +175,51 @@
 .quizScore {
   font-size: var(--text-sm);
   color: var(--color-accent-active);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .gradeBadge {
-  font-size: var(--text-xs);
-  font-weight: 700;
-  padding: 2px var(--space-sm);
-  border-radius: var(--radius-pill);
+  composes: chip from "../../../components/shared/UIPrimitives.module.css";
+  padding: var(--space-1) var(--space-sm);
 }
 
 .gradeA {
   background: var(--color-accent-active);
-  color: #06170e;
+  color: var(--color-text-on-button);
 }
 
 .gradeB {
-  background: rgba(0, 212, 92, 0.25);
+  background: var(--color-primary-soft);
   color: var(--color-accent-active);
 }
 
 .gradeC {
-  background: var(--color-warning);
-  color: #3a2a00;
+  background: var(--color-accent-soft-bg);
+  color: var(--color-warning-text);
 }
 
 .loadingText {
+  composes: loading from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xl);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
-.emptyState { padding: var(--space-xl); text-align: center; color: var(--color-text-muted); }
+.emptyState {
+  composes: empty from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-xl); }
 
 @media (max-width: 768px) {
-  .topbar, .main { padding: 1rem; }
+  .topbar, .main { padding: var(--space-4); }
   .statsGrid { flex-basis: 100%; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
 }
+
+/* Keep the learning overview calm and long subject/history titles readable. */
+.overviewRow { gap: var(--space-6); align-items: center; }
+.overallBlock { padding: var(--space-4); }
+.statsGrid, .statCard, .statCard > div { min-width: 0; }
+.statLabel { color: var(--color-text-muted); }
+.statValue, .overallPercent, .subjectProgress, .quizScore { font-variant-numeric: tabular-nums; }
+.sectionTitle { color: var(--color-text-primary); font-size: var(--font-size-xl); }
+.sectionHeaderRow { gap: var(--space-3); flex-wrap: wrap; }
+.subjectRow, .quizRow { gap: var(--space-4); flex-wrap: wrap; }
+.subjectName, .quizTitle { min-width: 0; overflow-wrap: anywhere; flex: 1 1 12rem; }
+.quizScoreGroup, .subjectProgress { flex-shrink: 0; }
+.gradeA { background: var(--color-primary-soft); color: var(--color-success-text); }
+@media (max-width: 768px) { .overviewRow { justify-content: center; } }

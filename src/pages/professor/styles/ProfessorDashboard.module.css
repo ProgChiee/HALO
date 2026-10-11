@@ -18,79 +18,62 @@
 }
 
 .topbar {
-  display: flex;
-  align-items: center;
+ composes: topbar from "../../../components/shared/Navigation.module.css";
   padding: var(--space-md) var(--space-xl);
-  border-bottom: 1px solid var(--color-border-panel);
 }
 
 .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  font-size: var(--text-sm);
+ composes: breadcrumb from "../../../components/shared/Navigation.module.css";
 }
 
 .main {
+ composes: content from "../../../components/shared/DashboardPresentation.module.css";
+  composes: wide from "../../../components/shared/PageLayout.module.css";
   padding: var(--space-xl);
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .loadingText {
+  composes: loading from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xl);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
 
 .greeting {
-  font-size: var(--text-2xl);
+ composes: greeting from "../../../components/shared/DashboardPresentation.module.css";
+  font-size: var(--font-size-3xl);
   color: var(--color-text-primary);
-  margin-bottom: var(--space-xs);
+
+  font-weight: var(--font-weight-bold);
+
+  line-height: var(--line-height-tight);
 }
 
 .subtext {
-  color: var(--color-accent-active);
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-xl);
+ composes: subtitle from "../../../components/shared/DashboardPresentation.module.css";
 }
 
 .statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-md);
-  margin-bottom: var(--space-xl);
+ composes: metrics from "../../../components/shared/DashboardPresentation.module.css";
+  composes: metrics from "../../../components/shared/PageLayout.module.css";
 }
 
 .statCard {
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-stat-card);
-  border-radius: var(--radius-stat-card);
-  padding: var(--space-lg);
+ composes: metric from "../../../components/shared/DashboardPresentation.module.css";
+  composes: surface from "../../../components/shared/UIPrimitives.module.css";
 }
 
 .statIcon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 212, 92, 0.08);
-  border: 1.5px solid var(--color-accent-active);
-  border-radius: 50%;
-  color: var(--color-accent-active);
-  margin-bottom: var(--space-md);
+ composes: icon from "../../../components/shared/DashboardPresentation.module.css";
 }
 
 .statValue {
+ composes: value from "../../../components/shared/DashboardPresentation.module.css";
   font-size: var(--text-2xl);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }
 
 .statLabel {
+ composes: label from "../../../components/shared/DashboardPresentation.module.css";
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   margin-top: var(--space-xs);
@@ -104,14 +87,17 @@
 }
 
 .sectionTitle {
-  font-size: var(--text-lg);
-  color: var(--color-accent-active);
+ composes: heading from "../../../components/shared/DashboardPresentation.module.css";
+
+  font-weight: var(--font-weight-semibold);
+
+  line-height: var(--line-height-heading);
 }
 
 .manageLink {
   font-size: var(--text-sm);
   color: var(--color-accent-active);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .subjectsList {
@@ -138,7 +124,7 @@
   align-items: center;
   justify-content: center;
   background: var(--color-bg-nav-active);
-  border: 1px solid rgba(0, 212, 92, 0.4);
+  border: 1px solid var(--color-primary-border);
   border-radius: var(--radius-sm);
   color: var(--color-accent-active);
 }
@@ -147,12 +133,12 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .subjectName {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
@@ -164,12 +150,13 @@
 .subjectStatus {
   font-size: var(--text-xs);
   color: var(--color-accent-active);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 @media (max-width: 1024px) {
   .contentArea { height: auto; min-height: 0; overflow-wrap: anywhere; }
-  .main { min-width: 0; overflow-wrap: anywhere; }
+  .main {
+ composes: content from "../../../components/shared/DashboardPresentation.module.css"; min-width: 0; overflow-wrap: anywhere; }
 }
 @media (max-width: 768px) {
-  .main, .topbar { padding: 1rem; }
+  .main, .topbar { padding: var(--space-4); }
 }

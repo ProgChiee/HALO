@@ -1,4 +1,4 @@
-const OPERATIONS = new Set(['load-dashboard', 'load-continue', 'load-subjects', 'load-quiz', 'start-quiz', 'submit-quiz', 'load-progress', 'load-badges', 'load-profile']);
+const OPERATIONS = new Set(['record-lesson-study', 'load-dashboard', 'load-continue', 'load-subjects', 'load-quiz', 'start-quiz', 'submit-quiz', 'load-progress', 'load-badges', 'load-profile']);
 const CODES = new Set([
   'AUTHENTICATION_REQUIRED', 'INVALID_OR_EXPIRED_TOKEN', 'ACCESS_DENIED',
   'INVALID_ROLE', 'INVALID_ROLE_OR_ACCESS', 'ACCOUNT_INACTIVE', 'STUDENT_NOT_ENROLLED',

@@ -1,11 +1,12 @@
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useCallback, useState } from 'react';
 import { TrendingUp, CheckCircle2, Award, Users } from 'lucide-react';
-import PageShell from '../../../components/shared/PageShell';
+import PageShell from './ProfessorPageShell';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
-import { getStudentProgressSummaries } from '../../../services/professor/professorService';
+import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import styles from '../styles/StudentProgress.module.css';
+import LearningEngagement from './LearningEngagement';
 
 export default function StudentProgress() {
   const [page, setPage] = useState(0);
@@ -14,7 +15,10 @@ export default function StudentProgress() {
 }
 
 function StudentProgressPage({ page, onPageChange }) {
-  const loadPage = useCallback((config) => getStudentProgressSummaries(page, 20, config), [page]);
+  const workflow = useProfessorWorkflow();
+  const { getStudentProgressSummaries } = workflow.api;
+
+  const loadPage = useCallback((config) => getStudentProgressSummaries(page, 20, config), [page, getStudentProgressSummaries]);
   const { data, isLoading, error: loadError, reload } = useRemoteData(loadPage);
 
   if (isLoading) {
@@ -50,11 +54,12 @@ function StudentProgressPage({ page, onPageChange }) {
       </header>
 
       <main className={styles.main}>
+        <LearningEngagement />
         <div className={styles.statsGrid}>
           <div className={styles.statCard}>
             <div className={styles.statIcon}><Users size={18} /></div>
             <p className={styles.statValue}>{totalStudents}</p>
-            <p className={styles.statLabel}>Student accounts (institution-wide)</p>
+            <p className={styles.statLabel}>Students in your subjects</p>
           </div>
           <div className={styles.statCard}>
             <div className={styles.statIcon}><CheckCircle2 size={18} /></div>

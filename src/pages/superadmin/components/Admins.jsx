@@ -155,7 +155,7 @@ export default function Admins() {
           {isLoading ? (
             <p className={styles.loadingText}>Loading admins...</p>
           ) : loadError ? (
-            <div className={styles.tableCard} style={{ padding: '3rem', textAlign: 'center' }}>
+            <div className={styles.tableCard} style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
               <p className={styles.loadingText}>{apiErrorMessage(loadError, "Couldn't load admins. Please check your connection.")}</p>
               <button
                 onClick={loadAdmins}

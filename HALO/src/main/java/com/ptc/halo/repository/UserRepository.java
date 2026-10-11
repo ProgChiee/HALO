@@ -38,8 +38,9 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
             (select count(b.id) from StudentBadgeEntity b where b.student.id = u.id))
         from UserEntity u left join StudentProfileEntity profile on profile.user.id = u.id
         where u.role = com.ptc.halo.enums.Role.STUDENT
+        and exists (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel)
         order by u.id asc
-        """, countQuery = "select count(u.id) from UserEntity u where u.role = com.ptc.halo.enums.Role.STUDENT")
+        """, countQuery = "select count(u.id) from UserEntity u join StudentProfileEntity profile on profile.user.id=u.id where u.role = com.ptc.halo.enums.Role.STUDENT and exists (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel)")
     org.springframework.data.domain.Page<com.ptc.halo.dtoResponse.ProfessorStudentSummary> findProfessorProgressSummaries(
             @org.springframework.data.repository.query.Param("professorId") Long professorId,
             org.springframework.data.domain.Pageable pageable);

@@ -229,7 +229,7 @@ export default function ProfessorManagement() {
         {isLoading ? (
           <p className={styles.loadingText}>Loading professors...</p>
         ) : loadError ? (
-          <div className={styles.tableCard} style={{ padding: '3rem', textAlign: 'center' }}>
+          <div className={styles.tableCard} style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
             <p className={styles.loadingText}>Couldn't load professors. Please check your connection.</p>
             <button
               onClick={loadProfessors}
@@ -245,7 +245,7 @@ export default function ProfessorManagement() {
               <span role="columnheader" id="professor-column-1">Name</span>
               <span role="columnheader" id="professor-column-2">Email</span>
               <span role="columnheader" id="professor-column-3">Professor ID</span>
-              <span role="columnheader" id="professor-column-4">Status</span>
+              <span role="columnheader" id="professor-column-4">Account Action</span>
               <span role="columnheader" id="professor-column-5">Actions</span>
             </div>
 
@@ -259,8 +259,16 @@ export default function ProfessorManagement() {
                 <span role="cell" aria-describedby="professor-column-1" className={styles.profName}>{accountDisplay(prof.name)}</span>
                 <span role="cell" aria-describedby="professor-column-2" className={styles.profEmail}>{accountDisplay(prof.email, 'Email not provided')}</span>
                 <span role="cell" aria-describedby="professor-column-3" className={styles.profCount}>{prof.professorId}</span>
-                <span role="cell" aria-describedby="professor-column-4" className={`${styles.statusText} ${styles[`status_${prof.status?.toLowerCase()}`]}`}>
-                  {STATUS_LABELS[prof.status] ?? prof.status}
+                <span role="cell" aria-describedby="professor-column-4" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className={`${styles.actionBtn} ${prof.status === 'ACTIVE' ? styles.actionBtnOff : ''}`}
+                    onClick={() => handleToggleStatus(prof)}
+                    disabled={togglingId !== null}
+                    aria-label={prof.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                  >
+                    <Power size={15} aria-hidden="true" />
+                    {prof.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                  </button>
                 </span>
                 <span role="cell" aria-describedby="professor-column-5" className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
@@ -269,7 +277,7 @@ export default function ProfessorManagement() {
                     disabled={isSubmitting}
                     aria-label="View"
                   >
-                    <Eye size={15} />
+                    <Eye size={15} aria-hidden="true" /> View
                   </button>
                   <button
                     className={styles.actionBtn}
@@ -277,16 +285,9 @@ export default function ProfessorManagement() {
                     disabled={isSubmitting}
                     aria-label="Edit"
                   >
-                    <Pencil size={15} />
+                    <Pencil size={15} aria-hidden="true" /> Edit
                   </button>
-                  <button
-                    className={`${styles.actionBtn} ${prof.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
-                    onClick={() => handleToggleStatus(prof)}
-                    disabled={togglingId !== null}
-                    aria-label={prof.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                  >
-                    <Power size={15} />
-                  </button>
+
                 </span>
               </div>
             ))}

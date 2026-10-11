@@ -18,96 +18,75 @@
 }
 
 .topbar {
-  display: flex;
-  align-items: center;
+ composes: topbar from "../../../components/shared/Navigation.module.css";
   padding: var(--space-md) var(--space-xl);
-  border-bottom: 1px solid var(--color-border-panel);
 }
 
 .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  font-size: var(--text-sm);
+ composes: breadcrumb from "../../../components/shared/Navigation.module.css";
 }
 
 .breadcrumbSub {
   color: var(--color-text-muted);
-  font-weight: 400;
+  font-weight: var(--font-weight-regular);
   font-size: var(--text-xs);
 }
 
 .main {
+ composes: content from "../../../components/shared/DashboardPresentation.module.css";
+  composes: wide from "../../../components/shared/PageLayout.module.css";
   padding: var(--space-xl);
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .loadingText {
+  composes: loading from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xl);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
 
 .statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-md);
-  margin-bottom: var(--space-xl);
+ composes: metrics from "../../../components/shared/DashboardPresentation.module.css";
+  composes: metrics from "../../../components/shared/PageLayout.module.css";
 }
 
 .statCard {
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-stat-card);
-  border-radius: var(--radius-stat-card);
-  padding: var(--space-lg);
+ composes: metric from "../../../components/shared/DashboardPresentation.module.css";
+  composes: surface from "../../../components/shared/UIPrimitives.module.css";
 }
 
 .statIcon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 212, 92, 0.08);
-  border: 1.5px solid var(--color-accent-active);
-  border-radius: 50%;
-  color: var(--color-accent-active);
-  margin-bottom: var(--space-md);
+ composes: icon from "../../../components/shared/DashboardPresentation.module.css";
 }
 
 .statValue {
+ composes: value from "../../../components/shared/DashboardPresentation.module.css";
   font-size: var(--text-2xl);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }
 
 .statLabel {
+ composes: label from "../../../components/shared/DashboardPresentation.module.css";
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   margin-top: var(--space-xs);
 }
 
 .bottomGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: var(--space-lg);
+  composes: panels from "../../../components/shared/PageLayout.module.css";
 }
 
 .panelCard {
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-stat-card);
-  border-radius: var(--radius-lg);
+  composes: surface from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-lg);
 }
 
 .panelTitle {
-  font-size: var(--text-base);
-  font-weight: 700;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   margin-bottom: var(--space-lg);
+
+  line-height: var(--line-height-heading);
 }
 
 /* --- Subject Enrollment --- */
@@ -137,7 +116,7 @@
 .enrollmentBarTrack {
   width: 100%;
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-background);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }
@@ -165,7 +144,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  margin-top: 6px;
+  margin-top: var(--space-2);
   flex-shrink: 0;
 }
 
@@ -185,15 +164,33 @@
 .activityTime {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
-  margin-top: 2px;
+  margin-top: var(--space-1);
 }
-.greeting { font-size: var(--text-xl); margin-bottom: var(--space-sm); }
-.subtext { color: var(--color-text-muted); margin-bottom: var(--space-lg); }
-.sectionTitle { font-size: var(--text-base); margin-bottom: var(--space-md); }
-.activityActor { font-weight: 600; }
+.greeting {
+ composes: greeting from "../../../components/shared/DashboardPresentation.module.css"; font-size: var(--font-size-3xl); 
+  font-weight: var(--font-weight-bold);
+
+  line-height: var(--line-height-tight);
+}
+.subtext {
+ composes: subtitle from "../../../components/shared/DashboardPresentation.module.css"; }
+.sectionTitle {
+ composes: heading from "../../../components/shared/DashboardPresentation.module.css"; margin-bottom: var(--space-md); 
+  font-weight: var(--font-weight-semibold);
+
+  line-height: var(--line-height-heading);
+}
+.activityActor { font-weight: var(--font-weight-semibold); }
 
 .main, .statCard { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 768px) {
  .activityRow { flex-wrap: wrap; }
  .activityText { min-width: 0; overflow-wrap: anywhere; }
 }
+
+.activityList { gap: 0; }
+.activityRow { padding-block: var(--space-4); justify-content: space-between; gap: var(--space-4); }
+.activityRow + .activityRow { border-top: 1px solid var(--color-border); }
+.activityText { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.activityTime { flex-shrink: 0; margin-top: 0; }
+@media (max-width: 768px) { .activityRow { flex-direction: column; gap: var(--space-1); } }

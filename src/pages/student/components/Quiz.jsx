@@ -1,3 +1,4 @@
+import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -5,8 +6,6 @@ import { ClipboardCheck, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
-import { getWeekLesson } from '../../../services/student/studentService';
-import { getAssessmentStatus, getAssessment, startAttempt, submitAttempt, getAttemptResult } from '../../../services/student/quizService';
 import { buildAssessmentAnswers } from '../../../utils/backendContract';
 import { shouldReconcileQuiz, isSavedQuizResult } from '../../../utils/quizReconciliation';
 import { validateLessonRoute } from '../../../utils/lessonLoader';
@@ -17,10 +16,13 @@ const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
 export default function Quiz() {
   const { topicId, weekId } = useParams();
-  return <WeekQuiz key={`${topicId}:${weekId}`} subjectId={topicId} weekId={weekId} />;
+  const { identity } = useStudentWorkflow();
+  return <WeekQuiz key={`${identity}:${topicId}:${weekId}`} subjectId={topicId} weekId={weekId} />;
 }
 
 function WeekQuiz({ subjectId, weekId }) {
+  const workflow = useStudentWorkflow();
+  const { getWeekLesson, getAssessmentStatus, getAssessment, startAttempt, submitAttempt, getAttemptResult } = workflow.api;
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -59,7 +61,7 @@ function WeekQuiz({ subjectId, weekId }) {
         if (!isMounted) return;
         validateLessonRoute(module, weekId);
         if (String(module.subjectId) !== String(subjectId)) {
-          navigate(`/student/quiz/${module.subjectId}/${module.weekId}`, { replace: true }); return;
+          navigate(`${workflow.basePath}/quiz/${module.subjectId}/${module.weekId}`, { replace: true }); return;
         }
         setWeekNumber(module.weekNumber);
         setModuleId(module.id);
@@ -82,7 +84,7 @@ function WeekQuiz({ subjectId, weekId }) {
 
     loadQuiz();
     return () => { isMounted = false; controller.abort(); };
-  }, [subjectId, weekId, navigate]);
+  }, [subjectId, weekId, navigate, workflow.basePath, getWeekLesson, getAssessmentStatus, getAssessment]);
 
   if (isLoading) {
     return (
@@ -113,7 +115,7 @@ function WeekQuiz({ subjectId, weekId }) {
     return <StudentPageShell>
       <main className={styles.contentArea}>
         <p className={styles.loadingText}>This quiz is not available yet.</p>
-        <Button onClick={() => navigate('/student/subjects')}>Back to Subjects</Button>
+        <Button onClick={() => navigate(workflow.basePath + '/subjects')}>Back to Subjects</Button>
       </main>
     </StudentPageShell>;
   }
@@ -161,7 +163,7 @@ function WeekQuiz({ subjectId, weekId }) {
         const submitted = await submitAttempt(attemptId, answers);
         if (!mounted.current) return;
         setResult(submitted);
-        showToast('Quiz submitted!', 'success');
+        showToast(workflow.preview ? 'Preview evaluated. No Student records changed.' : 'Quiz submitted!', 'success');
         setStage('results');
         // The submit controller fills score/passed only. Detailed feedback
         // comes from the separate result endpoint.
@@ -169,7 +171,7 @@ function WeekQuiz({ subjectId, weekId }) {
           const review = await getAttemptResult(submitted.attemptId);
           if (mounted.current) setResult(review);
         } catch {
-          if (mounted.current) showToast('Score saved, but the answer review could not load.', 'error');
+          if (mounted.current) showToast(workflow.preview ? 'Preview evaluated, but the answer review could not load.' : 'Score saved, but the answer review could not load.', 'error');
         }
         try {
           const latestStatus = await getAssessmentStatus(moduleId);
@@ -187,7 +189,7 @@ function WeekQuiz({ subjectId, weekId }) {
             if (!isSavedQuizResult(saved, attemptId)) throw new Error('Invalid saved result', { cause: err });
             setResult(saved);
             setStage('results');
-            showToast('Quiz submitted!', 'success');
+            showToast(workflow.preview ? 'Preview evaluated. No Student records changed.' : 'Quiz submitted!', 'success');
           } catch (reconcileError) {
             if (!mounted.current) return;
             logStudentError('submit-quiz', reconcileError);
@@ -247,7 +249,7 @@ function WeekQuiz({ subjectId, weekId }) {
               )}
 
               {status?.hasUnfinishedAttempt && <p className={styles.introDescription}>
-                Your unfinished attempt will be reused. Answers are saved only when you submit.
+                {workflow.preview ? 'This is a temporary preview attempt. No Student progress or academic records will be changed.' : 'Your unfinished attempt will be reused. Answers are saved only when you submit.'}
               </p>}
               <Button onClick={handleStart} isLoading={isStarting} disabled={!status?.canTakeAssessment}>
                 {status?.hasUnfinishedAttempt ? 'Continue attempt' : 'Start quiz'}
@@ -307,7 +309,8 @@ function WeekQuiz({ subjectId, weekId }) {
               <span className={styles.resultsIcon}>
                 {result.passed ? <CheckCircle2 size={32} /> : <XCircle size={32} />}
               </span>
-              <h1 className={styles.resultsScore}>{result.score}%</h1>
+              <h1 className={styles.resultsScore}>{workflow.preview ? 'Preview Score: ' : ''}{result.score}%</h1>
+              {workflow.preview && <p role="status">This was a preview attempt. No Student progress or academic records were changed.</p>}
               <p className={styles.resultsMessage}>
                 {result.passed
                   ? "Great job! You've passed this quiz."
@@ -345,13 +348,13 @@ function WeekQuiz({ subjectId, weekId }) {
               )}
 
               <div className={styles.actionsRow}>
-                {!result.passed && (
+                {(!result.passed || workflow.preview) && (
                   <Button variant="secondary" disabled={isSubmitting} onClick={handleRetry}>
                     <RotateCcw size={16} style={{ marginRight: 6 }} />
                     Retry quiz
                   </Button>
                 )}
-                <Button onClick={() => navigate('/student')}>Back to Dashboard</Button>
+                <Button onClick={() => navigate(workflow.basePath)}>Back to Dashboard</Button>
               </div>
             </div>
           )}

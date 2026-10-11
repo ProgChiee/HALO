@@ -76,4 +76,10 @@ class ModuleGenerationConcurrencyTest {
   var old=modules.findById(id).orElseThrow();var fresh=modules.findById(id).orElseThrow();fresh.setLessonText("Fresh");modules.saveAndFlush(fresh);old.setLessonText("Stale");
   assertThrows(org.springframework.dao.OptimisticLockingFailureException.class,()->modules.saveAndFlush(old));assertEquals("Fresh",modules.findById(id).orElseThrow().getLessonText());
  }
+ @Test void rejectedRegenerationPreservesPersistedLesson() {
+  var original=modules.findById(id).orElseThrow();original.setGeneratedSummary("Saved summary");original.setGeneratedObjectives("Saved objectives");original.setAiGenerationStatus(AiGenerationStatus.COMPLETED);modules.saveAndFlush(original);
+  when(CLIENT.prompt().user(anyString()).call().content()).thenReturn("{\"valid\":false}");
+  assertEquals(422,assertThrows(ResponseStatusException.class,()->service.generateLesson(id)).getStatusCode().value());
+  var persisted=modules.findById(id).orElseThrow();assertEquals("Saved summary",persisted.getGeneratedSummary());assertEquals("Saved objectives",persisted.getGeneratedObjectives());assertEquals(AiGenerationStatus.COMPLETED,persisted.getAiGenerationStatus());
+ }
 }

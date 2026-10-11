@@ -1,8 +1,8 @@
+import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { Award } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
-import { getBadgesData } from '../../../services/student/studentService';
 import styles from '../styles/Badges.module.css';
 
 // Total number of possible badges, from the backend's BadgeType enum —
@@ -14,6 +14,8 @@ import styles from '../styles/Badges.module.css';
 const TOTAL_POSSIBLE_BADGES = 12;
 
 export default function Badges() {
+  const workflow = useStudentWorkflow();
+  const { getBadgesData } = workflow.api;
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [earnedBadges, setEarnedBadges] = useState([]);
@@ -35,7 +37,7 @@ export default function Badges() {
 
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [getBadgesData]);
 
   if (isLoading) {
     return (

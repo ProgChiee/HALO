@@ -1,4 +1,5 @@
 .wrapper {
+  composes: background from "./AuthPresentation.module.css";
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -6,20 +7,11 @@
   justify-content: center;
   padding: var(--space-lg);
 
-  /*
-    THE DARK FILTER TECHNIQUE:
-    We stack a dark linear-gradient ON TOP of the background image
-    in the same `background` property. The gradient is painted first
-    (frontmost), the image behind it — so the image shows through
-    but darkened/tinted by the gradient's opacity.
-    --bg-image is set inline in Login.jsx from the imported BG.jpeg.
-  */
-  background:
-    linear-gradient(180deg, rgba(3, 13, 2, 0.75) 0%, rgba(0, 0, 0, 0.92) 100%),
-    var(--bg-image) center / cover no-repeat;
+  
 }
 
 .card {
+  composes: surface from "./AuthPresentation.module.css";
   width: 100%;
   max-width: 420px;
   display: flex;
@@ -28,9 +20,12 @@
 }
 
 .logo {
-  width: 180px;
+  display: block;
+  width: 320px;
+  max-width: 100%;
   height: auto;
-  margin-bottom: var(--space-md);
+  margin-inline: auto;
+  margin-bottom: var(--space-6);
 }
 
 .tagline {
@@ -41,18 +36,19 @@
 
 .formCard {
   width: 100%;
-  background: var(--gradient-glass-card);
-  border: 1px solid var(--color-border-glow);
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: var(--glass-shadow);
-  padding: var(--space-xl);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
 }
 
 .welcome {
-  font-size: var(--text-xl);
+  font-size: var(--font-size-3xl);
   margin-bottom: var(--space-xs);
+
+  font-weight: var(--font-weight-bold);
+
+  line-height: var(--line-height-tight);
 }
 
 .subtitle {
@@ -81,13 +77,9 @@
 }
 
 .input {
+  composes: control from "../../../components/shared/UIPrimitives.module.css";
   width: 100%;
-  background: var(--color-bg-input);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-sm) var(--space-md) var(--space-sm) 44px;
-  font-size: var(--text-base);
-  color: var(--color-text-primary);
+  padding: var(--space-3) var(--space-md) var(--space-3) var(--space-input-icon);
 }
 
 .input::placeholder {
@@ -147,5 +139,24 @@
 
 .signupLink {
   color: var(--color-accent-active);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
+/* Focused auth presentation; keep existing fields and reset stages intact. */
+.card { min-width: 0; padding: var(--space-6); }
+.title, .welcome { font-size: var(--font-size-2xl); overflow-wrap: anywhere; }
+.subtitle, .tagline { overflow-wrap: anywhere; }
+.inputWrapper, .field { min-width: 0; }
+.input { min-width: 0; padding-right: var(--space-input-icon); }
+.eyeToggle { width: var(--space-8); height: var(--space-8); justify-content: center; right: var(--space-2); border-radius: var(--radius-sm); }
+.eyeToggle:hover { background: var(--color-primary-soft); }
+.error { composes: error from "../../../components/shared/UIPrimitives.module.css"; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .wrapper { padding: var(--space-4); } }
+
+.rememberRow { gap: var(--space-3); flex-wrap: wrap; }
+
+.tagline { text-align: center; margin-bottom: var(--space-6); }
+
+.input { background: var(--color-surface); }
+@media (max-width: 480px) { .card { padding: var(--space-5); } }
+
+@media (max-width: 480px) { .logo { width: 280px; margin-bottom: var(--space-5); } }

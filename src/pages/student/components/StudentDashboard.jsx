@@ -1,3 +1,4 @@
+import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -5,15 +6,16 @@ import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp } from 'lucide-re
 import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
 import { useAuth } from '../../../context/login/useAuth';
-import { getDashboardData, getSubjectsData, getSubjectWeeks } from '../../../services/student/studentService';
 import { findAvailableWeek } from '../../../utils/backendContract';
 import styles from '../styles/StudentDashboard.module.css';
 
 // Find the first published, unlocked, incomplete week across subjects.
 export default function StudentDashboard() {
+  const workflow = useStudentWorkflow();
+  const { getDashboardData, getSubjectsData, getSubjectWeeks } = workflow.api;
   const { user } = useAuth();
   const navigate = useNavigate();
-  const firstName = user?.name?.split(' ')[0] ?? 'there';
+  const firstName = (workflow.target ?? user)?.name?.split(' ')[0] ?? 'there';
 
   const [summary, setSummary] = useState(null);
   const [subjects, setSubjects] = useState([]);
@@ -34,7 +36,7 @@ export default function StudentDashboard() {
       if (!controller.signal.aborted) { logStudentError('load-dashboard', error); setStatsStatus('error'); }
     });
     return () => controller.abort();
-  }, [statsRetry]);
+  }, [statsRetry, getDashboardData]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -45,7 +47,7 @@ export default function StudentDashboard() {
       if (!controller.signal.aborted) { logStudentError('load-subjects', error); setSubjectsStatus('error'); }
     });
     return () => controller.abort();
-  }, [subjectsRetry]);
+  }, [subjectsRetry, getSubjectsData]);
 
   useEffect(() => {
     if (subjectsStatus !== 'ready') return;
@@ -66,7 +68,7 @@ export default function StudentDashboard() {
         setContinueStatus(failed ? 'error' : 'ready');
       });
     return () => controller.abort();
-  }, [subjects, subjectsStatus, continueRetry]);
+  }, [subjects, subjectsStatus, continueRetry, getSubjectWeeks]);
 
   const statCards = summary ? [
     { id: 'completedModules', icon: CheckCircle2, value: summary.completedModules, label: 'Modules completed' },
@@ -131,8 +133,8 @@ export default function StudentDashboard() {
                 <Button
                   onClick={() =>
                     nextLesson
-                      ? navigate(`/student/lesson/${nextLesson.subject.subjectId}/${nextLesson.week.weekId}`)
-                      : navigate('/student/subjects')
+                      ? navigate(`${workflow.basePath}/lesson/${nextLesson.subject.subjectId}/${nextLesson.week.weekId}`)
+                      : navigate(workflow.basePath + '/subjects')
                   }
                 >
                   Continue

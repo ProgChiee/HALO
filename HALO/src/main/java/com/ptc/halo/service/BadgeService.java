@@ -49,28 +49,32 @@ public class BadgeService {
     public void checkAndAwardBadges(
             UserEntity student,
             AssessmentAttemptEntity currentAttempt) {
+        checkAndAwardBadges(student, currentAttempt, null);
+    }
+    @Transactional
+    public void checkAndAwardBadges(UserEntity student, AssessmentAttemptEntity currentAttempt, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         // Reuse the assessment lifecycle lock before any award reads. The surrounding
         // transaction retains it through commit, including badge and audit writes.
         userRepository.findForAssessmentLifecycle(student.getId()).orElseThrow(() ->
                 new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND"));
-        checkProgressBadges(student);
+        checkProgressBadges(student, acting);
         if (studentModuleProgressRepository.countEligibleCompletedModules(student.getId()) > 0) {
-            awardBadge(student, BadgeType.MODULE_FINISHER, "Module Finisher",
+            awardBadge(student, acting, BadgeType.MODULE_FINISHER, "Module Finisher",
                     "Fully completed an available learning module.");
         }
         if (studentModuleProgressRepository.countMasteredEligibleSubjects(student.getId()) > 0) {
-            awardBadge(student, BadgeType.SUBJECT_MASTER, "Subject Master",
+            awardBadge(student, acting, BadgeType.SUBJECT_MASTER, "Subject Master",
                     "Completed every published, available module in one subject.");
         }
 
         checkAssessmentBadges(
-                student,
+                student, acting,
                 currentAttempt
         );
 
-        checkHaloAchiever(student);
+        checkHaloAchiever(student, acting);
     }
 
 
@@ -79,7 +83,7 @@ public class BadgeService {
     // =========================================
 
     private void checkProgressBadges(
-            UserEntity student) {
+            UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         long completedModules =
                 studentModuleProgressRepository
@@ -91,7 +95,7 @@ public class BadgeService {
         if (completedModules >= 1) {
 
             awardBadge(
-                    student,
+                    student, acting,
                     BadgeType.FIRST_STEP,
                     "First Step",
                     "Completed your first learning module."
@@ -102,7 +106,7 @@ public class BadgeService {
         if (completedModules >= 3) {
 
             awardBadge(
-                    student,
+                    student, acting,
                     BadgeType.GETTING_STARTED,
                     "Getting Started",
                     "Completed 3 learning modules."
@@ -113,7 +117,7 @@ public class BadgeService {
         if (completedModules >= 5) {
 
             awardBadge(
-                    student,
+                    student, acting,
                     BadgeType.KNOWLEDGE_SEEKER,
                     "Knowledge Seeker",
                     "Completed 5 learning modules."
@@ -124,7 +128,7 @@ public class BadgeService {
         if (completedModules >= 10) {
 
             awardBadge(
-                    student,
+                    student, acting,
                     BadgeType.DEDICATED_LEARNER,
                     "Dedicated Learner",
                     "Completed 10 learning modules."
@@ -138,7 +142,7 @@ public class BadgeService {
     // =========================================
 
     private void checkAssessmentBadges(
-            UserEntity student,
+            UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting,
             AssessmentAttemptEntity currentAttempt) {
 
 
@@ -147,7 +151,7 @@ public class BadgeService {
                 currentAttempt.getScore() == 100) {
 
             awardBadge(
-                    student,
+                    student, acting,
                     BadgeType.PERFECT_SCORE,
                     "Perfect Score",
                     "Earned a perfect score on an assessment."
@@ -181,7 +185,7 @@ public class BadgeService {
             if (submittedAttempts == 1) {
 
                 awardBadge(
-                        student,
+                        student, acting,
                         BadgeType.FIRST_TRY,
                         "First Try",
                         "Passed an assessment on the first attempt."
@@ -214,7 +218,7 @@ public class BadgeService {
             if (previouslyFailed) {
 
                 awardBadge(
-                        student,
+                        student, acting,
                         BadgeType.NEVER_GIVE_UP,
                         "Never Give Up",
                         "Passed an assessment after a previous failed attempt."
@@ -225,7 +229,7 @@ public class BadgeService {
 
         // COMEBACK STRONGER
         checkComebackBadge(
-                student,
+                student, acting,
                 currentAttempt,
                 attempts
         );
@@ -241,7 +245,7 @@ public class BadgeService {
         if (passedAssessments >= 5) {
 
             awardBadge(
-                    student,
+                    student, acting,
                     BadgeType.ASSESSMENT_ACE,
                     "Assessment Ace",
                     "Passed 5 assessments."
@@ -255,7 +259,7 @@ public class BadgeService {
     // =========================================
 
     private void checkComebackBadge(
-            UserEntity student,
+            UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting,
             AssessmentAttemptEntity currentAttempt,
             List<AssessmentAttemptEntity> attempts) {
 
@@ -296,7 +300,7 @@ public class BadgeService {
         if (improvement >= 20) {
 
             awardBadge(
-                    student,
+                    student, acting,
                     BadgeType.COMEBACK_STRONGER,
                     "Comeback Stronger",
                     "Improved your assessment score by at least 20 points."
@@ -310,7 +314,7 @@ public class BadgeService {
     // =========================================
 
     private void checkHaloAchiever(
-            UserEntity student) {
+            UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         long totalBadges = studentBadgeRepository.findByStudentIdOrderByEarnedAtDesc(student.getId())
                 .stream().map(StudentBadgeEntity::getBadgeType)
@@ -319,7 +323,7 @@ public class BadgeService {
         if (totalBadges >= 10) {
 
             awardBadge(
-                    student,
+                    student, acting,
                     BadgeType.HALO_ACHIEVER,
                     "HALO Achiever",
                     "Earned 10 distinct ordinary HALO badges."
@@ -333,7 +337,7 @@ public class BadgeService {
     // =========================================
 
     private void awardBadge(
-            UserEntity student,
+            UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting,
             BadgeType badgeType,
             String badgeName,
             String description) {
@@ -375,8 +379,8 @@ public class BadgeService {
 
         studentBadgeRepository.save(badge);
 
-        activityLogService.createLog(
-                student,
+        writeStudentAudit(
+                student, acting,
                 ActivityType.BADGE,
                 "Earned badge: " + badge.getBadgeName());
     }
@@ -416,5 +420,10 @@ public class BadgeService {
                     return response;
                 })
                 .toList();
+    }
+
+    private void writeStudentAudit(UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting, ActivityType type, String action) {
+        if (acting == null) activityLogService.createLog(student,type,action);
+        else activityLogService.createStudentLog(student,acting,type,action);
     }
 }

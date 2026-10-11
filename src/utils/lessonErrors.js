@@ -1,4 +1,7 @@
 const reasons = {
+  PREVIEW_LIMIT_REACHED: 'This temporary preview has reached its limit. Exit and start a new preview to continue.',
+  PREVIEW_STATE_CHANGED: 'The assessment changed during this preview. Exit and start a new preview.',
+  PREVIEW_OPERATION_PENDING: 'Another preview action is still running. Wait a moment and try again.',
   MESSAGE_REQUIRED: 'Enter a message between 1 and 4,000 characters. Shorten longer messages before sending.',
   MODULE_MATERIALS_REQUIRED: 'This module needs uploaded learning materials before its mentor chat can open. Contact your professor.',
   MODULE_MATERIAL_UNREADABLE: 'A learning material could not be read. Ask your professor to check the uploaded files.',

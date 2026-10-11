@@ -1,9 +1,9 @@
+import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronDown, ChevronUp, CheckCircle2, Play, Lock, BookOpen } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
-import { getSubjectsData, getSubjectWeeks } from '../../../services/student/studentService';
 import { useSubjectWeeks } from '../../../hooks/useSubjectWeeks';
 import styles from '../styles/Subjects.module.css';
 
@@ -22,6 +22,8 @@ import styles from '../styles/Subjects.module.css';
 //   (see studentService.js notes), so those were removed from the header.
 
 export default function Subjects() {
+  const workflow = useStudentWorkflow();
+  const { getSubjectsData, getSubjectWeeks } = workflow.api;
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +52,7 @@ export default function Subjects() {
 
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [getSubjectsData]);
 
   async function toggleSubject(subjectId) {
     if (expandedSubjectId === subjectId) {
@@ -171,7 +173,7 @@ export default function Subjects() {
                             className={`${styles.weekRow} ${styles[`weekRow_${status}`]} ${status === 'locked' ? styles.weekRowLocked : ''}`}
                             onClick={() => {
                               if (status !== 'locked') {
-                                navigate(`/student/lesson/${subject.subjectId}/${week.weekId}`);
+                                navigate(`${workflow.basePath}/lesson/${subject.subjectId}/${week.weekId}`);
                               }
                             }}
                           >

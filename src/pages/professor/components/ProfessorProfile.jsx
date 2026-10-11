@@ -2,10 +2,10 @@ import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useEffect } from 'react';
 import { User as UserIcon, KeyRound } from 'lucide-react';
-import PageShell from '../../../components/shared/PageShell';
+import PageShell from './ProfessorPageShell';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
-import { getProfessorProfile } from '../../../services/professor/professorService';
+import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/ProfessorProfile.module.css';
 
@@ -18,6 +18,8 @@ import styles from '../styles/ProfessorProfile.module.css';
 // in professorService.js is still flagged as unavailable).
 
 export default function ProfessorProfile() {
+  const workflow = useProfessorWorkflow();
+  const { getProfessorProfile } = workflow.api;
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [retry, setRetry] = useState(0);
@@ -39,7 +41,7 @@ export default function ProfessorProfile() {
     }
     loadData();
     return () => { isMounted = false; };
-  }, [retry]);
+  }, [retry, getProfessorProfile]);
 
   if (isLoading) {
     return (
@@ -104,7 +106,7 @@ export default function ProfessorProfile() {
             <span className={styles.infoValue}>{STATUS_LABELS[profile.status] ?? profile.status}</span>
           </div>
 
-          <h2 className={styles.sectionTitle}>Account</h2>
+          {!workflow.acting && <><h2 className={styles.sectionTitle}>Account</h2>
 
           <button
             className={styles.actionRow}
@@ -114,11 +116,11 @@ export default function ProfessorProfile() {
               <KeyRound size={16} />
             </span>
             Change password
-          </button>
+          </button></>}
         </main>
       </div>
 
-      <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
+      {!workflow.acting && <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />}
     </PageShell>
   );
 }

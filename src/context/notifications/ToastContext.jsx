@@ -59,7 +59,7 @@ export function ToastProvider({ children }) {
           zIndex: 1000,
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
+          gap: 'var(--space-2)',
         }}
       >
         {toasts.map((t) => (

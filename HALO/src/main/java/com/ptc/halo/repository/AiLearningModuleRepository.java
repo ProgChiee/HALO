@@ -28,7 +28,7 @@ public interface AiLearningModuleRepository
             LessonStatus status
     );
 
-    @EntityGraph(attributePaths = {"files"})
+    @EntityGraph(attributePaths = {"files", "week.subject"})
     Optional<AiLearningModuleEntity> findWithFilesById(Long id);
 
     @EntityGraph(attributePaths = {"files", "week"})

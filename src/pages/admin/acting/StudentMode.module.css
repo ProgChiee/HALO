@@ -1,0 +1,18 @@
+.selector { composes: selector from "./ActingMode.module.css"; }
+.banner { composes: banner from "./ActingMode.module.css"; }
+.actions { composes: actions from "./ActingMode.module.css"; }
+.targets { composes: targets from "./ActingMode.module.css"; }
+
+.previewBanner { background: var(--color-info-soft); }
+.previewBanner strong { color: var(--color-info-text); }
+.supportBanner { background: var(--color-accent-soft-bg); border-bottom-color: var(--color-warning-border); }
+.supportBanner strong { color: var(--color-warning-text); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: var(--space-4); margin-block: var(--space-6); }
+.choices > h2 { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.choices > div { padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.choices small { display: block; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.choices > div:first-of-type button { background: var(--color-primary); color: var(--color-surface); }
+.choices > div:first-of-type button:hover:not(:disabled) { background: var(--color-primary-hover); }
+
+.confirmDialog { width: min(100%, 34rem); padding: var(--space-6); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-dialog); }
+.confirmDialog p { margin-block: var(--space-4); }

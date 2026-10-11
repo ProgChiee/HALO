@@ -52,6 +52,8 @@ class ProfessorStudentScopeTest {
   assertEquals(2,service.getStudents(a).size());assertEquals(2,service.getStudents(b).size());
  }
  @Test void paginatedSummariesScopeCountsAndKeepZeroActivityStudents() {
+  var eligible=new StudentProfileEntity();eligible.setUser(empty);eligible.setStudentId("S2");eligible.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(eligible);
+  var outside=user("outside",Role.STUDENT);var excluded=new StudentProfileEntity();excluded.setUser(outside);excluded.setStudentId("S3");excluded.setYearLevel(YearLevel.SECOND_YEAR);profiles.saveAndFlush(excluded);
   var stats=entityManager.getEntityManagerFactory().unwrap(org.hibernate.SessionFactory.class).getStatistics();
   stats.setStatisticsEnabled(true);entityManager.flush();entityManager.clear();stats.clear();
   var first=service.getProgressSummaries(a,0,1);

@@ -20,6 +20,18 @@ public class ActivityLogService {
         this.activityLogRepository = activityLogRepository;
     }
 
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void createPreviewLog(UserEntity admin, UserEntity target, String action) {
+        ActivityLogEntity log = new ActivityLogEntity();
+        log.setUser(admin);
+        log.setActingTarget(target);
+        log.setActingTargetRole(Role.STUDENT);
+        log.setActivityType(ActivityType.ACCOUNT);
+        log.setAction(action + " by Admin " + admin.getId() + " viewing Student " + target.getId());
+        log.setCreatedAt(LocalDateTime.now());
+        activityLogRepository.save(log);
+    }
+
     // Must participate in the mutation transaction; the session supplies immutable provenance.
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void createActingLog(com.ptc.halo.entity.AdminActingSessionEntity session, String action) {
@@ -43,6 +55,14 @@ public class ActivityLogService {
             ActivityType type, String action) {
         if (acting == null) { createLog(professor, type, action); return; }
         if (acting.getTargetRole() != Role.PROFESSOR || !acting.getTarget().getId().equals(professor.getId()))
+            throw new org.springframework.security.access.AccessDeniedException("Invalid acting target");
+        createActingLog(acting, type, action);
+    }
+
+    public void createStudentLog(UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting,
+            ActivityType type, String action) {
+        if (acting == null) { createLog(student, type, action); return; }
+        if (acting.getTargetRole() != Role.STUDENT || !acting.getTarget().getId().equals(student.getId()))
             throw new org.springframework.security.access.AccessDeniedException("Invalid acting target");
         createActingLog(acting, type, action);
     }

@@ -83,7 +83,7 @@ export default function StudentManagement() {
         {isLoading ? (
           <p className={styles.loadingText}>Loading students...</p>
         ) : loadError ? (
-          <div className={styles.tableCard} style={{ padding: '3rem', textAlign: 'center' }}>
+          <div className={styles.tableCard} style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
             <p className={styles.loadingText}>Couldn't load students. Please check your connection.</p>
             <button
               onClick={loadStudents}
@@ -100,7 +100,7 @@ export default function StudentManagement() {
               <span role="columnheader" id="student-column-2">Email</span>
               <span role="columnheader" id="student-column-3">Year</span>
               <span role="columnheader" id="student-column-4">Progress</span>
-              <span role="columnheader" id="student-column-5">Status</span>
+              <span role="columnheader" id="student-column-5">Account Action</span>
               <span role="columnheader" id="student-column-6">Actions</span>
             </div>
 
@@ -115,8 +115,16 @@ export default function StudentManagement() {
                 <span role="cell" aria-describedby="student-column-2" className={styles.studentEmail}>{accountDisplay(student.email, 'Email not provided')}</span>
                 <span role="cell" aria-describedby="student-column-3" className={styles.studentYear}>{yearLevelLabel(student.yearLevel)}</span>
                 <span role="cell" aria-describedby="student-column-4" className={styles.studentProgress}>—</span>
-                <span role="cell" aria-describedby="student-column-5" className={`${styles.statusText} ${styles[`status_${student.status?.toLowerCase()}`]}`}>
-                  {STATUS_LABELS[student.status] ?? student.status}
+                <span role="cell" aria-describedby="student-column-5" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className={`${styles.actionBtn} ${student.status === 'ACTIVE' ? styles.actionBtnOff : ''}`}
+                    onClick={() => handleToggleStatus(student)}
+                    disabled={togglingId !== null}
+                    aria-label={student.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                  >
+                    <Power size={15} aria-hidden="true" />
+                    {student.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
+                  </button>
                 </span>
                 <span role="cell" aria-describedby="student-column-6" className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
@@ -124,16 +132,9 @@ export default function StudentManagement() {
                     onClick={() => setViewingStudent(student)}
                     aria-label="View"
                   >
-                    <Eye size={15} />
+                    <Eye size={15} aria-hidden="true" /> View
                   </button>
-                  <button
-                    className={`${styles.actionBtn} ${student.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
-                    onClick={() => handleToggleStatus(student)}
-                    disabled={togglingId !== null}
-                    aria-label={student.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                  >
-                    <Power size={15} />
-                  </button>
+
                 </span>
               </div>
             ))}

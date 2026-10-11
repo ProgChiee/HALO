@@ -1,9 +1,9 @@
+import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { User as UserIcon, KeyRound } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
-import { getProfileData } from '../../../services/student/studentService';
 import styles from '../styles/Profile.module.css';
 
 // ✅ Wired to the real backend — StudentProfileResponse has
@@ -17,6 +17,8 @@ const YEAR_LEVEL_LABELS = {
 };
 
 export default function Profile() {
+  const workflow = useStudentWorkflow();
+  const { getProfileData } = workflow.api;
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -37,7 +39,7 @@ export default function Profile() {
     }
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [getProfileData]);
 
   if (isLoading) {
     return (
@@ -107,9 +109,9 @@ export default function Profile() {
             <span className={styles.infoValue}>{yearLevelLabel}</span>
           </div>
 
-          <h2 className={styles.sectionTitle}>Account</h2>
+          {!workflow.acting && <h2 className={styles.sectionTitle}>Account</h2>}
 
-          <button
+          {!workflow.acting && <button
             className={styles.actionRow}
             onClick={() => setShowChangePassword(true)}
           >
@@ -117,11 +119,11 @@ export default function Profile() {
               <KeyRound size={16} />
             </span>
             Change password
-          </button>
+          </button>}
         </main>
       </div>
 
-      <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
+      {!workflow.acting && <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />}
     </StudentPageShell>
   );
 }

@@ -139,9 +139,16 @@ public class MentorService {
     }
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public MentorSessionResponse sendMessage(Long sessionId, UserEntity student, String studentMessage, String requestId) {
+        return sendMessage(sessionId, student, studentMessage, requestId, () -> {}, () -> {});
+    }
+    // Server-supplied callbacks run inside short transactions, never during indexing/AI.
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public MentorSessionResponse sendMessage(Long sessionId, UserEntity student, String studentMessage, String requestId,
+            Runnable validateActingAccess, Runnable auditExchange) {
         String key = requestKey(requestId);
         if (key != null) {
             var existing = transactions.execute(tx -> {
+            validateActingAccess.run();
                 var session = ownedSession(sessionId, student);
                 progressionService.validateModuleAccess(session.getModule().getId(), currentStudent(student));
                 return existingExchange(sessionId, session.getModule().getId(), key, studentMessage);
@@ -149,6 +156,7 @@ public class MentorService {
             if (existing != null) return existing;
         }
         Captured captured = transactions.execute(tx -> {
+            validateActingAccess.run();
             var session = ownedSession(sessionId, student);
             if (studentMessage == null || studentMessage.isBlank() || studentMessage.length() > 4000)
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "MESSAGE_REQUIRED");
@@ -164,6 +172,7 @@ public class MentorService {
         String reply = answerWithinModule(captured.module(), studentMessage, captured.history());
         if (reply == null || reply.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "MENTOR_EMPTY_RESPONSE");
         return transactions.execute(tx -> {
+            validateActingAccess.run();
             var module = revalidate(captured, student);
             var session = ownedSession(sessionId, student);
             if (!Objects.equals(session.getModule().getId(), module.getId()))
@@ -174,6 +183,7 @@ public class MentorService {
             saveMessage(session, MessageSender.HALO, reply, key);
             session.setLastActivityAt(LocalDateTime.now()); session.setProgressStatus(MentorProgressStatus.LEARNING);
             mentorSessionRepository.save(session);
+            auditExchange.run();
             var response = new MentorSessionResponse(); response.setSessionId(sessionId);
             response.setModuleId(module.getId()); response.setHaloMessage(reply); return response;
         });
@@ -206,12 +216,20 @@ public class MentorService {
     }
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public MentorConversationResponse openSession(Long moduleId, UserEntity student) {
-        Captured captured = transactions.execute(tx -> capture(moduleId, student, ""));
+        return openSession(moduleId, student, () -> {}, () -> {});
+    }
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public MentorConversationResponse openSession(Long moduleId, UserEntity student,
+            Runnable validateActingAccess, Runnable auditOpen) {
+        Captured captured = transactions.execute(tx -> { validateActingAccess.run(); return capture(moduleId, student, ""); });
         materialIndex.getOrBuild(captured.module());
-        return transactions.execute(tx -> finishOpen(moduleId, student, revalidate(captured, student)));
+        return transactions.execute(tx -> {
+            validateActingAccess.run();
+            return finishOpen(moduleId, student, revalidate(captured, student), auditOpen);
+        });
     }
 
-    private MentorConversationResponse finishOpen(Long moduleId, UserEntity student, AiLearningModuleEntity module) {
+    private MentorConversationResponse finishOpen(Long moduleId, UserEntity student, AiLearningModuleEntity module, Runnable auditOpen) {
         MentorSessionEntity session =
                 mentorSessionRepository
                         .findByStudentIdAndModuleId(
@@ -261,10 +279,33 @@ public class MentorService {
             );
 
             mentorSessionRepository.save(session);
+            auditOpen.run();
         }
 
 
         return conversationWindow(session.getId(), moduleId, null);
+    }
+
+    // Preview reuses exactly the same capture, indexing, retrieval, prompts and
+    // revalidation as real Mentor, but never touches session/message repositories.
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public void preparePreview(Long moduleId, UserEntity student, Runnable guard) {
+        Captured captured = transactions.execute(tx -> { guard.run(); return capture(moduleId, student, ""); });
+        materialIndex.getOrBuild(captured.module());
+        transactions.executeWithoutResult(tx -> { guard.run(); revalidate(captured, student); });
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public String answerPreview(Long moduleId, UserEntity student, String message, String history, Runnable guard) {
+        if (message == null || message.isBlank() || message.length() > 4000)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "MESSAGE_REQUIRED");
+        Captured captured = transactions.execute(tx -> {
+            guard.run(); return capture(moduleId, student, history + MessageSender.STUDENT + ": " + message + "\n");
+        });
+        String reply = answerWithinModule(captured.module(), message, captured.history());
+        if (reply == null || reply.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "MENTOR_EMPTY_RESPONSE");
+        transactions.executeWithoutResult(tx -> { guard.run(); revalidate(captured, student); });
+        return reply;
     }
 
     private String answerWithinModule(AiLearningModuleEntity module, String question, String history) {

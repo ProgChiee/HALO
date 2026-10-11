@@ -5,8 +5,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.6);
+  padding: var(--space-4);
+  background: var(--color-overlay);
   overscroll-behavior: contain;
 }
 .dialog {
@@ -21,5 +21,5 @@
 }
 .dialog :focus-visible { outline: 2px solid var(--color-accent-active); outline-offset: 3px; }
 @media (max-width: 480px) {
-  .dialog { padding: 1rem; }
+  .dialog { padding: var(--space-4); }
 }

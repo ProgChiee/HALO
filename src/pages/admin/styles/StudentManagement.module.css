@@ -1,23 +1,15 @@
 .topbar {
-  display: flex;
-  align-items: center;
+ composes: topbar from "../../../components/shared/Navigation.module.css";
   padding: var(--space-md) var(--space-xl);
-  border-bottom: 1px solid var(--color-border-panel);
 }
 
 .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  font-size: var(--text-sm);
+ composes: breadcrumb from "../../../components/shared/Navigation.module.css";
 }
 
 .main {
+  composes: wide from "../../../components/shared/PageLayout.module.css";
   padding: var(--space-xl);
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .searchWrapper {
@@ -36,13 +28,9 @@
 }
 
 .searchInput {
+  composes: control from "../../../components/shared/UIPrimitives.module.css";
   width: 100%;
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-md);
-  padding: var(--space-sm) var(--space-md) var(--space-sm) 44px;
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
+  padding: var(--space-3) var(--space-md) var(--space-3) var(--space-input-icon);
 }
 
 .searchInput::placeholder {
@@ -54,33 +42,26 @@
 }
 
 .loadingText {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  composes: loading from "../../../components/shared/UIPrimitives.module.css";
 }
 
 /* --- Table --- */
 .tableCard {
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-stat-card);
-  border-radius: var(--radius-lg);
+  composes: surface from "../../../components/shared/UIPrimitives.module.css";
   overflow: hidden;
 }
 
 .tableHeaderRow {
+  composes: tableHeading from "../../../components/shared/UIPrimitives.module.css";
   display: grid;
-  grid-template-columns: 1.3fr 1.8fr 0.9fr 0.9fr 0.8fr 0.9fr;
+  grid-template-columns: 1.3fr 1.8fr 0.9fr 0.9fr 132px 80px;
   gap: var(--space-md);
   padding: var(--space-md) var(--space-lg);
-  background: var(--color-bg-topbar);
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .tableRow {
   display: grid;
-  grid-template-columns: 1.3fr 1.8fr 0.9fr 0.9fr 0.8fr 0.9fr;
+  grid-template-columns: 1.3fr 1.8fr 0.9fr 0.9fr 132px 80px;
   gap: var(--space-md);
   align-items: center;
   padding: var(--space-md) var(--space-lg);
@@ -98,7 +79,7 @@
 }
 
 .studentName {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
@@ -111,66 +92,67 @@
 
 .studentYear {
   color: var(--color-text-primary);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .studentProgress {
   color: var(--color-accent-active);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .statusText {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .status_active {
-  color: var(--color-accent-active);
+  composes: successText from "../../../components/shared/UIPrimitives.module.css";
 }
 
 .status_inactive {
-  color: var(--color-error);
+  composes: dangerText from "../../../components/shared/UIPrimitives.module.css";
 }
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-xs);
 }
 
 .actionBtn {
-  width: 28px;
-  height: 28px;
+  min-height: 32px;
+  padding: var(--space-2);
+  gap: var(--space-2);
+  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-bg-nav-active);
-  border: 1px solid rgba(0, 212, 92, 0.4);
+  border: 1px solid var(--color-primary-border);
   border-radius: var(--radius-sm);
   color: var(--color-accent-active);
   transition: background var(--transition-fast);
 }
 
 .actionBtn:hover {
-  background: rgba(0, 212, 92, 0.25);
+  background: var(--color-primary-soft);
 }
 
 .actionBtnOff {
-  background: rgba(230, 90, 90, 0.12);
-  border-color: rgba(230, 90, 90, 0.4);
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-border);
   color: var(--color-error);
 }
 
 .emptyState {
+  composes: empty from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xl);
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
 
 /* --- View modal --- */
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -179,6 +161,7 @@
 }
 
 .modal {
+  composes: dialogSurface from "../../../components/shared/UIPrimitives.module.css";
   box-sizing: border-box;
   min-width: 0;
   max-height: calc(100vh - 2rem);
@@ -188,11 +171,7 @@
   overflow-wrap: anywhere;
   width: 100%;
   max-width: 440px;
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border-glow);
-  border-radius: var(--radius-lg);
-  padding: var(--space-xl);
-  box-shadow: var(--glass-shadow);
+  padding: var(--space-6);
   animation: modalPopIn 180ms ease;
 }
 
@@ -210,23 +189,22 @@
 }
 
 .modalTitle {
-  font-size: var(--text-lg);
+  font-size: var(--font-size-xl);
   color: var(--color-text-primary);
+
+  font-weight: var(--font-weight-semibold);
+
+  line-height: var(--line-height-heading);
 }
 
 .closeBtn {
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  display: flex;
-  flex-shrink: 0;
+  composes: iconButton from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xs);
-  border-radius: var(--radius-sm);
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .closeBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-background);
   color: var(--color-text-primary);
 }
 
@@ -243,13 +221,13 @@
   height: 48px;
   border-radius: 50%;
   background: var(--color-bg-nav-active);
-  border: 1px solid rgba(0, 212, 92, 0.4);
+  border: 1px solid var(--color-primary-border);
   color: var(--color-text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   flex-shrink: 0;
 }
 
@@ -280,7 +258,7 @@
 
 .detailRow:hover {
   background: var(--color-bg-nav-active);
-  border-color: rgba(0, 212, 92, 0.3);
+  border-color: var(--color-primary-border);
 }
 
 .detailLabel {
@@ -290,7 +268,7 @@
 
 .detailValue {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 /* Keep wide account rows within a local scroll region. */
@@ -298,13 +276,24 @@
 .tableHeaderRow, .tableRow { min-width: 760px; }
 .tableHeaderRow > *, .tableRow > * { min-width: 0; overflow-wrap: anywhere; }
 .main, .searchWrapper { min-width: 0; }
-.searchInput { box-sizing: border-box; min-width: 0; }
+.searchInput { box-sizing: border-box; min-width: 0; 
+  border-radius: var(--radius-sm);
+}
 @media (max-width: 768px) {
- .toolbarRow { flex-wrap: wrap; gap: 1rem; }
+ .toolbarRow {
+  composes: toolbar from "../../../components/shared/PageLayout.module.css"; }
  .searchWrapper { width: 100%; max-width: 100%; }
 }
 
 @media (max-width: 480px), (max-height: 500px) {
-  .modal { padding: 1rem; }
-  .detailRow { flex-wrap: wrap; gap: 0.5rem; }
+  .modal { padding: var(--space-4); 
+  border-radius: var(--radius-xl);
+
+  box-shadow: var(--shadow-lg);
 }
+  .detailRow { flex-wrap: wrap; gap: var(--space-2); }
+}
+
+.actionBtnOff:hover { background: var(--color-danger-soft); }
+.actionBtn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.actionBtn:disabled { opacity: 0.6; cursor: not-allowed; }

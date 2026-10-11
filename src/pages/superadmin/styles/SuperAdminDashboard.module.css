@@ -16,31 +16,27 @@
 }
 
 .topbar {
-  display: flex;
-  align-items: center;
+ composes: topbar from "../../../components/shared/Navigation.module.css";
   padding: var(--space-md) var(--space-xl);
-  border-bottom: 1px solid var(--color-border-panel);
 }
 
 .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  font-size: var(--text-sm);
+ composes: breadcrumb from "../../../components/shared/Navigation.module.css";
 }
 
 .main {
+  composes: wide from "../../../components/shared/PageLayout.module.css";
   padding: var(--space-xl);
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .greeting {
-  font-size: var(--text-2xl);
+  font-size: var(--font-size-3xl);
   color: var(--color-text-primary);
   margin-bottom: var(--space-xs);
+
+  font-weight: var(--font-weight-bold);
+
+  line-height: var(--line-height-tight);
 }
 
 .subtext {
@@ -50,16 +46,12 @@
 }
 
 .statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-md);
+  composes: metrics from "../../../components/shared/PageLayout.module.css";
   margin-bottom: var(--space-xl);
 }
 
 .statCard {
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-stat-card);
-  border-radius: var(--radius-stat-card);
+  composes: surface from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-lg);
 }
 
@@ -69,7 +61,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 212, 92, 0.08);
+  background: var(--color-primary-soft);
   border: 1.5px solid var(--color-accent-active);
   border-radius: 50%;
   color: var(--color-accent-active);
@@ -78,7 +70,7 @@
 
 .statValue {
   font-size: var(--text-2xl);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }
 
@@ -92,9 +84,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  font-size: var(--text-lg);
+  font-size: var(--font-size-2xl);
   color: var(--color-accent-active);
   margin-bottom: var(--space-md);
+
+  font-weight: var(--font-weight-semibold);
+
+  line-height: var(--line-height-heading);
 }
 
 .activityList {
@@ -119,7 +115,7 @@
 }
 
 .activityActor {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-accent-active);
 }
 
@@ -131,13 +127,12 @@
 }
 
 .loadingText {
+  composes: loading from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xl);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
 .activityRow > div { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 768px) {
-  .activityRow { align-items: flex-start; flex-direction: column; gap: 0.5rem; }
+  .activityRow { align-items: flex-start; flex-direction: column; gap: var(--space-2); }
   .activityTime { margin-left: 0; }
   .statsGrid { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
 }

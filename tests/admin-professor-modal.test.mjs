@@ -80,8 +80,8 @@ for (const mode of ['create', 'edit']) test('AD-12 '+mode+' refresh preserves ne
   await act(async()=>calls[3].resolve([{...row,name:'Refreshed Professor',status:'ACTIVE'},...(mode==='create'?[{...row,id:2,name:'New Professor',professorId:'P2'}]:[])]));
   assert.equal(document.querySelector('form'),null);assert.match(host.textContent,/Refreshed Professor/);
   if(mode==='create')assert.match(host.textContent,/New Professor/);
-  assert.ok(document.querySelector('[aria-label="Activate"]'));
-  await click('[aria-label="Activate"]');
+  assert.ok(document.querySelector('[aria-label="Reactivate"]'));
+  await click('[aria-label="Reactivate"]');
   assert.deepEqual(JSON.parse(calls[4].config.data),{status:'ACTIVE'});
   await act(async()=>calls[4].resolve({...row,status:'ACTIVE'}));
   assert.ok(document.querySelector('[aria-label="Deactivate"]'));assert.equal(calls.length,5);

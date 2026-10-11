@@ -36,5 +36,12 @@ export function useSubjectWeeks(loader) {
     }
   }, [loader]);
 
-  return { weeksBySubject, weeksLoading, weekErrors, loadWeeks };
+  function replaceWeek(subjectId, week) {
+    requests.current.get(subjectId)?.abort();
+    requests.current.delete(subjectId);
+    setWeeksLoading(previous => ({ ...previous, [subjectId]: false }));
+    setWeeksBySubject(previous => ({ ...previous, [subjectId]: previous[subjectId]?.map(item => item.id === week.id ? week : item) ?? [] }));
+  }
+
+  return { weeksBySubject, weeksLoading, weekErrors, loadWeeks, replaceWeek };
 }

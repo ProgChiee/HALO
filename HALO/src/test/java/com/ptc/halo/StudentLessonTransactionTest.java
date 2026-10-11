@@ -56,9 +56,9 @@ class StudentLessonTransactionTest {
         when(week.getSubject()).thenReturn(owner); when(week.getWeekNumber()).thenReturn(1);
         when(access.requireStudent(null)).thenReturn(student);
         doAnswer(inv -> { requireSession(); return null; }).when(progression).validateModuleAccess(15L, student);
-        var target = new StudentAiLearningController(modules, access, progression);
-        assertThrows(LazyInitializationException.class, () -> target.getApprovedLesson(2L, null));
-        var result = transactional(target).getApprovedLesson(2L, null).getBody();
+        var target = new StudentLessonService(modules, progression);
+        assertThrows(LazyInitializationException.class, () -> target.byWeek(2L, student));
+        var result = transactional(target).byWeek(2L, student);
         assertNotNull(result); assertEquals(15L, result.getId());
         assertEquals(9L, result.getSubjectId()); assertEquals(1, result.getWeekNumber()); assertEquals(2L, result.getWeekId()); assertEquals("Published summary", result.getGeneratedSummary());
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());

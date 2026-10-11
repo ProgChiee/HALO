@@ -1,0 +1,12 @@
+/* Content composition only; navigation and visual primitives stay separate. */
+.regular, .wide, .focused, .profile { width: 100%; min-width: 0; margin-inline: auto; box-sizing: border-box; }
+.regular { max-width: 1280px; }
+.wide { max-width: 1440px; }
+.focused { max-width: 880px; }
+.profile { max-width: 720px; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-4); align-items: stretch; }
+.metrics > * { min-width: 0; }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: var(--space-6); align-items: start; }
+.panels > * { min-width: 0; }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
+@media (max-width: 768px) { .metrics, .panels { grid-template-columns: minmax(0, 1fr); } }

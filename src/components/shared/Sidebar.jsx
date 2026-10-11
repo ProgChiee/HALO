@@ -1,6 +1,8 @@
+import { Fragment } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../../context/login/useAuth';
+import haloLogo from '../../assets/login/Icon.png';
 import styles from './Sidebar.module.css';
 
 /**
@@ -25,15 +27,17 @@ export default function Sidebar({ navItems = [], progress, sectionLabel = 'Overv
   return (
     <aside className={styles.sidebar}>
       <div className={styles.logo}>
-        HALO
+        <img src={haloLogo} alt="HALO" width="64" height="64" />
       </div>
 
-      {roleBadge && <div className={styles.roleBadge}>{roleBadge}</div>}
+      {roleBadge && <div className={styles.roleBadge}>{roleBadge === 'Superadmin' ? 'Super Admin' : roleBadge}</div>}
 
       <div className={styles.section}>
-        <p className={styles.sectionLabel}>{sectionLabel}</p>
+        {!navItems.some(item => item.section) && <p className={styles.sectionLabel}>{sectionLabel}</p>}
         <nav className={styles.nav}>
-          {navItems.map(({ label, icon: Icon, path, end }) => (
+          {navItems.map(({ label, icon: Icon, path, end, section }, index) => (
+            <Fragment key={path}>
+              {section && section !== navItems[index - 1]?.section && <p className={styles.sectionLabel}>{section}</p>}
             <NavLink
               key={path}
               to={path}
@@ -45,6 +49,7 @@ export default function Sidebar({ navItems = [], progress, sectionLabel = 'Overv
               <Icon size={18} />
               {label}
             </NavLink>
+            </Fragment>
           ))}
         </nav>
       </div>

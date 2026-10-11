@@ -19,7 +19,7 @@
 .responsive { height: 100dvh; }
 .responsive > .content { height: 100dvh; }
 .responsive > aside { height: 100dvh; overflow-wrap: anywhere; }
-.mobileBar, .drawerHeader { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1rem; }
+.mobileBar, .drawerHeader { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) var(--space-4); }
 .mobileBar { flex-shrink: 0; border-bottom: 1px solid var(--color-border-panel); color: var(--color-accent-active); }
 .menuButton { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; background: transparent; color: var(--color-text-primary); border: 1px solid var(--color-border-panel); border-radius: var(--radius-sm); }
 .drawer { position: absolute; top: 0; bottom: 0; left: 0; width: min(300px, 90vw); max-height: 100dvh; background: var(--color-bg-sidebar); padding: 0; }
@@ -28,8 +28,8 @@
 .drawer aside > div:last-child { overflow-wrap: anywhere; }
 .responsive :focus-visible { outline: 2px solid var(--color-accent-active); outline-offset: 3px; }
 @media (max-width: 768px) {
-  .responsive > .content > header, .responsive > .content > main { padding: 1rem; }
-  .responsive > .content > header { flex-wrap: wrap; gap: 0.75rem; }
+  .responsive > .content > header, .responsive > .content > main { padding: var(--space-4); }
+  .responsive > .content > header { flex-wrap: wrap; gap: var(--space-3); }
 }
 
 .responsive > .content > header > div { min-width: 0; flex-wrap: wrap; }
@@ -37,3 +37,20 @@
 @media (max-width: 1024px) {
   .responsive > .content { overflow-x: auto; }
 }
+
+.mobileBar, .drawerHeader { background: var(--color-surface); min-height: calc(var(--space-12) + var(--space-4)); }
+.drawerHeader { border-bottom: 1px solid var(--color-border); }
+.menuButton svg { width: var(--space-5); height: var(--space-5); }
+.menuButton:hover { background: var(--color-primary-soft); color: var(--color-primary); }
+
+/* Drawer and compact bar use the same branded frame as desktop navigation. */
+.mobileBar, .drawerHeader, .drawer { composes: frame from "./NavigationBrand.module.css"; }
+.mobileBar.mobileBar, .drawerHeader.drawerHeader { background: var(--nav-topbar); color: var(--nav-text); border-color: var(--nav-border); }
+.drawer.drawer { background: var(--nav-sidebar); }
+.drawerHeader h2 { color: var(--nav-text); }
+.mobileBar .menuButton, .drawerHeader .menuButton { color: var(--nav-text); border-color: var(--nav-border); }
+.mobileBar .menuButton:hover, .drawerHeader .menuButton:hover { background: var(--nav-hover); }
+.mobileBar :focus-visible, .drawer :focus-visible { outline-color: var(--nav-text); }
+
+.mobileBar { border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.drawer.drawer { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }

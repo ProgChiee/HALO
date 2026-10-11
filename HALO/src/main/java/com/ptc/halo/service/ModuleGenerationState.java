@@ -23,12 +23,6 @@ public class ModuleGenerationState {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Published lessons cannot be regenerated through the draft editor.");
         }
         module.setGenerationToken(UUID.randomUUID().toString()); // Forces a new version even when already PENDING.
-        module.setStatus(LessonStatus.PENDING);
-        module.setAiGenerationStatus(AiGenerationStatus.PENDING);
-        module.setGeneratedObjectives(null);
-        module.setGeneratedKnowledge(null);
-        module.setGeneratedExamples(null);
-        module.setGeneratedSummary(null);
         return modules.saveAndFlush(module);
     }
 
@@ -36,11 +30,14 @@ public class ModuleGenerationState {
     public AiLearningModuleEntity finish(Long id, AiLearningModuleEntity result) {
         var current = modules.findWithFilesById(id).orElseThrow(this::stale);
         if (!Objects.equals(current.getVersion(), result.getVersion())
+                || !Objects.equals(current.getWeek().getTitle(), result.getWeek().getTitle())
+                || !Objects.equals(current.getWeek().getWeekNumber(), result.getWeek().getWeekNumber())
+                || !Objects.equals(current.getWeek().getSubject().getSubjectName(), result.getWeek().getSubject().getSubjectName())
+                || !Objects.equals(current.getWeek().getSubject().getDescription(), result.getWeek().getSubject().getDescription())
                 || result.getGenerationToken() == null
-                || !Objects.equals(current.getGenerationToken(), result.getGenerationToken())
-                || current.getStatus() != LessonStatus.PENDING
-                || current.getAiGenerationStatus() != AiGenerationStatus.PENDING) throw stale();
+                || !Objects.equals(current.getGenerationToken(), result.getGenerationToken())) throw stale();
         // Copy generated fields only. Never merge detached materials, files, or publication state.
+        if (result.getAiGenerationStatus() == AiGenerationStatus.COMPLETED) current.setStatus(LessonStatus.PENDING);
         current.setGeneratedObjectives(result.getGeneratedObjectives());
         current.setGeneratedKnowledge(result.getGeneratedKnowledge());
         current.setGeneratedExamples(result.getGeneratedExamples());

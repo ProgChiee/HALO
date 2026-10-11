@@ -2,20 +2,11 @@ import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText, Upload, Link2, Sparkles, Check, X, RefreshCw, Image as ImageIcon } from 'lucide-react';
-import PageShell from '../../../components/shared/PageShell';
+import PageShell from './ProfessorPageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
-import {
-  createLearningModule,
-  getLearningModuleByWeek,
-  updateLearningModule,
-  uploadModuleFile,
-  deleteModuleFile,
-  generateLesson,
-  approveLesson,
-  declineLesson,
-} from '../../../services/professor/professorService';
+import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import styles from '../styles/LessonEditor.module.css';
 
 const MAX_SOURCE_FILES = 10;
@@ -28,6 +19,15 @@ export default function LessonEditor() {
 }
 
 function RouteLessonEditor({ subjectId, weekId }) {
+  const workflow = useProfessorWorkflow();
+  const { createLearningModule,
+  getLearningModuleByWeek,
+  updateLearningModule,
+  uploadModuleFile,
+  deleteModuleFile,
+  generateLesson,
+  approveLesson,
+  declineLesson, } = workflow.api;
   const navigate = useNavigate();
   const { showToast } = useToast();
   const materialsInputRef = useRef(null);
@@ -67,7 +67,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
         if (isCurrent()) setLoading(false);
       });
     return () => { controller.abort(); };
-  }, [subjectId, weekId, reloadKey]);
+  }, [subjectId, weekId, reloadKey, getLearningModuleByWeek]);
   const isSaving = pendingAction === 'save';
   const isGenerating = pendingAction === 'generate';
   const isApproving = pendingAction === 'approve';
@@ -296,7 +296,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
       <header className={styles.topHeader}>
         <div className={styles.topHeaderLeft}>
-          <button className={styles.backBtn} onClick={() => navigate('/professor/subjects')}>
+          <button className={styles.backBtn} onClick={() => navigate(workflow.basePath + '/subjects')}>
             <ArrowLeft size={16} />
             Back
           </button>

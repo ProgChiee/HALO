@@ -96,7 +96,7 @@ test('progress keeps all five columns in a keyboard-focusable scroll region', as
  api.defaults.adapter=async config=>({status:200,headers:{},config,data:{content:[{userId:1,name:'Long student name',section:'Section A',completedModules:2,passedAssessments:3,totalBadges:4}],totalElements:1,number:0,totalPages:1,first:true,last:true}});
  const cleanup=await mount(pages[3],'/professor/progress');
  try{
-  const region=document.querySelector('[role="region"]');assert.ok(region);assert.equal(region.tabIndex,0);assert.match(region.getAttribute('aria-label'),/scroll horizontally/);
+  const region=document.querySelector('[aria-label="Student progress table, scroll horizontally to view all columns"]');assert.ok(region);assert.equal(region.tabIndex,0);assert.match(region.getAttribute('aria-label'),/scroll horizontally/);
   assert.equal(region.querySelectorAll('thead th[scope="col"]').length,5);assert.equal(region.querySelectorAll('tbody tr:first-child td').length,5);assert.match(region.textContent,/Long student name/);
  }finally{await cleanup();}
 });

@@ -4,18 +4,11 @@ import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
-import PageShell from '../../../components/shared/PageShell';
+import PageShell from './ProfessorPageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
-import {
-  getSubjects,
-  createSubject,
-  updateSubject,
-  deleteSubject,
-  getWeeks,
-  addWeek,
-} from '../../../services/professor/professorService';
+import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import { useSubjectWeeks } from '../../../hooks/useSubjectWeeks';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import styles from '../styles/SubjectManagement.module.css';
@@ -27,12 +20,19 @@ const YEAR_LEVELS = [
 ];
 
 export default function SubjectManagement() {
+  const workflow = useProfessorWorkflow();
+  const { getSubjects,
+  createSubject,
+  updateSubject,
+  deleteSubject,
+  getWeeks,
+  addWeek, updateWeek, } = workflow.api;
   const { showToast } = useToast();
   const navigate = useNavigate();
 
   const { data: subjects, setData: setSubjects, isLoading, error: loadError, reload: loadSubjects } = useRemoteData(getSubjects, []);
   const [expandedId, setExpandedId] = useState(null);
-  const { weeksBySubject, weeksLoading, weekErrors, loadWeeks } = useSubjectWeeks(getWeeks);
+  const { weeksBySubject, weeksLoading, weekErrors, loadWeeks, replaceWeek } = useSubjectWeeks(getWeeks);
 
   const [subjectModal, setSubjectModal] = useState(null); // null | 'create' | { editing: subject }
   const [subjectCode, setSubjectCode] = useState('');
@@ -46,6 +46,7 @@ export default function SubjectManagement() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [addingWeekTo, setAddingWeekTo] = useState(null);
+  const [editingWeek, setEditingWeek] = useState(null);
   const [weekNumber, setWeekNumber] = useState('');
   const [weekTitle, setWeekTitle] = useState('');
 
@@ -62,6 +63,7 @@ export default function SubjectManagement() {
     modalIdentity.current = Symbol('modal');
     setSubjectModal(null);
     setAddingWeekTo(null);
+    setEditingWeek(null);
     setDeletingSubject(null);
     return true;
   }
@@ -71,6 +73,7 @@ export default function SubjectManagement() {
     modalIdentity.current = null;
     setSubjectModal(null);
     setAddingWeekTo(null);
+    setEditingWeek(null);
   }
 
   function startOperation() {
@@ -80,7 +83,7 @@ export default function SubjectManagement() {
     return () => mounted.current && modalIdentity.current === operation.modal && pendingOperation.current === operation;
   }
 
-  async function refetchSubjects(isCurrent = () => true) {
+  async function refetchSubjects(isCurrent = () => mounted.current) {
     try {
       const updated = await getSubjects();
       if (isCurrent()) setSubjects(updated);
@@ -159,14 +162,16 @@ export default function SubjectManagement() {
     setIsDeleting(true);
     try {
       await deleteSubject(deletingSubject.id);
+      if (!mounted.current) return;
       showToast('Subject deleted.', 'success');
       setDeletingSubject(null);
       await refetchSubjects();
     } catch (err) {
+      if (!mounted.current) return;
       logProfessorError('delete-subject', err);
       showToast(professorErrorMessage(err), 'error');
     } finally {
-      setIsDeleting(false);
+      if (mounted.current) setIsDeleting(false);
     }
   }
 
@@ -211,8 +216,42 @@ export default function SubjectManagement() {
     }
   }
 
+  function openEditWeek(subject, week) {
+    if (!beginModal()) return;
+    setEditingWeek({ subject, week });
+    setWeekTitle(week.title ?? '');
+    setFormError('');
+  }
+
+  async function handleSaveTitle(e) {
+    e.preventDefault();
+    if (pendingOperation.current) return;
+    const title = weekTitle.trim();
+    if (!title || title.length > 255) {
+      setFormError('Enter a module title between 1 and 255 characters.');
+      return;
+    }
+    const isCurrent = startOperation();
+    if (!isCurrent) return;
+    setIsSubmitting(true);
+    setFormError('');
+    try {
+      const saved = await updateWeek(editingWeek.week.id, { weekNumber: editingWeek.week.weekNumber, title });
+      if (!isCurrent()) return;
+      replaceWeek(editingWeek.subject.id, saved);
+      setEditingWeek(null);
+      showToast('Module title updated.', 'success');
+    } catch (err) {
+      if (!isCurrent()) return;
+      logProfessorError('update-week', err);
+      setFormError(professorErrorMessage(err));
+    } finally {
+      if (isCurrent()) { pendingOperation.current = null; setIsSubmitting(false); }
+    }
+  }
+
   function goToLessonEditor(subject, week) {
-    navigate(`/professor/subjects/${subject.id}/week/${week.id}`);
+    navigate(`${workflow.basePath}/subjects/${subject.id}/week/${week.id}`);
   }
 
   return (
@@ -232,7 +271,7 @@ export default function SubjectManagement() {
         {isLoading ? (
           <p className={styles.loadingText}>Loading subjects...</p>
         ) : loadError ? (
-          <div style={{ padding: '3rem', textAlign: 'center' }}>
+          <div style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
             <p className={styles.loadingText}>{professorErrorMessage(loadError, "Couldn't load subjects. Please try again.")}</p>
             <button
               onClick={loadSubjects}
@@ -281,6 +320,9 @@ export default function SubjectManagement() {
                         <div key={week.id} className={styles.weekRow}>
                           <Sparkles size={14} className={styles.weekIcon} />
                           <span className={styles.weekTitle}>Week {week.weekNumber}: {week.title}</span>
+                          <button className={styles.weekEditLink} disabled={isSubmitting} onClick={() => openEditWeek(subject, week)} aria-label={`Edit module title: ${week.title}`}>
+                            Edit title
+                          </button>
                           <button className={styles.weekEditLink} onClick={() => goToLessonEditor(subject, week)}>
                             Author Lesson
                           </button>
@@ -375,6 +417,27 @@ export default function SubjectManagement() {
               <Button variant="secondary" onClick={() => setDeletingSubject(null)} disabled={isDeleting}>Cancel</Button>
               <Button variant="danger" onClick={handleConfirmDelete} isLoading={isDeleting}>Delete</Button>
             </div>
+        </Dialog>
+      )}
+
+      {editingWeek && (
+        <Dialog labelledBy="edit-module-title" busy={isSubmitting} onClose={closeModal} className={styles.modal}>
+          <div className={styles.modalHeader}>
+            <h3 id="edit-module-title" className={styles.modalTitle}>Edit Module Title</h3>
+            <button className={styles.closeBtn} disabled={isSubmitting} onClick={closeModal} aria-label="Close"><X size={18} /></button>
+          </div>
+          <p className={styles.modalSubtitle}>{editingWeek.subject.subjectName} · Week {editingWeek.week.weekNumber}</p>
+          <form onSubmit={handleSaveTitle} className={styles.form}>
+            <div className={styles.field}>
+              <label htmlFor="module-title" className={styles.label}>Module title</label>
+              <input id="module-title" className={styles.input} value={weekTitle} onChange={e => setWeekTitle(e.target.value)} maxLength={255} disabled={isSubmitting} aria-invalid={Boolean(formError)} aria-describedby={formError ? 'module-title-error' : undefined} />
+            </div>
+            {formError && <p id="module-title-error" role="alert" className={styles.formError}>{formError}</p>}
+            <div className={styles.modalActions}>
+              <Button variant="secondary" onClick={closeModal} disabled={isSubmitting}>Cancel</Button>
+              <Button type="submit" isLoading={isSubmitting}>Save</Button>
+            </div>
+          </form>
         </Dialog>
       )}
 

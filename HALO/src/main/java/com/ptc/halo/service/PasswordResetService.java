@@ -43,9 +43,7 @@ public class PasswordResetService {
         UserEntity user =
                 userRepository.findByEmail(email)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "User not found"
-                                )
+                                new PasswordResetException(400)
                         );
 
         String otp = generateOtp();
@@ -88,22 +86,22 @@ public class PasswordResetService {
 
         UserEntity user = userRepository.findForPasswordChange(email)
                 .orElseThrow(() ->
-                        new RuntimeException("User not found")
+                        new PasswordResetException(400)
                 );
 
         PasswordResetOtpEntity otpEntity =
                 passwordResetOtpRepository
                         .findByUserId(user.getId())
                         .orElseThrow(() ->
-                                new RuntimeException("No password reset OTP found")
+                                new PasswordResetException(400)
                         );
 
         if (!otpEntity.getOtp().equals(otp)) {
-            throw new RuntimeException("Invalid OTP");
+            throw new PasswordResetException(400);
         }
 
         if (otpEntity.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("OTP has expired");
+            throw new PasswordResetException(400);
         }
 
         if (newPassword == null || newPassword.isBlank() || newPassword.length() < 8 || passwordEncoder.matches(newPassword, user.getPassword()))

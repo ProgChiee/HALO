@@ -1,0 +1,22 @@
+/* Navigation-only presentation; destinations and interaction remain in existing components. */
+.topbar { composes: frame from "./NavigationBrand.module.css"; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); min-height: calc(var(--space-12) + var(--space-4)); background: var(--color-surface); border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
+.breadcrumb { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; color: var(--color-text-primary); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+.breadcrumb svg { width: var(--space-5); height: var(--space-5); flex-shrink: 0; }
+.pageHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-4); }
+.pageHeader > div { min-width: 0; }
+
+/* Higher specificity keeps page-level header spacing intact while sharing the frame. */
+.topbar.topbar {
+  background: var(--nav-topbar); border-bottom-color: var(--nav-border); color: var(--nav-text);
+  --color-text-primary: var(--nav-text);
+  --color-text-muted: var(--nav-muted);
+  --color-accent-active: var(--nav-text);
+  --color-bg-nav-active: var(--nav-active);
+  --color-primary-border: var(--nav-border);
+}
+.topbar a { color: var(--nav-muted); }
+.topbar button { background: var(--nav-active); color: var(--nav-text); border: 1px solid var(--nav-border); }
+.topbar button:hover:not(:disabled) { background: var(--nav-hover); color: var(--nav-text); }
+.topbar :focus-visible { outline: 2px solid var(--nav-text); outline-offset: 2px; }
+
+.topbar { border-radius: 0 0 var(--radius-md) var(--radius-md); }

@@ -1,0 +1,17 @@
+/* Presentation shared only by the three role dashboards and their acting-mode reuse. */
+.content { min-width: 0; overflow-wrap: anywhere; }
+.content [role="status"], .content [role="alert"] { padding: var(--space-4); margin-bottom: var(--space-6); font-size: var(--font-size-sm); }
+.content [role="status"] { color: var(--color-text-muted); }
+.content [role="alert"] { color: var(--color-danger-text); border-left: 2px solid var(--color-danger-border); }
+.content [role="alert"] button { margin-top: var(--space-3); }
+.greeting { margin-bottom: var(--space-2); overflow-wrap: anywhere; }
+.subtitle { color: var(--color-text-muted); font-size: var(--font-size-sm); margin-bottom: var(--space-8); }
+.metrics { margin-bottom: var(--space-8); }
+.metric { display: grid; grid-template-columns: var(--space-10) minmax(0, 1fr); column-gap: var(--space-4); align-content: center; padding: var(--space-5); min-width: 0; }
+.icon { grid-column: 1; grid-row: 1 / 3; align-self: center; width: var(--space-10); height: var(--space-10); display: flex; align-items: center; justify-content: center; background: var(--color-primary-soft); color: var(--color-primary); border-radius: var(--radius-md); }
+.icon svg { width: var(--space-5); height: var(--space-5); }
+.value { grid-column: 2; font-variant-numeric: tabular-nums; line-height: var(--line-height-tight); overflow-wrap: anywhere; }
+.label { grid-column: 2; min-width: 0; }
+.heading { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-primary); font-size: var(--font-size-xl); }
+@media (max-width: 768px) { .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .metrics { grid-template-columns: minmax(0, 1fr); } }

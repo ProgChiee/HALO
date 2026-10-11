@@ -1,0 +1,4 @@
+.selector { composes: selector from "./ActingMode.module.css"; }
+.banner { composes: banner from "./ActingMode.module.css"; }
+.actions { composes: actions from "./ActingMode.module.css"; }
+.targets { composes: targets from "./ActingMode.module.css"; }

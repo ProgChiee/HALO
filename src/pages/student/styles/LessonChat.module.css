@@ -17,6 +17,7 @@
 }
 
 .topHeader {
+  composes: topbar from "../../../components/shared/Navigation.module.css";
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -38,14 +39,14 @@
   align-items: center;
   justify-content: center;
   background: var(--color-bg-nav-active);
-  border: 1px solid rgba(0, 212, 92, 0.4);
+  border: 1px solid var(--color-primary-border);
   border-radius: var(--radius-md);
   color: var(--color-accent-active);
 }
 
 .mentorName {
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }
 
@@ -55,10 +56,7 @@
 }
 
 .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-size: var(--text-sm);
+ composes: breadcrumb from "../../../components/shared/Navigation.module.css";
 }
 
 .breadcrumbMuted {
@@ -67,7 +65,7 @@
 
 .breadcrumbActive {
   color: var(--color-accent-active);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .tabsRow {
@@ -114,8 +112,8 @@
 .bubble {
   border-radius: var(--radius-lg);
   padding: var(--space-md) var(--space-lg);
-  font-size: var(--text-sm);
-  line-height: 1.5;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-relaxed);
 }
 
 .bubbleAi {
@@ -133,12 +131,12 @@
 .speakBtn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   align-self: flex-start;
   background: transparent;
   border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-pill);
-  padding: 3px var(--space-sm);
+  border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-sm);
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   transition: color var(--transition-fast), border-color var(--transition-fast);
@@ -151,12 +149,12 @@
 
 .speakBtnActive {
   color: var(--color-accent-active);
-  border-color: rgba(0, 212, 92, 0.4);
+  border-color: var(--color-primary-border);
 }
 
 .bubbleTyping {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   padding: var(--space-md) var(--space-lg);
 }
 
@@ -186,13 +184,9 @@
 }
 
 .chatInput {
+  composes: control from "../../../components/shared/UIPrimitives.module.css";
   flex: 1;
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-pill);
-  padding: var(--space-sm) var(--space-lg);
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
+  padding: var(--space-3) var(--space-lg);
 }
 
 .chatInput::placeholder {
@@ -204,7 +198,8 @@
 }
 
 .chatInput:disabled {
-  opacity: 0.6;
+  background: var(--color-background);
+  color: var(--color-text-muted);
   cursor: not-allowed;
 }
 
@@ -223,7 +218,7 @@
   background: var(--gradient-cta);
   border: none;
   border-radius: 50%;
-  color: #06170e;
+  color: var(--color-text-on-button);
 }
 
 .notFound {
@@ -237,15 +232,55 @@
 }
 
 .loadingText {
+  composes: loading from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xl);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
 .tabsRowActions { display: flex; align-items: center; gap: var(--space-sm); }
 
 @media (max-width: 768px) {
-  .topHeader, .tabsRow, .chatArea, .inputRow { padding: 1rem; }
-  .topHeader, .breadcrumb { flex-wrap: wrap; gap: 0.5rem; }
-  .chatInput { min-width: 0; }
+  .topHeader, .tabsRow, .chatArea, .inputRow { padding: var(--space-4); }
+  .topHeader, .breadcrumb { flex-wrap: wrap; gap: var(--space-2); }
+  .chatInput { min-width: 0; 
+  border-radius: var(--radius-sm);
+}
   .messageBlock { max-width: 100%; }
 }
+
+/* Bound reading lines and align the existing composer with the conversation. */
+.chatArea, .inputRow { width: 100%; max-width: 1120px; margin-inline: auto; min-width: 0; box-sizing: border-box; }
+.chatArea { min-height: 0; }
+.messageBlock { max-width: min(100%, 72ch); overflow-wrap: anywhere; }
+.chatArea > section { width: 100%; max-width: 80ch; margin-inline: auto; }
+.chatArea > section > section { margin-top: var(--space-6); }
+.inputRow { align-items: flex-end; }
+.chatInput { min-width: 0; }
+
+/* Published lesson reading hierarchy only; conversation behavior is unchanged. */
+.chatArea > section > h2 { margin-bottom: var(--space-4); }
+.chatArea > section > section > h3 { margin-bottom: var(--space-2); }
+.chatArea > section p { overflow-wrap: anywhere; }
+.tabsRow { gap: var(--space-3); flex-wrap: wrap; }
+.tabsSubtitle { min-width: 0; }
+
+/* Calm reading and composer presentation; message text and requests stay intact. */
+.chatArea { gap: var(--space-5); scroll-padding-bottom: var(--space-6); }
+.messageBlock { min-width: 0; width: fit-content; max-width: min(100%, 68ch); flex-shrink: 0; }
+.bubble { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: normal; padding: var(--space-4) var(--space-5); }
+.bubbleAi { background: var(--color-surface); border-color: var(--color-border); }
+.bubbleUser { background: var(--color-primary-soft); border-color: var(--color-primary-border); }
+.messageSender { font-weight: var(--font-weight-medium); }
+.speakBtn { gap: var(--space-2); }
+.bubbleTyping { min-height: var(--space-12); align-items: center; }
+.typingDot { background: var(--color-text-muted); }
+.inputRow { background: var(--color-surface); align-items: center; }
+.chatInput { min-height: var(--space-12); }
+.sendBtn { width: var(--space-12); height: var(--space-12); border-radius: var(--radius-md); }
+.sendBtn:hover:not(:disabled) { background: var(--color-primary-hover); }
+.sendBtn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.chatArea > button { align-self: center; }
+.chatArea [role="alert"] { color: var(--color-danger-text); font-size: var(--font-size-sm); padding: var(--space-4); border-left: 2px solid var(--color-danger-border); overflow-wrap: anywhere; }
+.chatArea [role="alert"] button { margin-top: var(--space-3); }
+.contentArea > [role="alert"] { color: var(--color-danger-text); font-size: var(--font-size-sm); width: 100%; max-width: 1120px; margin-inline: auto; padding: var(--space-2) var(--space-10); flex-shrink: 0; overflow-wrap: anywhere; }
+.mentorIdentity { min-width: 0; }
+.mentorName, .mentorStatus, .tabsSubtitle { overflow-wrap: anywhere; }
+@media (max-width: 768px) { .bubble { padding: var(--space-4); } .contentArea > [role="alert"] { padding-inline: var(--space-4); } }

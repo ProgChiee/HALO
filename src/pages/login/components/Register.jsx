@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Grip, User, Mail, KeyRound, Eye, EyeOff, Hash, Users2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, KeyRound, Eye, EyeOff, Hash, Users2 } from 'lucide-react';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { register as registerService } from '../../../services/authService';
-import bgImage from '../../../assets/login/BG.jpeg';
+import bgImage from '../../../assets/login/Background.png';
 import styles from '../styles/Register.module.css';
 
 // Change this if your institutional domain is different
@@ -73,22 +73,21 @@ export default function Register() {
   return (
     <div className={styles.wrapper} style={{ '--bg-image': `url(${bgImage})` }}>
       <div className={styles.card}>
+        <div className={styles.formCard}>
+          <div className={styles.formHeader}>
         <button className={styles.backBtn} onClick={() => navigate(-1)}>
           <ArrowLeft size={16} />
           Back
         </button>
-
-        <div className={styles.iconBadge}>
-          <Grip size={18} />
-        </div>
 
         <h1 className={styles.title}>Register account</h1>
         <p className={styles.subtitle}>
           Create your HALO account to start your learning journey.
         </p>
 
-        <div className={styles.formCard}>
+        </div>
           <form onSubmit={handleSubmit} className={styles.form}>
+<fieldset className={styles.group}><legend className={styles.groupTitle}>Personal information</legend>
             <div className={styles.field}>
               <label className={styles.label}>Fullname</label>
               <div className={styles.inputWrapper}>
@@ -117,7 +116,9 @@ export default function Register() {
               </div>
             </div>
 
-            <div className={styles.field}>
+            </fieldset>
+<fieldset className={styles.group}><legend className={styles.groupTitle}>School information</legend>
+<div className={styles.field}>
               <label className={styles.label}>Student ID</label>
               <div className={styles.inputWrapper}>
                 <Hash size={18} className={styles.inputIcon} />
@@ -154,7 +155,9 @@ export default function Register() {
               </select>
             </div>
 
-            <div className={styles.field}>
+            </fieldset>
+<fieldset className={styles.group}><legend className={styles.groupTitle}>Account information</legend>
+<div className={styles.field}>
               <label className={styles.label}>Password</label>
               <div className={styles.inputWrapper}>
                 <KeyRound size={18} className={styles.inputIcon} />
@@ -198,13 +201,14 @@ export default function Register() {
               </div>
             </div>
 
+            </fieldset>
             {error && <p className={styles.error}>{error}</p>}
 
             <Button type="submit" isLoading={isLoading}>Create account</Button>
 
             <p className={styles.signinText}>
               Already have an account?{' '}
-              <Link to="/login" className={styles.signinLink}>Sign in</Link>
+              <Link to="/login" className={styles.signinLink}>Log in</Link>
             </p>
           </form>
         </div>

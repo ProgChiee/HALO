@@ -14,6 +14,8 @@ const MESSAGES = {
   "MODULE_ALREADY_APPROVED": "This lesson is already approved. Reload to see its current status.",
   "MODULE_GENERATION_REQUIRED": "Generate the lesson successfully before this action.",
   "MODULE_NOT_EDITABLE": "Published lessons cannot be changed through the draft editor.",
+  "MATERIAL_NOT_RELEVANT": "The uploaded material does not appear to match this lesson. Please upload a relevant learning material.",
+  "MATERIAL_RELEVANCE_UNAVAILABLE": "Material relevance could not be checked. Please try again.",
   "MODULE_MATERIALS_REQUIRED": "Upload at least one original lesson file before publishing.",
   "MODULE_MATERIAL_UNREADABLE": "Replace the unreadable original lesson file and try again.",
   "MODULE_MATERIAL_UNSUPPORTED": "Replace unsupported original lesson files before publishing.",

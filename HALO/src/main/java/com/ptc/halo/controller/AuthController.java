@@ -46,11 +46,9 @@ public class AuthController {
     }
     @PostMapping("/forgot-password")
     public ResponseEntity<String> forgotPassword(
-            @RequestBody ForgotPasswordRequest request) {
+            @jakarta.validation.Valid @RequestBody ForgotPasswordRequest request) {
 
-        passwordResetService.sendOtp(
-                request.getEmail()
-        );
+        runReset(() -> passwordResetService.sendOtp(request.getEmail()));
 
         return ResponseEntity.ok(
                 "Password reset OTP sent successfully"
@@ -58,11 +56,9 @@ public class AuthController {
     }
     @PostMapping("/forgot-password/resend")
     public ResponseEntity<String> resendPasswordOtp(
-            @RequestBody ResendPasswordOtpRequest request) {
+            @jakarta.validation.Valid @RequestBody ResendPasswordOtpRequest request) {
 
-        passwordResetService.sendOtp(
-                request.getEmail()
-        );
+        runReset(() -> passwordResetService.sendOtp(request.getEmail()));
 
         return ResponseEntity.ok(
                 "New password reset OTP sent successfully"
@@ -70,13 +66,9 @@ public class AuthController {
     }
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(
-            @RequestBody ResetPasswordRequest request) {
+            @jakarta.validation.Valid @RequestBody ResetPasswordRequest request) {
 
-        passwordResetService.resetPassword(
-                request.getEmail(),
-                request.getOtp(),
-                request.getNewPassword()
-        );
+        runReset(() -> passwordResetService.resetPassword(request.getEmail(), request.getOtp(), request.getNewPassword()));
 
         return ResponseEntity.ok(
                 "Password reset successfully"
@@ -104,4 +96,14 @@ public class AuthController {
         );
     }
 
+
+    private void runReset(Runnable operation) {
+        try { operation.run(); }
+        catch (com.ptc.halo.service.PasswordResetException | org.springframework.web.server.ResponseStatusException
+                | org.springframework.security.core.AuthenticationException | org.springframework.security.access.AccessDeniedException error) { throw error; }
+        catch (RuntimeException error) {
+            org.slf4j.LoggerFactory.getLogger(AuthController.class).error("Password reset failed; exceptionType={}", error.getClass().getSimpleName());
+            throw new com.ptc.halo.service.PasswordResetException(500);
+        }
+    }
 }

@@ -82,6 +82,14 @@ public class AdminActingSessionService {
         if (session.getTargetRole() != Role.PROFESSOR) throw new AdminApiException(INVALID_TARGET_ROLE);
         return session;
     }
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public AdminActingSessionEntity requireStudent(Authentication authentication, String id) {
+        var actor = admin(authentication);
+        var session = sessions.findForRevocation(id, actor.getId()).orElseThrow(() -> new AdminApiException(RESOURCE_NOT_FOUND));
+        checkSession(actor, session);
+        if (session.getTargetRole() != Role.STUDENT) throw new AdminApiException(INVALID_TARGET_ROLE);
+        return session;
+    }
     @Transactional
     public void revoke(Authentication authentication, String id) {
         var actor = admin(authentication);
@@ -96,5 +104,37 @@ public class AdminActingSessionService {
         return new AdminActingSessionResponse(session.getId(), session.getAdmin().getId(),
                 new AdminActingTargetResponse(target.getId(), target.getName(), target.getEmail(), session.getTargetRole()),
                 session.getCreatedAt(), session.getExpiresAt());
+    }
+
+    // Preview credentials are never saved in admin_acting_session. Consequently they
+    // cannot authorize the real acting endpoints, even if the client changes its URL.
+    @Transactional
+    public AdminActingSessionEntity createStudentPreview(Authentication authentication, Long targetId) {
+        var actor = admin(authentication);
+        if (targetId == null || targetId <= 0) throw new AdminApiException(ACTING_INPUT_INVALID);
+        var target = users.findById(targetId).orElseThrow(() -> new AdminApiException(RESOURCE_NOT_FOUND));
+        if (target.getRole() != Role.STUDENT) throw new AdminApiException(INVALID_TARGET_ROLE);
+        if (target.getStatus() != Status.ACTIVE) throw new AdminApiException(ACTING_TARGET_INACTIVE);
+        var now = Instant.now();
+        var context = new AdminActingSessionEntity(UUID.randomUUID().toString(), actor, target, now, now.plus(LIFETIME));
+        audit.createPreviewLog(actor, target, "Started Student preview");
+        return context;
+    }
+
+    public UserEntity validateStudentPreview(Authentication authentication, AdminActingSessionEntity context) {
+        var actor = admin(authentication);
+        if (!actor.getId().equals(context.getAdmin().getId())) throw new AdminApiException(RESOURCE_NOT_FOUND);
+        var target = users.findById(context.getTarget().getId()).orElseThrow(() -> new AdminApiException(ACTING_SESSION_INVALID));
+        if (context.getRevokedAt() != null || !context.getExpiresAt().isAfter(Instant.now())
+                || context.getTargetRole() != Role.STUDENT || target.getRole() != Role.STUDENT
+                || target.getStatus() != Status.ACTIVE || actor.getTokenVersion() != context.getAdminTokenVersion()
+                || target.getTokenVersion() != context.getTargetTokenVersion()) throw new AdminApiException(ACTING_SESSION_INVALID);
+        return target;
+    }
+
+    @Transactional
+    public void endStudentPreview(Authentication authentication, AdminActingSessionEntity context) {
+        var target = validateStudentPreview(authentication, context);
+        audit.createPreviewLog(admin(authentication), target, "Ended Student preview");
     }
 }

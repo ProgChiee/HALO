@@ -1,0 +1,10 @@
+/* Scoped navigation palette: never inherited by page content. */
+.frame {
+  --nav-sidebar: linear-gradient(180deg, var(--color-primary) 0%, #286F51 55%, var(--color-primary-hover) 100%);
+  --nav-topbar: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
+  --nav-text: #FFFFFF;
+  --nav-muted: rgba(255, 255, 255, .96);
+  --nav-border: rgba(255, 255, 255, .28);
+  --nav-hover: rgba(255, 255, 255, .02);
+  --nav-active: rgba(255, 255, 255, .04);
+}

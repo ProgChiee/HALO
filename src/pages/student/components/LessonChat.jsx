@@ -1,23 +1,26 @@
+import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Bot, Send, Volume2, VolumeX } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
-import { getWeekLesson } from '../../../services/student/studentService';
-import { openSession, getConversation, getExchange, sendMessage as sendMentorMessage } from '../../../services/student/aiMentorService';
 import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
 import { useToast } from '../../../context/notifications/useToast';
 import { loadLessonChat } from '../../../utils/lessonLoader';
 import { lessonErrorMessage } from '../../../utils/lessonErrors';
 import styles from '../styles/LessonChat.module.css';
+import { logStudentError } from '../../../utils/studentDiagnostics';
 
 // Route weekId resolves to the approved module ID before opening its mentor session.
 export default function LessonChat() {
   const { topicId, weekId } = useParams();
-  return <ModuleLessonChat key={String(topicId) + ':' + String(weekId)} topicId={topicId} weekId={weekId} />;
+  const { identity } = useStudentWorkflow();
+  return <ModuleLessonChat key={identity + ':' + String(topicId) + ':' + String(weekId)} topicId={topicId} weekId={weekId} />;
 }
 
 function ModuleLessonChat({ topicId, weekId }) {
+  const workflow = useStudentWorkflow();
+  const { getWeekLesson, openSession, getConversation, getExchange, sendMessage: sendMentorMessage } = workflow.api;
   const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +48,15 @@ function ModuleLessonChat({ topicId, weekId }) {
   const { showToast } = useToast();
 
   useEffect(() => {
+    if (!lesson || workflow.preview) return;
+    const controller = new AbortController();
+    workflow.api.recordLessonStudy(lesson.weekId, { signal: controller.signal }).catch(error => {
+      if (!controller.signal.aborted) logStudentError('record-lesson-study', error);
+    });
+    return () => controller.abort();
+  }, [lesson, workflow.api, workflow.preview]);
+
+  useEffect(() => {
     return () => stop();
   }, [topicId, weekId, stop]);
 
@@ -54,7 +66,7 @@ function ModuleLessonChat({ topicId, weekId }) {
     sendLock.current = false;
     loadLessonChat({
       subjectId: topicId, weekId, signal: controller.signal, getLesson: getWeekLesson, openMentor: openSession,
-      onCanonical: module => navigate(`/student/lesson/${module.subjectId}/${module.weekId}`, { replace: true }),
+      onCanonical: module => navigate(`${workflow.basePath}/lesson/${module.subjectId}/${module.weekId}`, { replace: true }),
       onLesson: (module) => {
         setLesson(module);
         setIsLoading(false);
@@ -75,7 +87,7 @@ function ModuleLessonChat({ topicId, weekId }) {
       },
     });
     return () => { controller.abort(); };
-  }, [topicId, weekId, reloadKey, navigate]);
+  }, [topicId, weekId, reloadKey, navigate, workflow.basePath, getWeekLesson, openSession]);
 
   useEffect(() => {
     if (prepending.current) { prepending.current = false; return; }
@@ -114,7 +126,7 @@ function ModuleLessonChat({ topicId, weekId }) {
           <main className={styles.notFound}>
             <p role="alert">{loadError}</p>
             <Button onClick={retryLesson}>Retry</Button>
-            <Button onClick={() => navigate('/student/subjects')}>Back to Subjects</Button>
+            <Button onClick={() => navigate(workflow.basePath + '/subjects')}>Back to Subjects</Button>
           </main>
         </div>
       </StudentPageShell>
@@ -206,6 +218,7 @@ function ModuleLessonChat({ topicId, weekId }) {
     <StudentPageShell>
 
       <div className={styles.contentArea}>
+        {workflow.preview && <p role="note">Preview conversation - Messages are temporary and will not be added to the Student's real Mentor history.</p>}
         <header className={styles.topHeader}>
           <div className={styles.mentorIdentity}>
             <span className={styles.mentorAvatar}>
@@ -225,7 +238,7 @@ function ModuleLessonChat({ topicId, weekId }) {
         <div className={styles.tabsRow}>
           <p className={styles.tabsSubtitle}>Ask about this module's uploaded materials</p>
           <div className={styles.tabsRowActions}>
-            <Button onClick={() => navigate(`/student/quiz/${topicId}/${weekId}`)}>Start quiz</Button>
+            <Button onClick={() => navigate(`${workflow.basePath}/quiz/${topicId}/${weekId}`)}>Start quiz</Button>
           </div>
         </div>
 

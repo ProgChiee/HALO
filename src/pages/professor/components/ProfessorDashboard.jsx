@@ -2,18 +2,20 @@ import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useEffect } from 'react';
 import { LayoutGrid, Users, BookOpen, FileText, CheckCircle2, ClipboardCheck, Award } from 'lucide-react';
-import PageShell from '../../../components/shared/PageShell';
+import PageShell from './ProfessorPageShell';
 import { useAuth } from '../../../context/login/useAuth';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
-import { getProfessorDashboardData } from '../../../services/professor/professorService';
+import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import styles from '../styles/ProfessorDashboard.module.css';
 
 // ✅ Wired to the real backend — ProfessorDashboardController.
 // Returns a flat summary, not the old { stats, subjects } shape.
 
 export default function ProfessorDashboard() {
+  const workflow = useProfessorWorkflow();
+  const { getProfessorDashboardData } = workflow.api;
   const { user } = useAuth();
-  const firstName = user?.name?.split(' ')[0] ?? 'there';
+  const firstName = (workflow.target ?? user)?.name?.split(' ')[0] ?? 'there';
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -37,7 +39,7 @@ export default function ProfessorDashboard() {
 
     loadData();
     return () => { isMounted = false; };
-  }, [retry]);
+  }, [retry, getProfessorDashboardData]);
 
   if (isLoading) {
     return (

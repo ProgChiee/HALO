@@ -8,8 +8,8 @@ import { login as loginService } from '../../../services/authService';
 import { parseLoginResponse } from '../../../utils/backendContract';
 import { ROLE_HOME, getPasswordChangeRoute } from '../../../utils/roles';
 import Button from '../../../components/shared/Button';
-import bgImage from '../../../assets/login/BG.jpeg';
-import logo from '../../../assets/login/Logo.svg';
+import bgImage from '../../../assets/login/Background.png';
+import logo from '../../../assets/login/Logo.png';
 import styles from '../styles/Login.module.css';
 
 export default function Login() {
@@ -51,13 +51,10 @@ export default function Login() {
   }
 
   return (
-    // The dark filter over BG.jpeg is applied via inline CSS var so the
-    // gradient can reference the imported image path (see Login.module.css
-    // for the actual gradient-over-image technique).
     <div className={styles.wrapper} style={{ '--bg-image': `url(${bgImage})` }}>
       <div className={styles.card}>
         <img src={logo} alt="HALO logo" className={styles.logo} />
-        <p className={styles.tagline}>Hospitality AI Learning Outreach</p>
+      
 
         <div className={styles.formCard}>
           <h2 className={styles.welcome}>Welcome back</h2>

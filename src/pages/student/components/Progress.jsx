@@ -1,13 +1,15 @@
+import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { CheckCircle2, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import StudentPageShell from './StudentPageShell';
-import { getSubjectsData } from '../../../services/student/studentService';
 import styles from '../styles/Progress.module.css';
 
 // Module totals and completion counts use the same eligible-subject summaries.
 export default function Progress() {
+  const workflow = useStudentWorkflow();
+  const { getSubjectsData } = workflow.api;
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
@@ -33,7 +35,7 @@ export default function Progress() {
 
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [getSubjectsData]);
 
   if (isLoading) {
     return (
@@ -75,7 +77,7 @@ export default function Progress() {
             <div className={styles.overallBlock}>
               <div className={styles.progressRing}>
                 <svg width="140" height="140" viewBox="0 0 140 140">
-                  <circle cx="70" cy="70" r="60" fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="10" />
+                  <circle cx="70" cy="70" r="60" fill="none" stroke="var(--color-background)" strokeWidth="10" />
                   <circle
                     cx="70"
                     cy="70"
@@ -117,7 +119,7 @@ export default function Progress() {
 
           <div className={styles.sectionHeaderRow}>
             <h2 className={styles.sectionTitle}>Subject Progress</h2>
-            <Link to="/student/subjects" className={styles.viewAllLink}>View all →</Link>
+            <Link to={workflow.basePath + '/subjects'} className={styles.viewAllLink}>View all →</Link>
           </div>
           <div className={styles.rowsList}>
             {subjects.map((subject) => (

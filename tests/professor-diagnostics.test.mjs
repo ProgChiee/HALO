@@ -115,3 +115,9 @@ test('Professor Profile password dialog and Lesson Editor controls expose access
   }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=adapter;}
  }
 });
+
+test('lesson relevance failures use safe actionable messages',()=>{
+ assert.equal(professorErrorMessage({response:{status:422,data:{code:'MATERIAL_NOT_RELEVANT'}}}), 'The uploaded material does not appear to match this lesson. Please upload a relevant learning material.');
+ assert.match(professorErrorMessage({response:{status:502,data:{code:'MATERIAL_RELEVANCE_UNAVAILABLE'}}}),/could not be checked/);
+ assert.match(professorErrorMessage({response:{status:409,data:{code:'MODULE_MATERIAL_UNREADABLE'}}}),/unreadable/);
+});

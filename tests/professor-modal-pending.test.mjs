@@ -97,3 +97,30 @@ test('academic dialogs have names, associated labels, initial focus and Escape r
   assert.equal(document.activeElement,trigger);
  }finally{await page.close();}
 });
+
+test('module title edit saves existing week, validates, cancels, and survives reload', async()=>{
+ let week={id:37,weekNumber:1,title:'Original'};let writes=0;const pending=deferred();
+ api.defaults.adapter=async config=>{
+  if(config.method==='put'){writes++;assert.equal(config.url,'/professor/weeks/37');const payload=JSON.parse(config.data);assert.equal(payload.weekNumber,1);await pending.promise;week={...week,...payload};return {status:200,headers:{},config,data:week};}
+  return {status:200,headers:{},config,data:config.url.endsWith('/subjects')?[subject]:[week]};
+ };
+ let page=await mount();
+ const expand=async()=>act(async()=>[...page.host.querySelectorAll('button')].find(b=>b.textContent.includes('S1')).click());
+ try{
+  await expand();await act(async()=>button(page.host,'Edit title').click());
+  await fill(page.host,['   ']);await submitTwice(page.host);assert.equal(writes,0);assert.match(document.body.textContent,/between 1 and 255/);
+  await act(async()=>button(document,'Cancel').click());assert.equal(document.querySelector('[role="dialog"]'),null);assert.match(page.host.textContent,/Original/);
+  await act(async()=>button(page.host,'Edit title').click());await fill(page.host,['  Guest Services  ']);await submitTwice(page.host);assert.equal(writes,1);
+  assert.equal(button(document,'Cancel').disabled,true);assert.equal(document.querySelector('[aria-label="Close"]').disabled,true);
+  await act(async()=>pending.resolve());assert.equal(document.querySelector('[role="dialog"]'),null);assert.match(page.host.textContent,/Week 1: Guest Services/);
+  await page.close();page=await mount();await expand();assert.match(page.host.textContent,/Week 1: Guest Services/);assert.equal(writes,1);
+ }finally{await page.close();}
+});
+
+test('module title save failure preserves draft and can be retried',async()=>{
+ api.defaults.adapter=async config=>{if(config.method==='put')throw {response:{status:403}};return {status:200,headers:{},config,data:config.url.endsWith('/subjects')?[subject]:[{id:37,weekNumber:1,title:'Original'}]};};
+ const page=await mount();try{
+  await act(async()=>[...page.host.querySelectorAll('button')].find(b=>b.textContent.includes('S1')).click());await act(async()=>button(page.host,'Edit title').click());await fill(page.host,['Updated']);await submitTwice(page.host);
+  assert.equal(document.querySelector('#module-title').value,'Updated');assert.ok(document.querySelector('[role="alert"]'));assert.equal(button(document,'Save').disabled,false);assert.match(page.host.textContent,/Original/);
+ }finally{await page.close();}
+});

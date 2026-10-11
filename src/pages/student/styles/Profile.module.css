@@ -18,27 +18,18 @@
 }
 
 .topbar {
-  display: flex;
-  align-items: center;
+ composes: topbar from "../../../components/shared/Navigation.module.css";
   justify-content: space-between;
   padding: var(--space-md) var(--space-xl);
-  border-bottom: 1px solid var(--color-border-panel);
 }
 
 .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  font-size: var(--text-sm);
+ composes: breadcrumb from "../../../components/shared/Navigation.module.css";
 }
 
 .main {
+  composes: profile from "../../../components/shared/PageLayout.module.css";
   padding: var(--space-xl);
-  width: 100%;
-  max-width: 560px;
-  box-sizing: border-box;
 }
 
 .profileHeader {
@@ -53,19 +44,19 @@
   height: 64px;
   border-radius: 50%;
   background: var(--color-bg-nav-active);
-  border: 1px solid rgba(0, 212, 92, 0.4);
+  border: 1px solid var(--color-primary-border);
   color: var(--color-text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: var(--text-xl);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   flex-shrink: 0;
 }
 
 .fullName {
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
 }
 
@@ -98,7 +89,7 @@
 
 .infoValue {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
@@ -107,15 +98,17 @@
   border: none;
   color: var(--color-accent-active);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .sectionTitle {
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-accent-active);
-  margin-top: var(--space-lg);
+  margin-top: var(--space-8);
   margin-bottom: var(--space-md);
+
+  line-height: var(--line-height-heading);
 }
 
 .actionRow {
@@ -130,7 +123,7 @@
   margin-bottom: var(--space-sm);
   color: var(--color-text-primary);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   text-align: left;
   transition: background var(--transition-fast);
 }
@@ -152,10 +145,21 @@
 }
 
 .loadingText {
+  composes: loading from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xl);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
 }
 @media (max-width: 768px) {
-  .topbar, .main { padding: 1rem; }
+  .topbar, .main { padding: var(--space-4); }
 }
+
+/* Identity first, with quieter labels and safe long account values. */
+.profileHeader { gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-6); }
+.profileHeader > div { min-width: 0; }
+.avatar { width: var(--space-12); height: var(--space-12); }
+.fullName, .infoValue, .subMeta { overflow-wrap: anywhere; }
+.subMeta, .infoLabel { color: var(--color-text-muted); }
+.infoValueRow { min-width: 0; gap: var(--space-3); flex-wrap: wrap; }
+.infoValue { min-width: 0; }
+.sectionTitle { color: var(--color-text-primary); font-size: var(--font-size-xl); }
+.actionRow { overflow-wrap: anywhere; }
+@media (max-width: 480px) { .infoCard, .actionRow { padding: var(--space-4); } }

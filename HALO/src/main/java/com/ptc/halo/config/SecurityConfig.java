@@ -90,6 +90,7 @@ public class SecurityConfig {
                                 "/api/auth/register/student",
                                 "/api/auth/forgot-password",
                                 "/api/auth/forgot-password/resend",
+                                "/api/auth/verify-reset-code",
                                 "/api/auth/reset-password"
                         ).permitAll()
 

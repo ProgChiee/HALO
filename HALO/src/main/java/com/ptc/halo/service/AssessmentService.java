@@ -230,6 +230,10 @@ public class AssessmentService {
     public AssessmentAttemptEntity startAttempt(
             Long moduleId,
             UserEntity student) {
+        return startAttempt(moduleId, student, null);
+    }
+    @Transactional
+    public AssessmentAttemptEntity startAttempt(Long moduleId, UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         lockStudentLifecycle(student);
         progressionService.validateModuleAccess(
@@ -286,13 +290,19 @@ public class AssessmentService {
         attempt.setScore(0);
         attempt.setPassed(false);
 
-        return assessmentAttemptRepository.save(attempt);
+        var saved = assessmentAttemptRepository.save(attempt);
+        if (acting != null) writeStudentAudit(student, acting, ActivityType.ASSESSMENT, "Started assessment attempt ID " + saved.getId());
+        return saved;
     }
     @Transactional
     public AssessmentAttemptEntity submitAttempt(
             Long attemptId,
             UserEntity student,
             StudentAnswerRequest request) {
+        return submitAttempt(attemptId, student, request, null);
+    }
+    @Transactional
+    public AssessmentAttemptEntity submitAttempt(Long attemptId, UserEntity student, StudentAnswerRequest request, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         lockStudentLifecycle(student);
         AssessmentAttemptEntity attempt =
@@ -320,18 +330,7 @@ public class AssessmentService {
 
         // Validate the whole set before writing any answers or awarding progress/badges.
         var expected = questionRepository.findByAssessmentIdOrderByQuestionNumberAsc(attempt.getAssessment().getId());
-        var expectedIds = expected.stream().map(AssessmentQuestionEntity::getId).collect(java.util.stream.Collectors.toSet());
-        if (expectedIds.isEmpty() || request == null || request.getAnswers() == null
-                || request.getAnswers().size() != expectedIds.size()) throw invalidAnswerSet();
-        var submitted = new java.util.HashMap<Long, String>();
-        for (var item : request.getAnswers()) {
-            if (item == null || item.getQuestionId() == null || !expectedIds.contains(item.getQuestionId())
-                    || item.getAnswer() == null) throw invalidAnswerSet();
-            String answer = item.getAnswer().trim().toUpperCase(java.util.Locale.ROOT);
-            if (!answer.matches("[ABCD]") || submitted.putIfAbsent(item.getQuestionId(), answer) != null)
-                throw invalidAnswerSet();
-        }
-        if (!submitted.keySet().equals(expectedIds)) throw invalidAnswerSet();
+        var submitted = AssessmentAnswerSet.validate(expected, request);
 
         int correctAnswers = 0;
         var answers = new ArrayList<StudentAnswerEntity>();
@@ -355,7 +354,7 @@ public class AssessmentService {
             }
             throw conflict;
         }
-        int totalQuestions = expectedIds.size();
+        int totalQuestions = submitted.size();
 
         int score =
                 (int) Math.round(
@@ -398,8 +397,8 @@ public class AssessmentService {
 
             studentModuleProgressRepository.save(progress);
             
-            activityLogService.createLog(
-                    student,
+            writeStudentAudit(
+                    student, acting,
                     ActivityType.PROGRESS,
                     "Completed learning module ID " + module.getId()
             );
@@ -411,26 +410,24 @@ public class AssessmentService {
 
         if (passed) {
 
-            activityLogService.createLog(
-                    student,
+            writeStudentAudit(
+                    student, acting,
                     ActivityType.ASSESSMENT,
                     "Passed module assessment with score " + score + "%"
             );
 
         } else {
 
-            activityLogService.createLog(
-                    student,
+            writeStudentAudit(
+                    student, acting,
                     ActivityType.ASSESSMENT,
                     "Failed module assessment with score " + score + "%"
             );
         }
 
 
-        badgeService.checkAndAwardBadges(
-                student,
-                savedAttempt
-        );
+        if (acting == null) badgeService.checkAndAwardBadges(student, savedAttempt);
+        else badgeService.checkAndAwardBadges(student, savedAttempt, acting);
 
         return savedAttempt;
 
@@ -442,10 +439,6 @@ public class AssessmentService {
         userRepository.findForAssessmentLifecycle(student.getId()).orElseThrow(() ->
                 new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND"));
-    }
-
-    private org.springframework.web.server.ResponseStatusException invalidAnswerSet() {
-        return new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "INVALID_ANSWER_SET");
     }
 
     public List<AssessmentAttemptHistoryResponse> getAttemptHistory(
@@ -636,5 +629,10 @@ public class AssessmentService {
         );
 
         return response;
+    }
+
+    private void writeStudentAudit(UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting, ActivityType type, String action) {
+        if (acting == null) activityLogService.createLog(student,type,action);
+        else activityLogService.createStudentLog(student,acting,type,action);
     }
 }

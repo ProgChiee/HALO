@@ -1,12 +1,13 @@
 .sidebar {
+  composes: frame from "./NavigationBrand.module.css";
   width: 260px;
   height: 100vh;
   position: sticky;
   top: 0;
   align-self: flex-start;
   flex-shrink: 0;
-  background: var(--color-bg-sidebar);
-  border-right: 1px solid var(--color-border-panel);
+  background: var(--nav-sidebar);
+  border-right: 1px solid var(--nav-border);
   display: flex;
   flex-direction: column;
   padding: var(--space-lg) var(--space-md);
@@ -14,27 +15,30 @@
 }
 
 .logo {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--color-accent-active);
-  letter-spacing: 0.05em;
-  padding: 0 var(--space-sm);
-  margin-bottom: var(--space-xl);
+  align-self: flex-start;
+  margin-left: var(--space-2);
+  margin-bottom: var(--space-2);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  line-height: 0;
 }
 
 .roleBadge {
-  text-align: center;
-  background: var(--color-bg-nav-active);
-  border: 1px solid rgba(0, 212, 92, 0.4);
-  color: var(--color-accent-active);
+  align-self: flex-start;
+  margin-left: var(--space-2);
+  margin-bottom: var(--space-5);
+  padding: var(--space-1) var(--space-2);
+  background: var(--nav-active);
+  border: 1px solid var(--nav-border);
+  border-radius: var(--radius-sm);
+  color: var(--nav-muted);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding: var(--space-sm);
-  border-radius: var(--radius-pill);
-  margin-bottom: var(--space-lg);
 }
 
 .section {
@@ -43,7 +47,7 @@
 
 .sectionLabel {
   font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  color: var(--nav-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 0 var(--space-sm);
@@ -63,26 +67,26 @@
   padding: var(--space-sm) var(--space-sm);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  color: var(--color-text-secondary, var(--color-text-muted));
+  color: var(--nav-muted);
   font-size: var(--text-sm);
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .navItem:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--color-text-primary);
+  background: var(--nav-hover);
+  color: var(--nav-text);
 }
 
 .navItemActive {
-  background: var(--color-bg-nav-active);
-  border: 1px solid rgba(0, 212, 92, 0.4);
-  color: var(--color-accent-active);
-  font-weight: 600;
+  background: var(--nav-active);
+  border: 1px solid var(--nav-border);
+  color: var(--nav-text);
+  font-weight: var(--font-weight-semibold);
 }
 
 .progressCard {
-  background: var(--gradient-glass-card);
-  border: 1px solid rgba(0, 212, 92, 0.4);
+  background: var(--nav-hover);
+  border: 1px solid var(--nav-border);
   border-radius: var(--radius-md);
   padding: var(--space-md);
   margin-bottom: var(--space-lg);
@@ -90,15 +94,15 @@
 
 .progressLabel {
   font-size: var(--text-sm);
-  color: var(--color-accent-active);
-  font-weight: 600;
+  color: var(--nav-text);
+  font-weight: var(--font-weight-semibold);
   margin-bottom: var(--space-sm);
 }
 
 .progressBarTrack {
   width: 100%;
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--nav-hover);
   border-radius: var(--radius-pill);
   overflow: hidden;
   margin-bottom: var(--space-xs);
@@ -106,13 +110,13 @@
 
 .progressBarFill {
   height: 100%;
-  background: var(--gradient-cta);
+  background: var(--nav-text);
   border-radius: var(--radius-pill);
 }
 
 .progressDetail {
   font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  color: var(--nav-muted);
 }
 
 .userFooter {
@@ -120,7 +124,7 @@
   align-items: center;
   gap: var(--space-sm);
   padding-top: var(--space-lg);
-  border-top: 1px solid var(--color-border-panel);
+  border-top: 1px solid var(--nav-border);
 }
 
 .logoutBtn {
@@ -132,38 +136,61 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid var(--color-border-panel);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
+  border: 1px solid var(--nav-border);
+  border-radius: var(--radius-md);
+  color: var(--nav-muted);
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .logoutBtn:hover {
-  background: rgba(255, 82, 82, 0.12);
-  border-color: rgba(255, 82, 82, 0.4);
-  color: #ff5252;
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
 }
 
 .avatar {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--color-bg-content);
-  color: var(--color-text-primary);
+  background: var(--nav-active);
+  color: var(--nav-text);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   flex-shrink: 0;
 }
 
 .userName {
   font-size: var(--text-sm);
-  color: var(--color-text-primary);
-  font-weight: 600;
+  color: var(--nav-text);
+  font-weight: var(--font-weight-semibold);
 }
 
 .userStatus {
   font-size: var(--text-xs);
-  color: var(--color-accent-active);
+  color: var(--nav-text);
 }
+/* Shared navigation sizing and states across roles. */
+.navItem { min-height: calc(var(--space-10) + var(--space-1)); font-weight: var(--font-weight-medium); }
+.navItem svg { width: var(--space-5); height: var(--space-5); flex-shrink: 0; }
+.navItemActive, .navItemActive:hover { background: var(--nav-active); color: var(--nav-text); font-weight: var(--font-weight-semibold); }
+.navItem:focus-visible, .logoutBtn:focus-visible { outline: 2px solid var(--nav-text); outline-offset: 2px; }
+.navItem[aria-disabled="true"], .logoutBtn:disabled { opacity: .5; cursor: not-allowed; }
+.userFooter > div { min-width: 0; }
+.userName { overflow-wrap: anywhere; }
+
+.sidebar > * { flex-shrink: 0; }
+.section { flex: 1 0 auto; padding-bottom: var(--space-6); }
+.nav .sectionLabel { margin: var(--space-5) 0 var(--space-1); }
+.nav .sectionLabel:first-child { margin-top: 0; }
+.navItem { min-width: 0; overflow-wrap: anywhere; }
+.navItemActive { border-color: var(--nav-border); border-left-color: var(--nav-text); }
+.userStatus::before { content: ''; display: inline-block; width: var(--space-2); height: var(--space-2); margin-right: var(--space-2); border-radius: var(--radius-pill); background: var(--nav-text); }
+.sidebar.sidebar :focus-visible { outline: 2px solid var(--nav-text); outline-offset: 2px; }
+
+/* Transparent brand icon retains its original colors against the green header. */
+.logo img { display: block; width: 64px; max-width: 100%; height: auto; }
+.sidebar { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+
+@media (max-width: 1024px) { .logo img { width: 52px; } }

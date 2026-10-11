@@ -8,7 +8,7 @@ import {
   resendPasswordResetCode,
   resetPassword,
 } from '../../../services/authService';
-import bgImage from '../../../assets/login/BG.jpeg';
+import bgImage from '../../../assets/login/Background.png';
 import styles from '../styles/ForgotPassword.module.css';
 
 // Change this if your institutional domain is different

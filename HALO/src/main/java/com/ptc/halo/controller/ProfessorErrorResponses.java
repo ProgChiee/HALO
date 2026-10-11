@@ -21,6 +21,8 @@ public class ProfessorErrorResponses {
         Map.entry("MODULE_ALREADY_APPROVED", "This lesson is already approved. Reload to see its current status."),
         Map.entry("MODULE_GENERATION_REQUIRED", "Generate the lesson successfully before this action."),
         Map.entry("MODULE_NOT_EDITABLE", "Published lessons cannot be changed through the draft editor."),
+        Map.entry("MATERIAL_NOT_RELEVANT", "The uploaded material does not appear to match this lesson. Please upload a relevant learning material."),
+        Map.entry("MATERIAL_RELEVANCE_UNAVAILABLE", "Material relevance could not be checked. Please try again."),
         Map.entry("MODULE_MATERIALS_REQUIRED", "Upload at least one original lesson file before publishing."),
         Map.entry("MODULE_MATERIAL_UNREADABLE", "Replace the unreadable original lesson file and try again."),
         Map.entry("MODULE_MATERIAL_UNSUPPORTED", "Replace unsupported original lesson files before publishing."),

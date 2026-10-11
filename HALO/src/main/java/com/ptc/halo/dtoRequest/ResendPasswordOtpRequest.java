@@ -2,6 +2,9 @@ package com.ptc.halo.dtoRequest;
 
 public class ResendPasswordOtpRequest {
 
+    @jakarta.validation.constraints.NotBlank
+    @jakarta.validation.constraints.Email
+    @jakarta.validation.constraints.Size(max = 254)
     private String email;
 
     public ResendPasswordOtpRequest() {

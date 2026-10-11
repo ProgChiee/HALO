@@ -33,14 +33,14 @@ const TABS = [
 // as literal hex values. Keep these in sync with src/styles/variables.css
 // if the palette ever changes.
 const CHART_COLORS = {
-  bar: '#00D45C',
-  barMuted: 'rgba(0, 212, 92, 0.35)',
-  barMid: '#E6B84A',
-  barLow: '#e65a5a',
-  grid: '#2F2F2F',
-  textMuted: '#9A9494',
-  tooltipBg: '#171B18',
-  tooltipBorder: '#2F2F2F',
+  bar: 'var(--color-success)',
+  barMuted: 'var(--color-primary-border)',
+  barMid: 'var(--color-warning)',
+  barLow: 'var(--color-danger)',
+  grid: 'var(--color-border)',
+  textMuted: 'var(--color-text-muted)',
+  tooltipBg: 'var(--color-surface)',
+  tooltipBorder: 'var(--color-border)',
 };
 
 function UsageChartTooltip({ active, payload }) {
@@ -313,7 +313,7 @@ function AiUsageTab() {
               <XAxis
                 type="number"
                 stroke={CHART_COLORS.textMuted}
-                fontSize={11}
+                fontSize="var(--font-size-xs)"
                 tickLine={false}
                 axisLine={{ stroke: CHART_COLORS.grid }}
               />
@@ -322,12 +322,12 @@ function AiUsageTab() {
                 dataKey="name"
                 width={160}
                 stroke={CHART_COLORS.textMuted}
-                fontSize={11}
+                fontSize="var(--font-size-xs)"
                 tickLine={false}
                 axisLine={{ stroke: CHART_COLORS.grid }}
                 tickFormatter={accountTick}
               />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<UsageChartTooltip />} />
+              <Tooltip cursor={{ fill: 'var(--color-background)' }} content={<UsageChartTooltip />} />
               <Bar dataKey="moduleActivities" radius={[0, 4, 4, 0]} maxBarSize={18}>
                 {sortedByActivity.slice(0, 25).map((entry, index) => (
                   <Cell
@@ -454,7 +454,7 @@ function QuizPerformanceTab() {
                 type="number"
                 domain={[0, 100]}
                 stroke={CHART_COLORS.textMuted}
-                fontSize={11}
+                fontSize="var(--font-size-xs)"
                 tickLine={false}
                 axisLine={{ stroke: CHART_COLORS.grid }}
                 tickFormatter={(v) => `${v}%`}
@@ -464,12 +464,12 @@ function QuizPerformanceTab() {
                 dataKey="name"
                 width={160}
                 stroke={CHART_COLORS.textMuted}
-                fontSize={11}
+                fontSize="var(--font-size-xs)"
                 tickLine={false}
                 axisLine={{ stroke: CHART_COLORS.grid }}
                 tickFormatter={accountTick}
               />
-              <Tooltip cursor={{ fill: 'rgba(255,255,255,0.04)' }} content={<QuizChartTooltip />} />
+              <Tooltip cursor={{ fill: 'var(--color-background)' }} content={<QuizChartTooltip />} />
               <Bar dataKey="latestAssessmentScore" radius={[0, 4, 4, 0]} maxBarSize={18}>
                 {sortedByScore.slice(0, 25).map((entry) => (
                   <Cell key={entry.userId} fill={barColorFor(entry.latestAssessmentScore)} />

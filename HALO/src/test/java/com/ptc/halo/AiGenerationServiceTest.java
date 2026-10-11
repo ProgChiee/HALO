@@ -27,6 +27,8 @@ class AiGenerationServiceTest {
     private static final String VALID = "{\"valid\":true,\"objectives\":\"Learn\",\"knowledge\":\"Concept\",\"examples\":\"Example\",\"summary\":\"Summary\"}";
 
     @BeforeEach void setup() {
+        module.setStatus(LessonStatus.PENDING);
+        module.setAiGenerationStatus(AiGenerationStatus.PENDING);
         ChatClient.Builder builder = mock(ChatClient.Builder.class);
         when(builder.build()).thenReturn(client);
         var state = mock(com.ptc.halo.service.ModuleGenerationState.class);
@@ -56,10 +58,11 @@ class AiGenerationServiceTest {
         assertEquals(LessonStatus.PENDING, module.getStatus());
         assertEquals("Summary", module.getGeneratedSummary());
     }
-    @Test void apiErrorIsFailedAndClearsOldContent() {
+    @Test void apiErrorPreservesOldContent() {
         module.setGeneratedObjectives("Old preview");
         when(client.prompt().user(anyString()).call().content()).thenThrow(new RuntimeException("API unavailable"));
-        fails();
+        assertThrows(ResponseStatusException.class, () -> service.generateLesson(15L));
+        assertEquals("Old preview", module.getGeneratedObjectives());
     }
     @Test void invalidJsonIsFailed() { reply("not JSON"); fails(); }
     @Test void missingValidFlagIsFailedNotDeclined() { reply("{}"); fails(); }
@@ -67,12 +70,13 @@ class AiGenerationServiceTest {
     @Test void emptyReplyIsFailed() { reply(" "); fails(); }
     @Test void missingFileIsFailed() {
         AiLearningFileEntity file = new AiLearningFileEntity(); file.setFilePath(null);
-        module.addFile(file); fails();
+        module.addFile(file);
+        assertEquals("MODULE_MATERIAL_UNREADABLE", assertThrows(ResponseStatusException.class, () -> service.generateLesson(15L)).getReason());
     }
     @Test void semanticRejectionIsDistinctFromTechnicalFailure() {
         reply("{\"valid\":false,\"reason\":\"No usable materials\"}");
-        service.generateLesson(15L);
-        assertEquals(AiGenerationStatus.DECLINED, module.getAiGenerationStatus());
+        assertEquals("MATERIAL_NOT_RELEVANT", assertThrows(ResponseStatusException.class, () -> service.generateLesson(15L)).getReason());
+        assertEquals(AiGenerationStatus.PENDING, module.getAiGenerationStatus());
         assertEquals(LessonStatus.PENDING, module.getStatus());
     }
     @Test void professorGuidanceFallbackRemainsSupported() {
