@@ -1,3 +1,5 @@
+import { youtubeVideoId } from '../../../utils/youtubeVideo';
+import { VideoPreview } from '../../../components/shared/VideoLearning';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -232,6 +234,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
   }
 
   function handleSaveMaterials() {
+    if (youtubeLink.trim() && !youtubeVideoId(youtubeLink)) { showToast('Please provide a valid YouTube video URL.', 'error'); return; }
     if (!lessonText.trim() && !youtubeLink.trim() && files.length + savedFiles.length === 0) {
       showToast('Add lesson text, a YouTube link, or a file first.', 'error');
       return;
@@ -351,7 +354,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
             <input
               type="text"
               className={styles.input}
-              aria-label="YouTube lesson link (optional)" value={youtubeLink}
+              aria-label="YouTube lesson link (optional)" aria-describedby="youtube-feedback" aria-invalid={Boolean(youtubeLink.trim() && !youtubeVideoId(youtubeLink))} value={youtubeLink}
               onChange={(e) => setYoutubeLink(e.target.value)}
               placeholder="YouTube link (optional)"
               disabled={editingDisabled}
@@ -359,6 +362,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
           </div>
 
           <div className={styles.field}>
+            <div id="youtube-feedback">{youtubeLink.trim() && !youtubeVideoId(youtubeLink) ? <p role="alert">Please provide a valid YouTube video URL.</p> : <VideoPreview url={youtubeLink} />}</div>
             <label htmlFor="lesson-notes" className={styles.label}>Notes for the AI mentor (optional)</label>
             <textarea
               className={styles.textarea}

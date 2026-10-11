@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect","spring.jpa.open-in-view=false"},showSql=false)
-@Import({StudentDashboardService.class,StudentSubjectService.class,StudentProgressService.class,StudentLessonService.class,ProfileService.class,AdminStudentModeService.class,AdminActingSessionService.class,ActivityLogService.class,MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
+@Import({LessonStudyService.class,StudentDashboardService.class,StudentSubjectService.class,StudentProgressService.class,StudentLessonService.class,ProfileService.class,AdminStudentModeService.class,AdminActingSessionService.class,ActivityLogService.class,MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AdminStudentModeTest {
  @Autowired AssessmentService service;
@@ -44,6 +44,8 @@ class AdminStudentModeTest {
  @Autowired StudentSubjectService subjectService;
  @Autowired StudentProgressService progressService;
  @Autowired StudentLessonService lessonService;
+ @Autowired LessonStudyService study;
+ @Autowired LessonStudyDayRepository studyDays;
  @Autowired ProfileService profileService;
  @Autowired BadgeService badgeService;
  @Autowired AdminStudentModeService mode;
@@ -54,7 +56,7 @@ class AdminStudentModeTest {
  UserEntity admin; String actingId; org.springframework.security.core.Authentication auth;
  UserEntity student;AssessmentAttemptEntity attempt;AssessmentQuestionEntity q1,q2,foreign;
  @BeforeEach void setup(){
-  reset((ActivityLogService)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit));logs.deleteAll();actingSessions.deleteAll();messages.deleteAll();sessions.deleteAll();badges.deleteAll();progress.deleteAll();answers.deleteAll();attempts.deleteAll();questions.deleteAll();assessments.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();profiles.deleteAll();users.deleteAll();
+  reset((ActivityLogService)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit));studyDays.deleteAll();logs.deleteAll();actingSessions.deleteAll();messages.deleteAll();sessions.deleteAll();badges.deleteAll();progress.deleteAll();answers.deleteAll();attempts.deleteAll();questions.deleteAll();assessments.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();profiles.deleteAll();users.deleteAll();
   student=new UserEntity();student.setEmail("student@test.example");student.setName("Student");student.setRole(Role.STUDENT);student.setStatus(Status.ACTIVE);student=users.saveAndFlush(student);
   var subject=new SubjectEntity();subject.setYearLevel(YearLevel.FIRST_YEAR);subject.setSubjectCode("S");subject.setSubjectName("Subject");subject=subjects.saveAndFlush(subject);
   var week=new WeekEntity();week.setSubject(subject);week.setWeekNumber(1);week.setTitle("Week");week=weeks.saveAndFlush(week);
@@ -204,5 +206,16 @@ class AdminStudentModeTest {
   var older=mode.execute(auth,actingId,s->mentor.getConversation(opened.getSessionId(),s.getTarget(),page.getNextBeforeId()));
   assertEquals(6,older.getMessages().size());assertFalse(older.isHasOlder());
   assertTrue(older.getMessages().get(5).getId()<page.getMessages().get(0).getId());
+ }
+
+ @Test void supportStudyTracksSelectedStudentAndAuditRollsBackTogether() throws Exception {
+  Long weekId=weeks.findAll().get(0).getId();
+  mode.execute(auth,actingId,s->{var id=study.record(weekId,s.getTarget());audit.createActingLog(s,ActivityType.MODULE,"Studied module ID "+id);return null;});
+  assertTrue(studyDays.existsByStudentIdAndModuleIdAndStudyDate(student.getId(),moduleId(),java.time.LocalDate.now()));
+  studyDays.deleteAll();
+  var auditTarget=(ActivityLogService)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit);
+  doThrow(new IllegalStateException("Audit unavailable")).when(auditTarget).createActingLog(any(),eq(ActivityType.MODULE),eq("Study audit"));
+  assertThrows(IllegalStateException.class,()->mode.execute(auth,actingId,s->{study.record(weekId,s.getTarget());audit.createActingLog(s,ActivityType.MODULE,"Study audit");return null;}));
+  assertEquals(0,studyDays.count());
  }
 }

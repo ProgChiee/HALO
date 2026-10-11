@@ -1,5 +1,6 @@
 // Fixed messages only: never display arbitrary server messages or payloads.
 const MESSAGES = {
+  INVALID_YOUTUBE_URL: "Please provide a valid YouTube video URL.",
   "AUTHENTICATION_REQUIRED": "Please sign in to continue.",
   "ACCESS_DENIED": "You do not have permission to access this resource.",
   "RESOURCE_NOT_FOUND": "The requested resource is unavailable.",

@@ -74,3 +74,10 @@ test('Learning Engagement renders selected scoped students with zero metrics and
   assert.equal(calls.length,2);assert.ok(calls.every(c=>c.url==='/professor/students/engagement'&&c.signal));
  }finally{await ui.close();}
 });
+
+test('module metrics load only for selected student and paginate with zero counts',async()=>{
+ const original=api.defaults.adapter,calls=[];
+ api.defaults.adapter=async config=>{calls.push(config);return {status:200,headers:{},config,data:config.url.endsWith('/engagement')?{...page(0,[{userId:8,name:'Selected',activeDaysWeek:3,activeDaysMonth:8,weeklyConsistency:'Consistent',monthlyConsistency:'Consistent',mentorSessionsWeek:0,mentorSessionsMonth:0}]),last:true}:page(config.params.page,[{moduleId:config.params.page+1,subjectName:'Hospitality',weekNumber:1,title:'Module',reviewCount:0,reviewsMonth:0,assessmentAttempts:2}])};};
+ const ui=await mount('LearningEngagement');const click=async label=>act(async()=>[...ui.host.querySelectorAll('button')].find(b=>b.textContent===label).click());
+ try{assert.equal(calls.length,1);assert.match(ui.host.textContent,/Consistent/);await click('View module activity');assert.equal(calls[1].url,'/professor/students/8/engagement/modules');assert.match(ui.host.textContent,/Assessment Attempts/);await click('Next modules');assert.equal(calls[2].params.page,1);assert.ok(calls.every(c=>c.signal));await click('Close module activity');assert.ok(!ui.host.textContent.includes('Reviews This Month'));}finally{await ui.close();api.defaults.adapter=original;}
+});

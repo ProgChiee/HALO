@@ -164,9 +164,9 @@
 .studentName { overflow-wrap: anywhere; }
 .barTrack { background: var(--color-border); }
 .passFail { flex-wrap: wrap; }
-.main > nav { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-6); }
-.main > nav button { padding: var(--space-2) var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-primary); }
-.main > nav button:disabled { opacity: .5; cursor: not-allowed; }
+.main > nav, .engagement nav { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-6); }
+.main > nav button, .engagement nav button { padding: var(--space-2) var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-primary); }
+.main > nav button:disabled, .engagement nav button:disabled { opacity: .5; cursor: not-allowed; }
 .engagement { margin-bottom: var(--space-8); }
 .engagement h2 { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); margin-bottom: var(--space-2); }
 .engagementHelp { color: var(--color-text-muted); font-size: var(--font-size-sm); margin-bottom: var(--space-4); }

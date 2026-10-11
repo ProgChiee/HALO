@@ -515,6 +515,16 @@
       "method": "POST",
       "path": "/api/admin/acting/student/ai-learning-modules/week/{weekId}/study",
       "controller": "LessonStudyController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/students/{studentId}/engagement/modules",
+      "controller": "ProfessorEngagementController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/professor/students/{studentId}/engagement/modules",
+      "controller": "ProfessorEngagementController.java"
     }
   ],
   "dtos": {

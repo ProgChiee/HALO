@@ -22,4 +22,15 @@ public class ProfessorEngagementController extends ProfessorErrorResponses {
  public Object acting(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size){
   return acting.execute(auth,session.toString(),s->engagement.get(s.getTarget(),page,size));
  }
+ @GetMapping("/api/professor/students/{studentId}/engagement/modules")
+ @PreAuthorize("hasRole('PROFESSOR')")
+ public Object modules(Authentication auth,@PathVariable Long studentId,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size){
+  if(auth==null)throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
+  return engagement.modules(users.findByEmail(auth.getName()).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),studentId,page,size);
+ }
+ @GetMapping("/api/admin/acting/professor/students/{studentId}/engagement/modules")
+ @PreAuthorize("hasRole('ADMIN')")
+ public Object actingModules(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session,@PathVariable Long studentId,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size){
+  return acting.execute(auth,session.toString(),s->engagement.modules(s.getTarget(),studentId,page,size));
+ }
 }

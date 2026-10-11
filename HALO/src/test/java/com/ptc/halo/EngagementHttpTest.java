@@ -44,6 +44,22 @@ class EngagementHttpTest {
   mvc.perform(post("/api/admin/preview/student/ai-learning-modules/week/3/study").header("Authorization","Bearer token")).andExpect(status().isNotFound());
   token("STUDENT");mvc.perform(get("/api/professor/students/engagement").header("Authorization","Bearer token")).andExpect(status().isForbidden());verifyNoInteractions(study,engagement);
  }
+ @Test void moduleMetricsUseAuthenticatedProfessorAndSerializeConsistency() throws Exception {
+  var u=token("PROFESSOR");
+  mvc.perform(get("/api/professor/students/10/engagement/modules").param("professorId","999").header("Authorization","Bearer token")).andExpect(status().isOk());verify(engagement).modules(u,10L,0,20);
+  when(engagement.get(u,0,20)).thenReturn(new ProfessorEngagementService.Page(List.of(new ProfessorEngagementService.Engagement(10L,"Student",3,4,0,0)),0,20,1,1,true,true,"Asia/Manila","MONDAY"));
+  mvc.perform(get("/api/professor/students/engagement").header("Authorization","Bearer token")).andExpect(jsonPath("$.content[0].weeklyConsistency").value("Consistent")).andExpect(jsonPath("$.content[0].monthlyConsistency").value("Moderate"));
+  token("ADMIN");mvc.perform(get("/api/professor/students/10/engagement/modules").header("Authorization","Bearer token")).andExpect(status().isForbidden());
+  token("STUDENT");mvc.perform(get("/api/admin/acting/professor/students/10/engagement/modules").header("Authorization","Bearer token")).andExpect(status().isForbidden());
+ }
+ @Test void actingModuleMetricsUseOnlyValidatedSessionTarget() throws Exception {
+  token("ADMIN");var target=new UserEntity();target.setId(99L);target.setRole(Role.PROFESSOR);
+  var session=mock(AdminActingSessionEntity.class);when(session.getTarget()).thenReturn(target);String id=UUID.randomUUID().toString();
+  when(acting.execute(any(),eq(id),any())).thenAnswer(invocation->((AdminProfessorModeService.Work<?>)invocation.getArgument(2)).apply(session));
+  mvc.perform(get("/api/admin/acting/professor/students/10/engagement/modules").param("professorId","777").header("X-Acting-Session",id).header("Authorization","Bearer token")).andExpect(status().isOk());verify(engagement).modules(target,10L,0,20);
+  when(acting.execute(any(),eq(id),any())).thenThrow(new org.springframework.security.access.AccessDeniedException("Denied"));
+  mvc.perform(get("/api/admin/acting/professor/students/10/engagement/modules").header("X-Acting-Session",id).header("Authorization","Bearer token")).andExpect(status().isForbidden());verifyNoMoreInteractions(engagement);
+ }
  @Test void realStudentStudyUsesAuthenticatedIdentity() throws Exception {
   var u=token("STUDENT");mvc.perform(post("/api/student/ai-learning-modules/week/3/study").param("studentId","999").header("Authorization","Bearer token")).andExpect(status().isNoContent());verify(study).record(3L,u);
  }

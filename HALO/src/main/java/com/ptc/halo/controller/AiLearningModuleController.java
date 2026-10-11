@@ -79,7 +79,7 @@ public class AiLearningModuleController {
             String lessonText,
             @RequestParam(value = "youtubeLink", required = false)
             @jakarta.validation.constraints.Size(max = 255)
-            @org.hibernate.validator.constraints.URL(regexp = "https?://.+", message = "must be a valid HTTP(S) URL")
+            URL")
             String youtubeLink,
             @RequestParam(value = "aiNotes", required = false)
             @jakarta.validation.constraints.Size(max = 10000)

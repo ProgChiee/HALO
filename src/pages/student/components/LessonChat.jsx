@@ -1,3 +1,4 @@
+import VideoLearning from '../../../components/shared/VideoLearning';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -230,6 +231,7 @@ function ModuleLessonChat({ topicId, weekId }) {
             </div>
           </div>
 
+          <VideoLearning url={lesson?.youtubeLink} />
           <div className={styles.breadcrumb}>
             <span className={styles.breadcrumbActive}>Week {lesson?.weekNumber}</span>
           </div>

@@ -10,6 +10,7 @@ public class ProfessorErrorResponses {
         Map.entry("AUTHENTICATION_REQUIRED", "Please sign in to continue."),
         Map.entry("ACCESS_DENIED", "You do not have permission to access this resource."),
         Map.entry("RESOURCE_NOT_FOUND", "The requested resource is unavailable."),
+        Map.entry("INVALID_YOUTUBE_URL", "Please provide a valid YouTube video URL."),
         Map.entry("INVALID_REQUEST", "Check the request fields and try again."),
         Map.entry("INVALID_PAGINATION", "Page must be non-negative and size must be positive."),
         Map.entry("RESOURCE_CONFLICT", "The change conflicts with existing data. Reload before trying again."),

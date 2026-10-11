@@ -16,7 +16,7 @@ class ProfessorEngagementTest {
   for(String sql:new String[]{
    "create table user_entity(id bigint primary key,name varchar(100),role varchar(30))",
    "create table student_profile_entity(user_id bigint,year_level varchar(30))",
-   "create table lesson_study_days(student_id bigint,module_id bigint,study_date date)",
+   "create table lesson_study_days(student_id bigint,module_id bigint,study_date date,review_count bigint default 0)",
    "create table professor_entity(id bigint primary key,user_id bigint)",
    "create table subjects(id bigint primary key,professor_id bigint,year_level varchar(30))",
    "create table weeks(id bigint primary key,subject_id bigint)",
@@ -29,6 +29,7 @@ class ProfessorEngagementTest {
   db.update("insert into user_entity values(1,'Professor','PROFESSOR'),(2,'Other','PROFESSOR'),(10,'Student','STUDENT'),(11,'Unrelated','STUDENT'),(12,'Admin','ADMIN')");
   db.update("insert into professor_entity values(1,1),(2,2)");db.update("insert into subjects values(1,1,'FIRST_YEAR'),(2,2,'SECOND_YEAR')");db.update("insert into weeks values(1,1),(2,2)");db.update("insert into ai_learning_modules values(1,1),(2,2)");db.update("insert into assessments values(1,1),(2,2)");
   db.update("insert into student_profile_entity values(10,'FIRST_YEAR'),(11,'SECOND_YEAR'),(12,'FIRST_YEAR')");
+  db.execute("alter table subjects add subject_name varchar(100) default 'Subject'");db.execute("alter table weeks add week_number integer default 1");db.execute("alter table weeks add title varchar(100) default 'Module'");
   professor=db.queryForObject("select id from user_entity where id=1",(rs,n)->{var p=new UserEntity();p.setId(rs.getLong(1));p.setRole(Role.PROFESSOR);return p;});
  }
  void attempt(int student,int assessment,String start,String finish){db.update("insert into assessment_attempts values(?,?,?,?)",student,assessment,start,finish);}
@@ -61,10 +62,34 @@ class ProfessorEngagementTest {
   assertEquals(1,page().content().size());assertEquals(0,page().content().get(0).activeDaysWeek());assertEquals(0,page().content().get(0).mentorSessionsMonth()); // Preview exchanges are in-memory only, never these durable tables.
  }
  @Test void dailyStudyHistoryIncludesRepeatedVisitsAndCrossMonthWeek() {
-  db.update("insert into lesson_study_days values(10,1,'2026-10-26'),(10,1,'2026-10-28'),(10,1,'2026-11-01'),(10,2,'2026-10-30')");
+  db.update("insert into lesson_study_days(student_id,module_id,study_date) values(10,1,'2026-10-26'),(10,1,'2026-10-28'),(10,1,'2026-11-01'),(10,2,'2026-10-30')");
   attempt(10,1,"2026-11-01 12:00:00",null);
   var result=service.get(professor,0,20,LocalDate.of(2026,11,1)).content().get(0);
   assertEquals(3,result.activeDaysWeek());assertEquals(1,result.activeDaysMonth());assertEquals(0,result.mentorSessionsWeek());
+ }
+ @Test void moduleCountsKeepZeroRowsAndRejectUnrelatedStudents(){
+  db.update("insert into ai_learning_modules values(3,1)");
+  attempt(10,1,"2026-10-05 08:00:00",null);attempt(10,1,"2026-10-06 08:00:00",null);attempt(10,2,"2026-10-06 08:00:00",null);
+  db.update("insert into lesson_study_days values(10,1,CURRENT_DATE,3),(10,2,CURRENT_DATE,99)");
+  var result=service.modules(professor,10L,0,1);
+  var rows=(java.util.List<ProfessorEngagementService.ModuleEngagement>)result.get("content");
+  assertEquals(2L,result.get("totalElements"));assertEquals(2,rows.get(0).assessmentAttempts());assertEquals(3,rows.get(0).reviewCount());assertEquals(3,rows.get(0).reviewsMonth());
+  var zero=(java.util.List<ProfessorEngagementService.ModuleEngagement>)service.modules(professor,10L,1,1).get("content");assertEquals(0,zero.get(0).assessmentAttempts());assertEquals(0,zero.get(0).reviewCount());
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.modules(professor,11L,0,20));
+  professor.setId(2L);assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.modules(professor,10L,0,20));
+ }
+ @Test void ownedButWrongYearModuleActivityIsExcluded(){
+  db.update("update subjects set professor_id=1 where id=2");
+  attempt(10,2,"2026-10-06 00:00:00",null);
+  assertEquals(0,page().content().stream().filter(v->v.userId()==10L).findFirst().orElseThrow().activeDaysWeek());
+  assertEquals(1L,service.modules(professor,10L,0,20).get("totalElements"));
+ }
+ @Test void consistencyThresholdsAreDeterministic(){
+  for(int days=0;days<=10;days++){
+   var value=new ProfessorEngagementService.Engagement(10L,"Student",days,days,0,0);
+   assertEquals(days>=3?"Consistent":days==2?"Moderate":"Low Activity",value.getWeeklyConsistency());
+   assertEquals(days>=8?"Consistent":days>=4?"Moderate":"Low Activity",value.getMonthlyConsistency());
+  }
  }
  @Test void paginationAndRoleGuard(){
   db.update("update student_profile_entity set year_level='FIRST_YEAR' where user_id=11");

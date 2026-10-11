@@ -224,4 +224,10 @@ class AdminStudentPreviewTest {
    release.countDown();var result=first.get(10,java.util.concurrent.TimeUnit.SECONDS);assertEquals(result,preview.send(auth,actingId,chat.getSessionId(),"Question",key));assertEquals(2,preview.conversation(auth,actingId,chat.getSessionId(),null).getMessages().size());noHistory();
   }finally{release.countDown();pool.shutdownNow();}
  }
+
+ @Test void previewLessonReadNeverRecordsStudyDays(){
+  var weekId=weeks.findAll().get(0).getId();
+  preview.read(auth,actingId,s->lessonService.byWeek(weekId,s));
+  assertEquals(0,studyDays.count());
+ }
 }

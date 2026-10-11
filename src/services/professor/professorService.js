@@ -134,6 +134,11 @@ async function getProfessorProfile(config = {}) {
   return res.data;
 }
 
+async function getModuleEngagement(studentId, page = 0, size = 20, config = {}) {
+  const { data } = await apiClient.get(`/professor/students/${studentId}/engagement/modules`, { ...config, params: { page, size } });
+  return data;
+}
+
 async function getLearningEngagement(page = 0, size = 20, config = {}) {
   const { data } = await apiClient.get('/professor/students/engagement', { ...config, params: { page, size } });
   return data;
@@ -146,7 +151,7 @@ async function getStudentProgressSummaries(page = 0, size = 20, config = {}) {
   return data;
 }
 
-  return { createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement };
+  return { createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement };
 }
 
-export const { createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement } = createProfessorService();
+export const { createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement } = createProfessorService();

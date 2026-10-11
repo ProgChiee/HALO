@@ -127,7 +127,7 @@ public class AdminProfessorModeController {
     @PostMapping("/ai-learning-modules")
     public Object createModule(@RequestParam @Positive Long weekId,
             @RequestParam(required=false) @Size(max=100000) String lessonText,
-            @RequestParam(required=false) @Size(max=255) @org.hibernate.validator.constraints.URL(regexp="https?://.+") String youtubeLink,
+            @RequestParam(required=false) @Size(max=255) String youtubeLink,
             @RequestParam(required=false) @Size(max=10000) String aiNotes,
             @RequestParam(required=false) List<MultipartFile> files, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
         return mode.execute(authentication,sessionId.toString(),s -> modules.createModule(weekId,lessonText,youtubeLink,aiNotes,files,s.getTarget(),s));

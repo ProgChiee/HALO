@@ -111,6 +111,7 @@ public class ProfessorModuleService {
             );
         }
 
+        youtubeLink = YoutubeVideoUrl.normalize(youtubeLink);
         var validatedFiles = fileUploadService.validateFiles(files);
 
         boolean hasFiles = files != null
@@ -300,8 +301,9 @@ public class ProfessorModuleService {
         if (!hasText(request.getLessonText()) && !hasText(request.getYoutubeLink()) && module.getFiles().isEmpty()) {
             throw new ProfessorInputException("sources", "Keep lesson text, a valid link, or an attached file.");
         }
+        String validYoutubeLink = YoutubeVideoUrl.normalize(request.getYoutubeLink());
         module.setLessonText(request.getLessonText());
-        module.setYoutubeLink(request.getYoutubeLink());
+        module.setYoutubeLink(validYoutubeLink);
         module.setAiNotes(request.getAiNotes());
 
         invalidateGeneratedLesson(module);

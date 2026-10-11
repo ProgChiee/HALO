@@ -1,0 +1,8 @@
+.modal { width: min(100%, 800px); max-height: calc(100dvh - var(--space-8)); overflow-y: auto; padding: var(--space-6); }
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.header h2 { font-size: var(--font-size-xl); }
+.player { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius-md); }
+.help { margin-block: var(--space-4); color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.preview { margin: var(--space-4) 0; }
+.preview img { display: block; width: min(100%, 280px); height: auto; border-radius: var(--radius-md); }
+@media (max-width: 600px) { .modal { padding: var(--space-4); } }

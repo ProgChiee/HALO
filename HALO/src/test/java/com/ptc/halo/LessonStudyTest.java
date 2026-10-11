@@ -20,9 +20,17 @@ class LessonStudyTest {
  @MockBean StudentLessonService lessons;
  UserEntity student;
  @BeforeEach void setup(){
+  org.springframework.test.util.ReflectionTestUtils.setField((Object)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(service),"clock",java.time.Clock.systemDefaultZone());
   var u=new UserEntity();u.setName("Student");u.setEmail("study@example.test");u.setRole(Role.STUDENT);u.setStatus(Status.ACTIVE);student=users.saveAndFlush(u);
   var lesson=new com.ptc.halo.dtoResponse.AiLearningModuleResponse();lesson.setId(7L);
   when(lessons.byWeek(3L,student)).thenReturn(lesson);
+ }
+ void at(String instant){org.springframework.test.util.ReflectionTestUtils.setField((Object)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(service),"clock",java.time.Clock.fixed(java.time.Instant.parse(instant),java.time.ZoneOffset.UTC));}
+ @Test void firstOpenAndSlidingWindowAndMidnight(){
+  at("2026-10-10T23:30:00Z");service.record(3L,student);assertEquals(0,days.findAll().get(0).getReviewCount());
+  at("2026-10-10T23:50:00Z");service.record(3L,student);
+  at("2026-10-11T00:10:00Z");service.record(3L,student);assertEquals(0,days.findAll().stream().mapToLong(LessonStudyDayEntity::getReviewCount).sum());
+  at("2026-10-11T00:40:00Z");service.record(3L,student);service.record(3L,student);assertEquals(1,days.findAll().stream().mapToLong(LessonStudyDayEntity::getReviewCount).sum());assertEquals(2,days.count());
  }
  @Test void repeatedOpenStoresOneDayAndRetainsEarlierDays(){
   days.saveAndFlush(new LessonStudyDayEntity(student.getId(),7L,LocalDate.now().minusDays(2)));
