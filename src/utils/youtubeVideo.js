@@ -3,6 +3,7 @@ export function youtubeVideoId(value) {
  const text=value.trim();
  if(text.length>255 || /[\s\\]/.test(text))return null;
  try {
+  if(!/^https?:\/\/(?:www\.youtube\.com|m\.youtube\.com|youtube\.com|youtu\.be)\//i.test(text))return null;
   const url=new URL(text);
   if(!['https:','http:'].includes(url.protocol) || url.username || url.password || url.port)return null;
   let id=null;

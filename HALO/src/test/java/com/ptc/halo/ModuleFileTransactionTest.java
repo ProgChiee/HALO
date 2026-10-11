@@ -65,6 +65,17 @@ class ModuleFileTransactionTest {
  long physicalCount() throws Exception {try(var paths=Files.list(directory)){return paths.count();}}
  Long create(boolean attach) throws Exception {return controller.createModule(weekId,"lesson",null,null,attach?List.of(upload()):null,owner).getBody().getId();}
  void failAudit(){doThrow(new IllegalStateException("forced audit failure")).when(audit).createLog(any(),any(),anyString());}
+ @Autowired ProfessorModuleService workflows;
+ @Test void youtubeValidationPreservesDatabaseOnCreateAndUpdate() throws Exception {
+  var error=assertThrows(ResponseStatusException.class,()->controller.createModule(weekId,"lesson","https://evil.example/watch?v=abcdefghijk",null,null,owner));
+  assertEquals("INVALID_YOUTUBE_URL",error.getReason());assertEquals(0,modules.count());verifyNoInteractions(audit);
+  Long id=controller.createModule(weekId,"lesson","https://youtu.be/abcdefghijk",null,null,owner).getBody().getId();
+  assertEquals("https://www.youtube.com/watch?v=abcdefghijk",modules.findById(id).orElseThrow().getYoutubeLink());
+  var request=new com.ptc.halo.dtoRequest.AiLearningModuleUpdateRequest();request.setLessonText("Changed");request.setYoutubeLink("https://youtube.com/shorts/bad");
+  clearInvocations(audit);
+  assertThrows(ResponseStatusException.class,()->workflows.updateModule(id,request,users.findByEmail(owner.getName()).orElseThrow(),null));
+  var saved=modules.findById(id).orElseThrow();assertEquals("lesson",saved.getLessonText());assertEquals("https://www.youtube.com/watch?v=abcdefghijk",saved.getYoutubeLink());verifyNoInteractions(audit);
+ }
  @Test void bothUploadRoutesPreserveHostileNamesOnlyAsMetadata() throws Exception {
   String[] names={"../../escape.pdf","C:\\temp\\lesson.pdf","..\\..\\escape.pdf","bad<>:\"|?*.pdf","CON.pdf"};
   List<org.springframework.web.multipart.MultipartFile> initial=java.util.Arrays.stream(names).map(name->(org.springframework.web.multipart.MultipartFile)new MockMultipartFile("file",name,"application/pdf",validBytes())).toList();

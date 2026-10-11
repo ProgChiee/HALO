@@ -305,3 +305,11 @@ test('lesson study tracking uses Support writes but never Preview writes',async(
   }finally{await cleanup();}
  }
 });
+
+test('Preview and Support lesson pages inherit video without new learning writes',async()=>{
+ for(const preview of [false,true]){
+  const calls=[];api.defaults.adapter=adapter(calls,c=>c.url.includes('/ai-learning-modules/week/')?response(c,{id:10,subjectId:1,weekId:37,weekNumber:1,status:'APPROVED',aiGenerationStatus:'COMPLETED',generatedKnowledge:'Lesson',youtubeLink:'https://youtu.be/abcdefghijk'}):undefined);
+  const cleanup=await mount('/admin/'+(preview?'student-preview/':'student-mode/')+id+'/lesson/1/37');
+  try{assert.ok(button('Video Learning'));const before=calls.length;await click(button('Video Learning'));assert.equal(document.querySelector('iframe').getAttribute('src'),'https://www.youtube.com/embed/abcdefghijk');await click(document.querySelector('[role="dialog"] button'));assert.equal(document.querySelector('iframe'),null);assert.equal(calls.length,before);}finally{await cleanup();}
+ }
+});

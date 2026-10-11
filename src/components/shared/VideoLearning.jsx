@@ -21,7 +21,7 @@ function VideoControl({ videoId }) {
  return <>
   <Button onClick={()=>setOpen(true)}>Video Learning</Button>
   {open && <Dialog labelledBy={titleId} onClose={()=>setOpen(false)} className={styles.modal} initialFocus="button">
-   <div className={styles.header}><h2 id={titleId}>Video Learning</h2><Button onClick={()=>setOpen(false)} aria-label="Close Video Learning">Close</Button></div>
+   <div className={styles.header}><h2 id={titleId}>Video Learning</h2><Button onClick={()=>setOpen(false)}>Close</Button></div>
    <iframe className={styles.player} src={`https://www.youtube.com/embed/${videoId}`} title="Current lesson YouTube video" allow="encrypted-media; picture-in-picture; fullscreen" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" tabIndex={0} />
    <p className={styles.help}>Video unavailable? Please contact your Professor or open the source link on YouTube. Private, deleted, or restricted videos may not play here.</p>
    <a href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer">Open on YouTube</a>

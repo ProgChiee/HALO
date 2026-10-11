@@ -17,6 +17,8 @@
 }
 
 .topHeader {
+  flex-wrap: wrap;
+  gap: var(--space-3);
   composes: topbar from "../../../components/shared/Navigation.module.css";
   display: flex;
   align-items: center;

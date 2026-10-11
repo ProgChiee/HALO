@@ -82,7 +82,7 @@ class ProfessorInputValidationTest {
   bad(put(base+"/2").contentType("application/json").content("{\"lessonText\":\"   \",\"aiNotes\":\"notes only\"}"));
   org.junit.jupiter.api.Assertions.assertEquals("Original",module.getLessonText());
   verify(modules,never()).save(any());verifyNoInteractions(audit);
-  bad(put(base+"/2").contentType("application/json").content("{\"youtubeLink\":\"javascript:alert(1)\"}"));
+  mvc.perform(put(base+"/2").contentType("application/json").content("{\"youtubeLink\":\"javascript:alert(1)\"}").header("Authorization","Bearer test-token")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_YOUTUBE_URL"));
   bad(put(base+"/2").contentType("application/json").content("{\"youtubeLink\":\""+"x".repeat(256)+"\"}"));
   mvc.perform(put(base+"/2").contentType("application/json").content("{\"lessonText\":\" lesson \",\"aiNotes\":\" notes \"}").header("Authorization","Bearer test-token")).andExpect(status().isOk()).andExpect(jsonPath("$.lessonText").value("lesson")).andExpect(jsonPath("$.aiNotes").value("notes"));
   module.addFile(new AiLearningFileEntity());

@@ -7,7 +7,6 @@ public class AiLearningModuleUpdateRequest {
     @Size(max = 100000)
     private String lessonText;
     @Size(max = 255)
-    URL")
     private String youtubeLink;
     @Size(max = 10000)
     private String aiNotes;
