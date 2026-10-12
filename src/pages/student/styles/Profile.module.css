@@ -163,3 +163,12 @@
 .sectionTitle { color: var(--color-text-primary); font-size: var(--font-size-xl); }
 .actionRow { overflow-wrap: anywhere; }
 @media (max-width: 480px) { .infoCard, .actionRow { padding: var(--space-4); } }
+
+/* Compact Student-only identity and account layout. */
+.detailsGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-3); }
+.infoCard { margin-bottom: 0; padding: var(--space-4); min-width: 0; }
+.avatar { width: 112px; height: 112px; overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.sectionTitle { font-size: var(--font-size-lg); margin-top: var(--space-6); margin-bottom: var(--space-3); }
+.actionRow { width: auto; max-width: 100%; padding: var(--space-3) var(--space-4); }
+@media (max-width: 600px) { .detailsGrid { grid-template-columns: 1fr; } .avatar { width: 96px; height: 96px; } }

@@ -1,3 +1,4 @@
+import ProfilePhoto from '../../../components/shared/ProfilePhoto';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/login/useAuth';
 import { User as UserIcon, KeyRound } from 'lucide-react';
@@ -54,7 +55,7 @@ export default function AdminProfile() {
     );
   }
 
-  const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
+  const avatarInitial = profile.name?.trim().charAt(0).toUpperCase() || '?';
 
   return (
     <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
@@ -68,7 +69,7 @@ export default function AdminProfile() {
       <main className={styles.main}>
         {user?.mustChangePassword && <p role="alert">Change your temporary password before using Admin features.</p>}
         <div className={styles.profileHeader}>
-          <div className={styles.avatar}>{avatarInitial}</div>
+          <ProfilePhoto identity={profile.userId} initial={avatarInitial} />
           <div>
             <p className={styles.fullName}>{profile.name}</p>
             <p className={styles.subMeta}>Admin</p>

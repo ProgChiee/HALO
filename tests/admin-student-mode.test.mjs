@@ -313,3 +313,11 @@ test('Preview and Support lesson pages inherit video without new learning writes
   try{assert.ok(button('Video Learning'));const before=calls.length;await click(button('Video Learning'));assert.equal(document.querySelector('iframe').getAttribute('src'),'https://www.youtube.com/embed/abcdefghijk');await click(document.querySelector('[role="dialog"] button'));assert.equal(document.querySelector('iframe'),null);assert.equal(calls.length,before);}finally{await cleanup();}
  }
 });
+
+test('Preview and Support expose read-only Student calendar with the correct session',async()=>{
+ for(const preview of [false,true]){
+  const calls=[];api.defaults.adapter=adapter(calls,c=>c.url.endsWith('/dashboard')?response(c,{completedModules:0,passedAssessments:0,totalBadges:0,studyActivity:{weeklyStudyDays:1,studyStreak:1,mentorSessionsWeek:1,mentorSessionsMonth:2,timezone:'Asia/Manila'}}):c.url.endsWith('/study-calendar')?response(c,{month:'2026-10',today:'2026-10-03',timezone:'Asia/Manila',activeDates:['2026-10-01']}):undefined);
+  const cleanup=await mount('/admin/'+(preview?'student-preview/':'student-mode/')+id);
+  try{await click(button('View Study Calendar'));const call=calls.find(c=>c.url.endsWith('/study-calendar'));assert.equal(call.method,'get');assert.equal(call.url,preview?'/admin/preview/student/study-calendar':'/admin/acting/student/study-calendar');assert.equal(call.headers.get('X-Acting-Session'),id);assert.ok(document.querySelector('[aria-label="2026-10-01, Active study day"]'));}finally{await cleanup();}
+ }
+});

@@ -17,11 +17,13 @@ import java.util.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-@WebMvcTest({LessonStudyController.class,ProfessorEngagementController.class})
+@WebMvcTest({StudentStudyCalendarController.class,LessonStudyController.class,ProfessorEngagementController.class})
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class})
 class EngagementHttpTest {
  @Autowired MockMvc mvc;
  @MockBean LessonStudyService study;
+ @MockBean StudentStudyActivityService calendar;
+ @MockBean AdminStudentPreviewService preview;
  @MockBean StudentLessonAccessService access;
  @MockBean AdminStudentModeService support;
  @MockBean ActivityLogService audit;
@@ -59,6 +61,18 @@ class EngagementHttpTest {
   mvc.perform(get("/api/admin/acting/professor/students/10/engagement/modules").param("professorId","777").header("X-Acting-Session",id).header("Authorization","Bearer token")).andExpect(status().isOk());verify(engagement).modules(target,10L,0,20);
   when(acting.execute(any(),eq(id),any())).thenThrow(new org.springframework.security.access.AccessDeniedException("Denied"));
   mvc.perform(get("/api/admin/acting/professor/students/10/engagement/modules").header("X-Acting-Session",id).header("Authorization","Bearer token")).andExpect(status().isForbidden());verifyNoMoreInteractions(engagement);
+ }
+ @Test void calendarUsesAuthenticatedStudentAndRejectsAdminOnNormalRoute() throws Exception {
+  var u=token("STUDENT");mvc.perform(get("/api/student/study-calendar").param("month","2026-10").param("studentId","999").header("Authorization","Bearer token")).andExpect(status().isOk());verify(calendar).calendar(u,"2026-10");
+  token("ADMIN");mvc.perform(get("/api/student/study-calendar").header("Authorization","Bearer token")).andExpect(status().isForbidden());
+ }
+ @Test void calendarActingErrorsRemainSafeAndSessionSpecific() throws Exception {
+  token("ADMIN");String id=UUID.randomUUID().toString();
+  for(var code:List.of(AdminApiException.Code.ACTING_SESSION_INVALID,AdminApiException.Code.INVALID_TARGET_ROLE,AdminApiException.Code.ACTING_TARGET_INACTIVE)){
+   doThrow(new AdminApiException(code)).when(preview).read(any(),eq(id),any());doThrow(new AdminApiException(code)).when(support).execute(any(),eq(id),any());
+   for(String mode:List.of("preview","acting"))mvc.perform(get("/api/admin/"+mode+"/student/study-calendar").header("Authorization","Bearer token").header("X-Acting-Session",id)).andExpect(status().is(code.status)).andExpect(jsonPath("$.code").value(code.name()));
+  }
+  mvc.perform(get("/api/admin/preview/student/study-calendar").header("Authorization","Bearer token")).andExpect(status().isBadRequest());verifyNoInteractions(calendar);
  }
  @Test void realStudentStudyUsesAuthenticatedIdentity() throws Exception {
   var u=token("STUDENT");mvc.perform(post("/api/student/ai-learning-modules/week/3/study").param("studentId","999").header("Authorization","Bearer token")).andExpect(status().isNoContent());verify(study).record(3L,u);

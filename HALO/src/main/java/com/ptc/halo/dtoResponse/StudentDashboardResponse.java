@@ -1,6 +1,9 @@
 package com.ptc.halo.dtoResponse;
 
 public class StudentDashboardResponse {
+    private StudentStudyActivityResponse studyActivity;
+    public StudentStudyActivityResponse getStudyActivity(){return studyActivity;}
+    public void setStudyActivity(StudentStudyActivityResponse value){studyActivity=value;}
 
     private Long completedModules;
     private Long totalBadges;

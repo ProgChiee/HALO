@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect","spring.jpa.open-in-view=false"},showSql=false)
-@Import({LessonStudyService.class,StudentDashboardService.class,StudentSubjectService.class,StudentProgressService.class,StudentLessonService.class,ProfileService.class,AdminStudentModeService.class,AdminActingSessionService.class,ActivityLogService.class,MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
+@Import({LessonStudyService.class,StudentDashboardService.class,StudentStudyActivityService.class,StudentSubjectService.class,StudentProgressService.class,StudentLessonService.class,ProfileService.class,AdminStudentModeService.class,AdminActingSessionService.class,ActivityLogService.class,MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AdminStudentModeTest {
  @Autowired AssessmentService service;
@@ -212,6 +212,7 @@ class AdminStudentModeTest {
   Long weekId=weeks.findAll().get(0).getId();
   mode.execute(auth,actingId,s->{var id=study.record(weekId,s.getTarget());audit.createActingLog(s,ActivityType.MODULE,"Studied module ID "+id);return null;});
   assertTrue(studyDays.existsByStudentIdAndModuleIdAndStudyDate(student.getId(),moduleId(),java.time.LocalDate.now()));
+  var activity=mode.execute(auth,actingId,session->dashboard.getDashboard(session.getTarget()).getStudyActivity());assertEquals(1,activity.weeklyStudyDays());assertEquals(1,activity.studyStreak());
   studyDays.deleteAll();
   var auditTarget=(ActivityLogService)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit);
   doThrow(new IllegalStateException("Audit unavailable")).when(auditTarget).createActingLog(any(),eq(ActivityType.MODULE),eq("Study audit"));

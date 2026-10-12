@@ -360,3 +360,92 @@ test('lesson and quiz show academic week and canonicalize mismatched Subject URL
   }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=adapter;}
  }
 });
+
+test('Student study cards render weekly frequency, seven indicators and singular/zero streaks',async()=>{
+ const Component=(await server.ssrLoadModule('/src/pages/student/components/StudentDashboard.jsx')).default;
+ for(const [days,streak] of [[4,3],[0,0],[1,1]]){
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const original=api.defaults.adapter,calls=[];
+  api.defaults.adapter=async config=>{calls.push(config.url);return {status:200,headers:{},config,data:config.url.endsWith('/dashboard')?{completedModules:0,passedAssessments:0,totalBadges:0,studyActivity:{weeklyStudyDays:days,studyStreak:streak,timezone:'Asia/Manila',weekStartsOn:'MONDAY'}}:[]};};
+  try{await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(Router.MemoryRouter,{},React.createElement(Component)))));
+   const section=host.querySelector('[aria-labelledby="study-activity-title"]');assert.ok(section);assert.ok(section.textContent.includes(days+' / 7 active days'));assert.ok(section.textContent.includes(streak+'-day streak'));assert.equal(section.querySelectorAll('[aria-hidden="true"] span').length,7);assert.equal(calls.filter(c=>c.endsWith('/dashboard')).length,1);
+  }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=original;}
+ }
+});
+
+test('Study Calendar navigates months, labels active/today dates and excludes future activity',async()=>{
+ const Component=(await server.ssrLoadModule('/src/pages/student/components/StudentDashboard.jsx')).default;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const original=api.defaults.adapter,calls=[];
+ api.defaults.adapter=async config=>{calls.push(config);const month=config.params?.month??'2026-10';return {status:200,headers:{},config,data:config.url.endsWith('/dashboard')?{completedModules:0,passedAssessments:0,totalBadges:0,studyActivity:{weeklyStudyDays:2,studyStreak:1,mentorSessionsWeek:3,mentorSessionsMonth:8,timezone:'Asia/Manila'}}:config.url.endsWith('/study-calendar')?{month,today:'2026-10-03',timezone:'Asia/Manila',activeDates:month==='2026-10'?['2026-10-01','2026-10-03','2026-10-04']:month==='2026-09'?['2026-09-30']:[]}:[]};};
+ const click=label=>act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent===label).click());
+ try{await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(Router.MemoryRouter,{},React.createElement(Component)))));
+  assert.match(host.textContent,/3 this week/);assert.match(host.textContent,/8 this month/);assert.ok(!calls.some(c=>c.url.endsWith('/study-calendar')));
+  await click('View Study Calendar');assert.equal(host.querySelector('caption').textContent,'October 2026');assert.match(host.querySelector('[aria-current="date"]').getAttribute('aria-label'),/2026-10-03, Today, Active study day/);assert.ok(host.querySelector('[aria-label="2026-10-04, No study activity"]'));assert.ok(host.querySelector('[aria-label="2026-10-02, No study activity"]'));
+  await click('Previous month');assert.equal(calls.at(-1).params.month,'2026-09');assert.ok(host.querySelector('[aria-label="2026-09-30, Active study day"]'));
+  await click('Next month');await click('Next month');assert.equal(host.querySelector('caption').textContent,'November 2026');assert.equal(host.querySelectorAll('td[aria-label$="Active study day"]').length,0);
+  await click('Hide Study Calendar');assert.equal(host.querySelector('table'),null);assert.ok(calls.filter(c=>c.url.endsWith('/study-calendar')).every(c=>c.signal));
+ }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=original;}
+});
+
+test('Student photo previews, saves, reloads and remains read-only in acting mode', async () => {
+ const Photo=(await server.ssrLoadModule('/src/pages/student/components/ProfilePhoto.jsx')).default;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const originalAdapter=api.defaults.adapter, bitmap=globalThis.createImageBitmap;
+ const context=dom.window.HTMLCanvasElement.prototype.getContext, toBlob=dom.window.HTMLCanvasElement.prototype.toBlob;
+ globalThis.createImageBitmap=async()=>({width:100,height:100,close(){}});
+ dom.window.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){}});
+ dom.window.HTMLCanvasElement.prototype.toBlob=callback=>callback(new Blob(['png'],{type:'image/png'}));
+ let saved=null,puts=0;
+ api.defaults.adapter=async config=>{if(config.method==='put'){puts++;assert.equal(config.url,'/profile/photo');saved=config.data.get('photo');}return {status:saved?200:204,headers:{},config,data:saved};};
+ try {
+  await act(async()=>root.render(React.createElement(Photo,{initial:'S',readOnly:false})));
+  assert.equal(host.querySelector('img'),null);
+  const input=host.querySelector('input');Object.defineProperty(input,'files',{value:[new Blob(['png'],{type:'image/png'})]});
+  await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));
+  assert.equal(host.querySelector('img').alt,'New profile photo preview');
+  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Save photo').click());
+  assert.equal(puts,1);assert.equal(host.querySelector('img').alt,'Profile photo');
+  await act(async()=>root.render(React.createElement(Photo,{key:'reload',initial:'S',readOnly:false})));
+  assert.equal(host.querySelector('img').alt,'Profile photo');
+  await act(async()=>root.render(React.createElement(Photo,{key:'readonly',initial:'S',readOnly:true})));
+  assert.equal(host.querySelector('input'),null);assert.equal(host.querySelector('button'),null);
+ } finally {await act(async()=>root.unmount());host.remove();api.defaults.adapter=originalAdapter;globalThis.createImageBitmap=bitmap;dom.window.HTMLCanvasElement.prototype.getContext=context;dom.window.HTMLCanvasElement.prototype.toBlob=toBlob;}
+});
+
+test('all real role Profile pages expose the shared photo editor', async () => {
+ const original=api.defaults.adapter;
+ const routes=[['admin','AdminProfile'],['superadmin','SuperAdminProfile'],['professor','ProfessorProfile'],['student','Profile']];
+ api.defaults.adapter=async config=>({status:200,headers:{},config,data:config.url.endsWith('/photo')?new Blob(['png'],{type:'image/png'}):{userId:5,name:'User',email:'user@test',status:'ACTIVE',studentId:'S',professorId:'P'}});
+ try {for(const [role,page] of routes){
+  const Component=(await server.ssrLoadModule(`/src/pages/${role}/components/${page}.jsx`)).default;
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+  try {await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'User',role},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{},React.createElement(Component))))));
+   const input=host.querySelector('input[type="file"]');assert.ok(input,role);assert.equal(input.accept,'image/jpeg,image/png,image/webp');assert.ok(host.querySelector(`label[for="${input.id}"]`));assert.equal(host.querySelector('img[alt="Profile photo"]')?.getAttribute('src')?.startsWith('blob:'),true);
+  } finally {await act(async()=>root.unmount());host.remove();}
+ }} finally {api.defaults.adapter=original;}
+});
+
+test('Professor and Student acting photo loaders use only their session-scoped routes', async()=>{
+ const {createActingProfessorScope}=await server.ssrLoadModule('/src/services/admin/professorModeService.js');
+ const {createActingStudentScope}=await server.ssrLoadModule('/src/services/admin/studentModeService.js');
+ const original=api.defaults.adapter,calls=[];
+ api.defaults.adapter=async config=>{calls.push(config);return {status:200,headers:{},config,data:new Blob(['photo'],{type:'image/png'})};};
+ try {
+  for(const [scope,path] of [[createActingProfessorScope('p',()=>{}),'/admin/acting/professor/profile/photo'],[createActingStudentScope('s',()=>{}),'/admin/acting/student/profile/photo'],[createActingStudentScope('v',()=>{},true),'/admin/preview/student/profile/photo']]){
+   await scope.api.getProfilePhoto();assert.equal(calls.at(-1).url,path);assert.ok(calls.at(-1).headers['X-Acting-Session']);scope.dispose();
+  }
+ }finally{api.defaults.adapter=original;}
+});
+
+test('shared photo editor clears old target state and ignores a late photo response',async()=>{
+ const Photo=(await server.ssrLoadModule('/src/components/shared/ProfilePhoto.jsx')).default;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ let resolveOld,oldSignal;const old=config=>{oldSignal=config.signal;return new Promise(resolve=>{resolveOld=resolve;});};
+ const current=async()=>null;
+ try {
+  await act(async()=>root.render(React.createElement(Photo,{identity:'old',initial:'A',readOnly:true,getProfilePhoto:old})));
+  await act(async()=>root.render(React.createElement(Photo,{identity:'new',initial:'B',readOnly:true,getProfilePhoto:current})));
+  assert.equal(oldSignal.aborted,true);
+  await act(async()=>resolveOld(new Blob(['old photo'],{type:'image/png'})));
+  assert.equal(host.querySelector('img'),null);assert.equal(host.textContent,'B');assert.equal(host.querySelector('input'),null);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

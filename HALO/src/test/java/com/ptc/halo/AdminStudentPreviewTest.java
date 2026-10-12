@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect","spring.jpa.open-in-view=false"},showSql=false)
-@Import({AdminStudentPreviewService.class,StudentDashboardService.class,StudentSubjectService.class,StudentProgressService.class,StudentLessonService.class,ProfileService.class,AdminStudentModeService.class,AdminActingSessionService.class,ActivityLogService.class,MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
+@Import({AdminStudentPreviewService.class,StudentDashboardService.class,StudentStudyActivityService.class,StudentSubjectService.class,StudentProgressService.class,StudentLessonService.class,ProfileService.class,AdminStudentModeService.class,AdminActingSessionService.class,ActivityLogService.class,MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AdminStudentPreviewTest {
  @Autowired AdminStudentPreviewService preview;
@@ -43,6 +43,7 @@ class AdminStudentPreviewTest {
  @Autowired StudentProfileRepository profiles;
  @org.springframework.boot.test.mock.mockito.SpyBean ActivityLogService audit;
  @Autowired StudentDashboardService dashboard;
+ @Autowired StudentStudyActivityService studyActivity;
  @Autowired StudentSubjectService subjectService;
  @Autowired StudentProgressService progressService;
  @Autowired StudentLessonService lessonService;
@@ -96,6 +97,8 @@ class AdminStudentPreviewTest {
  Long moduleId(){return modules.findAll().get(0).getId();}
 
  void noHistory(){
+  assertTrue(studyActivity.calendar(student,null).activeDates().isEmpty());
+  var activity=dashboard.getDashboard(student).getStudyActivity();assertEquals(0,activity.mentorSessionsWeek());assertEquals(0,activity.mentorSessionsMonth());assertEquals(0,activity.weeklyStudyDays());assertEquals(0,activity.studyStreak());
   assertEquals(0,studyDays.count());assertEquals(0,attempts.count());assertEquals(0,answers.count());assertEquals(0,progress.count());assertEquals(0,badges.count());
   assertEquals(0,sessions.count());assertEquals(0,messages.count());assertEquals(0,actingSessions.count());
  }

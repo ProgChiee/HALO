@@ -3,6 +3,10 @@ import defaultClient from '../apiClient';
 
 export function createStudentService(apiClient = defaultClient) {
 
+async function getStudyCalendar(month, config = {}) {
+  return (await apiClient.get('/student/study-calendar', { ...config, params: month ? { month } : {} })).data;
+}
+
 async function getProgressData(config = {}) {
   const res = await apiClient.get('/student/progress', config);
   return res.data;
@@ -41,6 +45,7 @@ async function getProfileData(config = {}) {
   const res = await apiClient.get('/student/profile', config);
   return res.data;
 }
-return { getProgressData, getBadgesData, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy };
+async function getProfilePhoto(config = {}) { return (await apiClient.get('/student/profile/photo', { ...config, responseType: 'blob' })).data; }
+return { getProfilePhoto, getProgressData, getBadgesData, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy, getStudyCalendar };
 }
-export const { getProgressData, getBadgesData, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy } = createStudentService();
+export const { getProgressData, getBadgesData, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy, getStudyCalendar } = createStudentService();

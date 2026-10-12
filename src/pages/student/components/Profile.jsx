@@ -1,3 +1,4 @@
+import ProfilePhoto from './ProfilePhoto';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
@@ -5,11 +6,6 @@ import { User as UserIcon, KeyRound } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import styles from '../styles/Profile.module.css';
-
-// ✅ Wired to the real backend — StudentProfileResponse has
-// { userId, name, email, role, status, studentId, section, yearLevel }.
-// No "program" field exists — was mock-only, removed. No update endpoint
-// exists yet either, so "Edit" actions stay out until the backend adds one.
 
 const YEAR_LEVEL_LABELS = {
   FIRST_YEAR: '1st Year',
@@ -61,7 +57,7 @@ export default function Profile() {
     );
   }
 
-  const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
+  const avatarInitial = profile.name?.trim().charAt(0).toUpperCase() || '?';
   const yearLevelLabel = YEAR_LEVEL_LABELS[profile.yearLevel] ?? profile.yearLevel;
 
   return (
@@ -77,13 +73,14 @@ export default function Profile() {
 
         <main className={styles.main}>
           <div className={styles.profileHeader}>
-            <div className={styles.avatar}>{avatarInitial}</div>
+            <ProfilePhoto key={workflow.identity} initial={avatarInitial} readOnly={workflow.acting} />
             <div>
               <p className={styles.fullName}>{profile.name}</p>
               <p className={styles.subMeta}>{profile.section} · {yearLevelLabel}</p>
             </div>
           </div>
 
+          <div className={styles.detailsGrid}>
           <div className={styles.infoCard}>
             <span className={styles.infoLabel}>Full name</span>
             <span className={styles.infoValue}>{profile.name}</span>
@@ -107,6 +104,8 @@ export default function Profile() {
           <div className={styles.infoCard}>
             <span className={styles.infoLabel}>Year Level</span>
             <span className={styles.infoValue}>{yearLevelLabel}</span>
+          </div>
+
           </div>
 
           {!workflow.acting && <h2 className={styles.sectionTitle}>Account</h2>}

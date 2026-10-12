@@ -1,8 +1,9 @@
+import StudyCalendar from './StudyCalendar';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp } from 'lucide-react';
+import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp, Flame } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
 import { useAuth } from '../../../context/login/useAuth';
@@ -111,6 +112,31 @@ export default function StudentDashboard() {
             })}
           </div>}
 
+          {statsStatus === 'ready' && summary?.studyActivity && <section className={styles.studySection} aria-labelledby="study-activity-title">
+            <h2 id="study-activity-title" className={styles.sectionTitle}>My Study Activity</h2>
+            <div className={styles.studyActivityGrid}>
+              <div className={styles.activityCard}>
+                <h3 className={styles.activityLabel}>Weekly Study</h3>
+                <p className={styles.activityValue}>{summary.studyActivity.weeklyStudyDays} / 7 active days</p>
+                <div className={styles.studyDots} aria-hidden="true">{Array.from({length:7},(_,i)=><span key={i} className={i<summary.studyActivity.weeklyStudyDays ? styles.studyDotActive : styles.studyDot} />)}</div>
+              </div>
+              <div className={styles.activityCard}>
+                <h3 className={styles.activityLabel}><Flame size={16} aria-hidden="true" />Study Streak</h3>
+                <p className={styles.activityValue}>{summary.studyActivity.studyStreak}-day streak</p>
+                <p className={styles.activityCaption} title="Yesterday keeps your streak going until today ends.">Keep studying to continue your streak.</p>
+              </div>
+              <div className={styles.activityCard}>
+                <h3 className={styles.activityLabel}>AI Mentor Sessions</h3>
+                <div className={styles.mentorStats}>
+                  <p><strong>{summary.studyActivity.mentorSessionsWeek ?? 0}</strong>{' '}<span>this week</span></p>
+                  <p><strong>{summary.studyActivity.mentorSessionsMonth ?? 0}</strong>{' '}<span>this month</span></p>
+                </div>
+              </div>
+            </div>
+            <StudyCalendar />
+            <p className={styles.activityHelp}>Week starts Monday. Dates use {summary.studyActivity.timezone}. Lesson study, assessments, completions, and real Mentor messages count; Preview activity does not. Yesterday keeps your streak going until today ends.</p>
+          </section>}
+
           <h2 className={styles.sectionTitle}>Continue Where You Left Off</h2>
           <div className={styles.continueCard}>
             <div className={styles.continueIcon}>
@@ -155,7 +181,8 @@ export default function StudentDashboard() {
             {subjects.map((subject) => (
               <div key={subject.subjectId} className={styles.subjectRow}>
                 <span className={styles.subjectName}>{subject.subjectName}</span>
-                <span className={styles.subjectProgress}>{subject.progressPercentage}%</span>
+                <span className={styles.subjectProgress}>Progress: {subject.progressPercentage}%</span>
+                <progress className={styles.subjectBar} max="100" value={subject.progressPercentage} aria-label={`${subject.subjectName} progress`} />
               </div>
             ))}
             {subjects.length === 0 && (

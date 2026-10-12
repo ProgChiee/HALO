@@ -1,3 +1,4 @@
+import ProfilePhoto from '../../../components/shared/ProfilePhoto';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useEffect } from 'react';
@@ -64,7 +65,7 @@ export default function ProfessorProfile() {
     );
   }
 
-  const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
+  const avatarInitial = profile.name?.trim().charAt(0).toUpperCase() || '?';
 
   return (
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
@@ -79,7 +80,7 @@ export default function ProfessorProfile() {
 
         <main className={styles.main}>
           <div className={styles.profileHeader}>
-            <div className={styles.avatar}>{avatarInitial}</div>
+            <ProfilePhoto identity={`${workflow.basePath}:${profile.userId}`} initial={avatarInitial} readOnly={workflow.acting} getProfilePhoto={workflow.acting ? workflow.api.getProfilePhoto : undefined} />
             <div>
               <p className={styles.fullName}>{profile.name}</p>
               <p className={styles.subMeta}>Professor</p>

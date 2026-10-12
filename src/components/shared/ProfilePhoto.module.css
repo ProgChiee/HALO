@@ -1,0 +1,12 @@
+.avatar { width: 112px; height: 112px; overflow: hidden; border-radius: 50%; background: var(--color-primary-soft); border: 1px solid var(--color-primary-border); color: var(--color-text-primary); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-xl); font-weight: var(--font-weight-bold); flex-shrink: 0; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.photoArea { max-width: 260px; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.photoArea input { max-width: 100%; font-size: var(--font-size-xs); }
+.photoLabel { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.photoHelp, .photoArea [role] { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.photoArea [role="alert"] { color: var(--color-danger-text); }
+.photoActions { display: flex; gap: var(--space-2); }
+.photoActions button { padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-primary); }
+.photoActions button:disabled { opacity: .6; cursor: not-allowed; }
+.photoActions button:focus-visible, .photoArea input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+@media (max-width: 600px) { .avatar { width: 96px; height: 96px; } }

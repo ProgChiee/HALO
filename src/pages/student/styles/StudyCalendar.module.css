@@ -1,0 +1,17 @@
+.container { margin-top: var(--space-4); max-width: 640px; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.header h3 { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.toggle, .monthButton { padding: var(--space-2); color: var(--color-primary); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); cursor: pointer; }
+.toggle { font-size: var(--font-size-sm); }
+.navigation { display: flex; justify-content: center; align-items: center; gap: var(--space-3); margin-block: var(--space-3); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.monthButton { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.monthButton:disabled { opacity: .5; cursor: not-allowed; }
+.calendar { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 2px; }
+.calendar th, .calendar td { text-align: center; padding: var(--space-2) 0; font-size: var(--font-size-sm); }
+.calendar th { color: var(--color-text-muted); font-size: var(--font-size-xs); }
+.active { background: var(--color-primary-soft); color: var(--color-primary); font-weight: var(--font-weight-semibold); border-radius: var(--radius-sm); }
+.calendar [aria-current="date"] { outline: 2px solid var(--color-primary); outline-offset: -2px; border-radius: var(--radius-sm); }
+.help { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--space-2); }
+.toggle:focus-visible, .monthButton:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 480px) { .container { padding: var(--space-3); } }

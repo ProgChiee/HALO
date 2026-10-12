@@ -1,3 +1,4 @@
+import ProfilePhoto from '../../../components/shared/ProfilePhoto';
 import { useAuth } from '../../../context/login/useAuth';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState, useEffect } from 'react';
@@ -59,7 +60,7 @@ export default function SuperAdminProfile() {
     );
   }
 
-  const avatarInitial = profile.name?.charAt(0).toUpperCase() ?? '?';
+  const avatarInitial = profile.name?.trim().charAt(0).toUpperCase() || '?';
 
   return (
     <PageShell responsive navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
@@ -73,7 +74,7 @@ export default function SuperAdminProfile() {
         <main className={styles.main}>
           {user?.mustChangePassword && <p role="alert">Change your temporary password before using Super Admin features.</p>}
           <div className={styles.profileHeader}>
-            <div className={styles.avatar}>{avatarInitial}</div>
+            <ProfilePhoto identity={profile.userId} initial={avatarInitial} />
             <div>
               <p className={styles.fullName}>{profile.name}</p>
               <p className={styles.subMeta}>Super Admin</p>

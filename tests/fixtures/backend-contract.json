@@ -525,6 +525,53 @@
       "method": "GET",
       "path": "/api/admin/acting/professor/students/{studentId}/engagement/modules",
       "controller": "ProfessorEngagementController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/study-calendar",
+      "controller": "StudentStudyCalendarController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/student/study-calendar",
+      "controller": "StudentStudyCalendarController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/student/study-calendar",
+      "controller": "StudentStudyCalendarController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/profile/photo"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/student/profile/photo"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/student/profile/photo"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/student/profile/photo"
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile/photo"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/profile/photo"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/profile/photo"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/professor/profile/photo"
     }
   ],
   "dtos": {
@@ -879,7 +926,8 @@
       "completedModules": "Long",
       "totalBadges": "Long",
       "passedAssessments": "Long",
-      "latestAssessmentScore": "Integer"
+      "latestAssessmentScore": "Integer",
+      "studyActivity": "StudentStudyActivityResponse"
     },
     "StudentListResponse": {
       "id": "Long",

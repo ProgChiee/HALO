@@ -12,6 +12,7 @@ import java.util.Optional;
 
 @Service
 public class StudentDashboardService {
+    private final StudentStudyActivityService studyActivity;
 
     private final StudentModuleProgressRepository
             studentModuleProgressRepository;
@@ -26,7 +27,8 @@ public class StudentDashboardService {
     public StudentDashboardService(
             StudentModuleProgressRepository studentModuleProgressRepository,
             StudentBadgeRepository studentBadgeRepository,
-            AssessmentAttemptRepository assessmentAttemptRepository) {
+            AssessmentAttemptRepository assessmentAttemptRepository, StudentStudyActivityService studyActivity) {
+        this.studyActivity = studyActivity;
 
         this.studentModuleProgressRepository =
                 studentModuleProgressRepository;
@@ -97,6 +99,7 @@ public class StudentDashboardService {
         );
 
 
+        response.setStudyActivity(studyActivity.get(student));
         return response;
     }
 }
