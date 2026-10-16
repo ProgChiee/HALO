@@ -34,7 +34,7 @@ async function mount(Component, route = '/admin', logout = () => {}) {
   await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Admin' }, logout } },
     React.createElement(ToastContext.Provider, { value: { showToast() {} } },
       React.createElement(Router.MemoryRouter, { initialEntries: [route] },
-        React.createElement(Router.Routes, {}, React.createElement(Router.Route, { path: '*', element: React.createElement(Component) })), React.createElement(Location))))));
+        React.createElement(Router.Routes, {}, React.createElement(Router.Route, { path: '/login', element: null }), React.createElement(Router.Route, { path: '*', element: React.createElement(Component) })), React.createElement(Location))))));
   return async () => { await act(async () => root.unmount()); host.remove(); };
 }
 const click = async element => act(async () => element.click());
@@ -45,12 +45,12 @@ test('all six Admin pages retain navigation during loading at desktop, tablet an
       const cleanup = await mount(Page);
       try {
         const toggle = document.querySelector('[aria-label="Open navigation"]');
-        if (width > 1024) { assert.equal(toggle, null); assert.equal(document.querySelectorAll('nav a').length, 7); }
+        if (width > 1024) { assert.equal(toggle, null); assert.equal(document.querySelectorAll('nav a').length, 8); }
         else {
           assert.doesNotMatch(document.body.textContent, /Superadmin|Super Admin/); assert.ok(toggle); assert.equal(document.querySelector('aside'), null);
           await click(toggle);
           assert.equal(toggle.getAttribute('aria-expanded'), 'true');
-          assert.equal(document.querySelectorAll('[role="dialog"] nav a').length, 7);
+          assert.equal(document.querySelectorAll('[role="dialog"] nav a').length, 8);
           await click(document.querySelector('[aria-label="Close navigation"]'));
           assert.equal(document.querySelector('[role="dialog"]'), null);
           assert.equal(document.activeElement, toggle);
@@ -67,7 +67,7 @@ test('compact navigation preserves links, active state, Escape, desktop transiti
     let toggle = document.querySelector('[aria-label="Open navigation"]');
     await click(toggle);
     assert.equal(document.querySelector('nav a[aria-current="page"]').getAttribute('href'), '/admin/professors');
-    assert.deepEqual([...document.querySelectorAll('nav a')].map(a => a.getAttribute('href')), ['/admin', '/admin/professors', '/admin/students', '/admin/monitoring', '/admin/professor-mode', '/admin/student-mode', '/admin/profile']);
+    assert.deepEqual([...document.querySelectorAll('nav a')].map(a => a.getAttribute('href')), ['/admin', '/admin/professors', '/admin/students', '/admin/monitoring', '/admin/professor-mode', '/admin/student-mode', '/admin/profile', '/admin/settings']);
     await act(async () => document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     assert.equal(document.querySelector('[role="dialog"]'), null);
     assert.equal(document.activeElement, toggle);
@@ -84,6 +84,8 @@ test('compact navigation preserves links, active state, Escape, desktop transiti
     assert.equal(toggle.getAttribute('aria-expanded'), 'false');
     await click(toggle);
     await click(document.querySelector('[aria-label="Log out"]'));
+    assert.equal(logouts, 0);
+    await act(async () => [...document.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === 'Log Out').click());
     assert.equal(logouts, 1);
     assert.equal(document.querySelector('output').textContent, '/login');
     assert.equal(document.querySelector('[role="dialog"]'), null);
@@ -142,11 +144,11 @@ test('branded Admin navigation keeps logo first and groups destinations in deskt
       if (width <= 1024) await click(document.querySelector('[aria-label="Open navigation"]'));
       const sidebar = document.querySelector('aside');
       assert.equal(sidebar.firstElementChild.querySelector('img').alt, 'HALO');
-      assert.match(sidebar.firstElementChild.querySelector('img').getAttribute('src'), /Icon\.png/);
+      assert.match(sidebar.firstElementChild.querySelector('img').getAttribute('src'), /Logo\.png/);
       assert.equal(sidebar.children[1].textContent.trim(), 'Admin');
       const nav = sidebar.querySelector('nav');
       assert.deepEqual([...nav.querySelectorAll('p')].map(p => p.textContent), ['Main', 'Modes', 'Account']);
-      assert.deepEqual([...nav.querySelectorAll('a')].map(a => a.textContent.trim()), ['Dashboard', 'Professor Management', 'Student Management', 'Monitoring', 'Professor Mode', 'Student Mode', 'Profile']);
+      assert.deepEqual([...nav.querySelectorAll('a')].map(a => a.textContent.trim()), ['Dashboard', 'Professor Management', 'Student Management', 'Monitoring', 'Professor Mode', 'Student Mode', 'Profile', 'Settings']);
       assert.equal(nav.querySelector('[aria-current="page"]').textContent.trim(), 'Dashboard');
       assert.ok(sidebar.querySelector('[aria-label="Log out"]'));
     } finally { await cleanup(); }
@@ -188,11 +190,14 @@ test('account action reflects real status for Professor and Student without dupl
   api.defaults.adapter=async config=>{if(config.method!=='get')record={...record,status:JSON.parse(config.data).status};return {status:200,headers:{},config,data:config.method==='get'?[record]:record};};
   const cleanup=await mount(pages[index]);try{
    const table=document.querySelector('[role="table"]');assert.match(table.textContent,/Account Action/);
+   if(status==='INACTIVE') await click([...document.querySelectorAll('[aria-label="Account state"] button')].find(b=>b.textContent==='Inactive'));
    const row=table.querySelectorAll('[role="row"]')[1];const cell=row.children[index===1?3:4];
-   assert.equal(cell.textContent.trim(),status==='ACTIVE'?'Deactivate':'Reactivate');
-   assert.deepEqual([...row.lastElementChild.querySelectorAll('button')].map(b=>b.textContent.trim()),index===1?['View','Edit']:['View']);
-   await click(cell.querySelector('button'));assert.equal(document.querySelector('[role="dialog"]'),null);
-   assert.equal(cell.textContent.trim(),status==='ACTIVE'?'Reactivate':'Deactivate');
+   assert.equal(cell.querySelector('button').textContent.trim(),status==='ACTIVE'?'Deactivate':'Reactivate');
+   assert.deepEqual([...row.lastElementChild.querySelectorAll('button')].map(b=>b.textContent.trim()),index===1&&status==='ACTIVE'?['View','Edit']:['View']);
+   await click(cell.querySelector('button'));await click([...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent===(status==='ACTIVE'?'Deactivate':'Reactivate')));assert.equal(document.querySelector('[role="dialog"]'),null);
+   assert.equal(table.querySelectorAll('[role="row"]').length,1);
+   await click([...document.querySelectorAll('[aria-label="Account state"] button')].find(b=>b.textContent===(status==='ACTIVE'?'Inactive':'Active')));
+   assert.ok(table.querySelector('[aria-label="'+(status==='ACTIVE'?'Reactivate':'Deactivate')+'"]'));
   }finally{await cleanup();}
  }
 });

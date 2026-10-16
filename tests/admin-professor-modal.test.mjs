@@ -65,6 +65,7 @@ for (const mode of ['create', 'edit']) test('AD-12 '+mode+' refresh preserves ne
   await act(async()=>root.render(React.createElement(MemoryRouter,{},React.createElement(AuthContext.Provider,{value:{role:'admin',user:{name:'Admin'}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Page))))));
   await act(async()=>calls[0].resolve([row]));
   await click('[aria-label="Deactivate"]');
+  await act(async()=>[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Deactivate').click());
   assert.deepEqual(JSON.parse(calls[1].config.data),{status:'INACTIVE'});
   if(mode==='edit') await click('[aria-label="Edit"]');
   else {
@@ -78,12 +79,16 @@ for (const mode of ['create', 'edit']) test('AD-12 '+mode+' refresh preserves ne
   assert.equal(calls[3].config.method,'get');assert.ok(calls[3].config.signal);
   await act(async()=>calls[1].resolve({...row,status:'INACTIVE'}));
   await act(async()=>calls[3].resolve([{...row,name:'Refreshed Professor',status:'ACTIVE'},...(mode==='create'?[{...row,id:2,name:'New Professor',professorId:'P2'}]:[])]));
-  assert.equal(document.querySelector('form'),null);assert.match(host.textContent,/Refreshed Professor/);
-  if(mode==='create')assert.match(host.textContent,/New Professor/);
+  assert.equal(document.querySelector('form'),null);
+  await act(async()=>[...document.querySelectorAll('[aria-label="Account state"] button')].find(b=>b.textContent==='Inactive').click());
+  assert.match(host.textContent,/Refreshed Professor/);
+
   assert.ok(document.querySelector('[aria-label="Reactivate"]'));
   await click('[aria-label="Reactivate"]');
+  await act(async()=>[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Reactivate').click());
   assert.deepEqual(JSON.parse(calls[4].config.data),{status:'ACTIVE'});
   await act(async()=>calls[4].resolve({...row,status:'ACTIVE'}));
+  await act(async()=>[...document.querySelectorAll('[aria-label="Account state"] button')].find(b=>b.textContent==='Active').click());
   assert.ok(document.querySelector('[aria-label="Deactivate"]'));assert.equal(calls.length,5);
  }finally{await act(async()=>root.unmount());host.remove();}
 });

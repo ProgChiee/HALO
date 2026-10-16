@@ -572,6 +572,31 @@
     {
       "method": "GET",
       "path": "/api/admin/acting/professor/profile/photo"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/super-admin/admin/{id}",
+      "controller": "SuperAdminController"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/professors/{id}/archive",
+      "controller": "AdminController"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/professors/{id}/restore",
+      "controller": "AdminController"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/students/{id}/archive",
+      "controller": "AdminController"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/students/{id}/restore",
+      "controller": "AdminController"
     }
   ],
   "dtos": {

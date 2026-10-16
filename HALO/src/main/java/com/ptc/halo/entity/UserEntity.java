@@ -27,6 +27,12 @@ public class UserEntity {
 
     @Enumerated(EnumType.STRING)
     private Status status;
+    @Enumerated(EnumType.STRING)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.VARCHAR)
+    @Column(length = 16)
+    private Status previousStatusBeforeArchive;
+    public Status getPreviousStatusBeforeArchive() { return previousStatusBeforeArchive; }
+    public void setPreviousStatusBeforeArchive(Status value) { previousStatusBeforeArchive = value; }
 
     public UserEntity() {
     }

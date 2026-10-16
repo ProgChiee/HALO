@@ -215,4 +215,28 @@ public class AdminController {
         );
     }
 
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/professors/{id}/archive")
+    public ResponseEntity<?> archiveProfessor(@Positive @PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(adminService.archiveOrRestore(id, com.ptc.halo.enums.Role.PROFESSOR, getCurrentAdmin(authentication), false));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/professors/{id}/restore")
+    public ResponseEntity<?> restoreProfessor(@Positive @PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(adminService.archiveOrRestore(id, com.ptc.halo.enums.Role.PROFESSOR, getCurrentAdmin(authentication), true));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/students/{id}/archive")
+    public ResponseEntity<?> archiveStudent(@Positive @PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(adminService.archiveOrRestore(id, com.ptc.halo.enums.Role.STUDENT, getCurrentAdmin(authentication), false));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/students/{id}/restore")
+    public ResponseEntity<?> restoreStudent(@Positive @PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(adminService.archiveOrRestore(id, com.ptc.halo.enums.Role.STUDENT, getCurrentAdmin(authentication), true));
+    }
 }

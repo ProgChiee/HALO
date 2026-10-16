@@ -8,6 +8,7 @@ import {
   Users,
   GraduationCap,
   Activity,
+  Settings,
 } from 'lucide-react';
 
 export const STUDENT_NAV_ITEMS = [
@@ -19,6 +20,7 @@ export const STUDENT_NAV_ITEMS = [
   { label: 'Progress', icon: TrendingUp, path: '/student/progress', section: 'Main' },
   { label: 'Badge', icon: Award, path: '/student/badges', section: 'Main' },
   { label: 'Profile', icon: UserIcon, path: '/student/profile', section: 'Account' },
+  { label: 'Settings', icon: Settings, path: '/student/settings', section: 'Account' },
 ];
 
 export const SUPERADMIN_NAV_ITEMS = [
@@ -26,6 +28,7 @@ export const SUPERADMIN_NAV_ITEMS = [
   { label: 'Admins', icon: Users, path: '/superadmin/admins', section: 'Main' },
   { label: 'Monitoring', icon: Activity, path: '/superadmin/monitoring', section: 'Main' },
   { label: 'Profile', icon: UserIcon, path: '/superadmin/profile', section: 'Account' },
+  { label: 'Settings', icon: Settings, path: '/superadmin/settings', section: 'Account' },
 ];
 
 export const ADMIN_NAV_ITEMS = [
@@ -36,6 +39,7 @@ export const ADMIN_NAV_ITEMS = [
   { label: 'Professor Mode', icon: GraduationCap, path: '/admin/professor-mode', section: 'Modes' },
   { label: 'Student Mode', icon: Users, path: '/admin/student-mode', section: 'Modes' },
   { label: 'Profile', icon: UserIcon, path: '/admin/profile', section: 'Account' },
+  { label: 'Settings', icon: Settings, path: '/admin/settings', section: 'Account' },
 ];
 
 // ✅ Professors now have their own subject/week management
@@ -45,4 +49,5 @@ export const PROFESSOR_NAV_ITEMS = [
   { label: 'Subjects', icon: BookOpen, path: '/professor/subjects', section: 'Main' },
   { label: 'Student Progress', icon: TrendingUp, path: '/professor/progress', section: 'Main' },
   { label: 'Profile', icon: UserIcon, path: '/professor/profile', section: 'Account' },
+  { label: 'Settings', icon: Settings, path: '/professor/settings', section: 'Account' },
 ];

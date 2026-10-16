@@ -1,0 +1,10 @@
+.filters, .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.filters { margin-bottom: var(--space-4); }
+.filters button, .actions > button { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-primary); cursor: pointer; font: inherit; font-size: var(--font-size-sm); }
+.filters button[aria-pressed="true"] { background: var(--color-primary-soft); border-color: var(--color-primary); font-weight: var(--font-weight-semibold); }
+.actions > button.danger { color: var(--color-danger-text); }
+.filters button:focus-visible, .actions > button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.actions > button:disabled { opacity: .6; cursor: not-allowed; }
+.dialog { composes: dialogSurface from "./UIPrimitives.module.css"; width: 480px; padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); color: var(--color-text-primary); }
+.dialog h2 { margin: 0; font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); }
+.dialog p { margin: 0; line-height: var(--line-height-base); }

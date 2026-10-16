@@ -4,7 +4,8 @@ export const ROLE_FROM_API = Object.freeze({
 });
 
 export const STATUS_LABELS = Object.freeze({
-  ACTIVE: 'Active', INACTIVE: 'Inactive', BLOCKED: 'Blocked',
+  ACTIVE: 'Active', INACTIVE: 'Inactive',
+  ARCHIVED: 'Archived', BLOCKED: 'Blocked',
 });
 
 export function parseLoginResponse(response) {

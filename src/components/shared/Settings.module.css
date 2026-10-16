@@ -1,0 +1,14 @@
+.topbar { composes: topbar from './Navigation.module.css'; padding: var(--space-4) var(--space-6); }
+.main { composes: regular from './PageLayout.module.css'; padding: var(--space-6); width: 100%; }
+.main h1 { font-size: var(--font-size-3xl); margin-bottom: var(--space-6); }
+.card { composes: surface from './UIPrimitives.module.css'; padding: var(--space-5); max-width: 640px; }
+.card h2 { font-size: var(--font-size-xl); margin-bottom: var(--space-4); }
+.card fieldset { border: 0; min-width: 0; }
+.card legend { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); margin-bottom: var(--space-2); }
+.options { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.option { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); cursor: pointer; }
+.option:has(input:checked) { background: var(--color-primary-soft); border-color: var(--color-primary); }
+.option:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.option input { accent-color: var(--color-primary); }
+.card p { font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: var(--space-4); }
+@media(max-width:600px) { .main { padding: var(--space-4); } .options { flex-direction: column; } }

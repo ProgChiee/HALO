@@ -1,3 +1,5 @@
+import { Camera } from 'lucide-react';
+import { useProfilePhoto } from '../../context/login/useProfilePhoto';
 import { useEffect, useRef, useState, useId } from 'react';
 import { getOwnProfilePhoto, saveOwnProfilePhoto } from '../../services/profilePhotoService';
 import { prepareProfilePhoto } from '../../utils/profilePhoto';
@@ -6,19 +8,26 @@ import styles from './ProfilePhoto.module.css';
 export default function ProfilePhoto({ identity, ...props }) {
   return <Photo key={identity} {...props} />;
 }
-function Photo({ initial, readOnly = false, getProfilePhoto = getOwnProfilePhoto }) {
+function Photo({ initial, readOnly = false, getProfilePhoto = getOwnProfilePhoto, identityContent }) {
+  const sharedPhoto = useProfilePhoto();
+  const ownPhoto = !readOnly ? sharedPhoto : null;
+  const hasSharedPhoto = Boolean(ownPhoto);
+  const fileInput = useRef(null);
   const inputId = useId();
   const helpId = useId();
-  const [saved, setSaved] = useState(null), [draft, setDraft] = useState(null);
+  const [localSaved, setLocalSaved] = useState(null), [draft, setDraft] = useState(null);
+  const saved = ownPhoto ? ownPhoto.photo : localSaved;
+  const setSaved = ownPhoto ? ownPhoto.updatePhoto : setLocalSaved;
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const controller = useRef(null), locked = useRef(false), edited = useRef(false);
   useEffect(() => {
     const request = new AbortController(); controller.current = request;
+    if (hasSharedPhoto) return () => request.abort();
     getProfilePhoto({ signal: request.signal }).then(data => {
       if (!request.signal.aborted && !edited.current && data instanceof Blob && data.size) setSaved(data);
     }).catch(() => { if (!request.signal.aborted) setError('Could not load your photo. Please try again later.'); });
     return () => request.abort();
-  }, [getProfilePhoto]);
+  }, [getProfilePhoto, hasSharedPhoto, setSaved]);
   const imageRef = useRef(null);
   useEffect(() => {
     const blob = draft ?? saved;
@@ -44,11 +53,21 @@ function Photo({ initial, readOnly = false, getProfilePhoto = getOwnProfilePhoto
     } catch { if (!controller.current.signal.aborted) setError('Could not save your photo. Please try again.'); }
     finally { locked.current = false; if (!controller.current.signal.aborted) setBusy(false); }
   }
-  return <div className={styles.photoArea}>
-    <div className={styles.avatar}>{draft || saved ? <img ref={imageRef} alt={draft ? 'New profile photo preview' : 'Profile photo'} /> : initial}</div>
-    {!readOnly && <><label className={styles.photoLabel} htmlFor={inputId}>Change photo</label><input id={inputId} type="file" accept="image/jpeg,image/png,image/webp" onChange={choose} disabled={busy} aria-describedby={helpId} />
+  const image = draft || saved ? <img ref={imageRef} onError={() => { setDraft(null); setSaved(null); }} alt={draft ? 'New profile photo preview' : 'Profile photo'} /> : initial;
+  const avatar = readOnly ? <div className={styles.avatar}>{image}</div> : (
+    <button type="button" className={`${styles.avatar} ${styles.avatarUpload}`} aria-label="Change photo" aria-controls={inputId} aria-describedby={helpId} disabled={busy} onClick={() => fileInput.current?.click()}>
+      {image}
+      <span className={styles.hoverOverlay} aria-hidden="true">Change photo</span>
+      <span className={styles.cameraBadge} aria-hidden="true"><Camera size={18} /></span>
+    </button>
+  );
+  return <div className={identityContent ? `${styles.photoArea} ${styles.withIdentity}` : styles.photoArea}>
+    {identityContent ? <div className={styles.identityRow}>{avatar}{identityContent}</div> : avatar}
+    {!readOnly && <><label hidden htmlFor={inputId}>Change photo</label><input ref={fileInput} hidden id={inputId} type="file" accept="image/jpeg,image/png,image/webp" onChange={choose} disabled={busy} aria-describedby={helpId} />
       <p id={helpId} className={styles.photoHelp}>JPG, PNG or WEBP. Up to 5 MB.</p>
       {draft && <div className={styles.photoActions}><button disabled={busy} onClick={save}>Save photo</button><button disabled={busy} onClick={() => setDraft(null)}>Cancel</button></div>}
-      {busy && <p role="status">Preparing / saving photo...</p>}{error && <p role="alert">{error}</p>}</>}
+      {busy && <p role="status">Preparing / saving photo...</p>}{(error || ownPhoto?.error) && <p role="alert">{error || ownPhoto.error}</p>}</>}
   </div>;
 }
+
+

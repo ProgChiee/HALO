@@ -16,6 +16,8 @@ import styles from '../styles/AdminProfile.module.css';
 // There's also no update endpoint yet, so "Edit" actions are removed
 // until one exists.
 
+const noProfilePhoto = async () => null;
+
 export default function AdminProfile() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
@@ -69,11 +71,7 @@ export default function AdminProfile() {
       <main className={styles.main}>
         {user?.mustChangePassword && <p role="alert">Change your temporary password before using Admin features.</p>}
         <div className={styles.profileHeader}>
-          <ProfilePhoto identity={profile.userId} initial={avatarInitial} />
-          <div>
-            <p className={styles.fullName}>{profile.name}</p>
-            <p className={styles.subMeta}>Admin</p>
-          </div>
+          <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={Boolean(user?.mustChangePassword)} getProfilePhoto={user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{profile.name}</p><p className={styles.subMeta}>Admin</p></div>} />
         </div>
 
         <div className={styles.infoCard}>

@@ -189,7 +189,7 @@ public class AdminService {
     @org.springframework.transaction.annotation.Transactional
     public ProfessorResponse changeProfessorStatus(Long id, Status desiredStatus, UserEntity admin){
 
-        UserEntity professorUser = userRepository.findById(id)
+        UserEntity professorUser = userRepository.findForAssessmentLifecycle(id)
                 .orElseThrow(() ->
                         new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                 );
@@ -199,6 +199,8 @@ public class AdminService {
             throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
         }
 
+        if (professorUser.getStatus() == Status.ARCHIVED) throw new AdminApiException(AdminApiException.Code.ACCOUNT_STATE_CONFLICT);
+        if (professorUser.getStatus() != desiredStatus) professorUser.setTokenVersion(professorUser.getTokenVersion() + 1);
         professorUser.setStatus(desiredStatus);
 
 
@@ -228,6 +230,30 @@ public class AdminService {
 
 
         return response;
+    }
+    @org.springframework.transaction.annotation.Transactional
+    public Object archiveOrRestore(Long id, Role role, UserEntity admin, boolean restore) {
+        if (admin == null || admin.getRole() != Role.ADMIN) throw new org.springframework.security.access.AccessDeniedException("Admin required");
+        if (role != Role.PROFESSOR && role != Role.STUDENT) throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
+        UserEntity target = userRepository.findForAssessmentLifecycle(id).orElseThrow(() -> new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND));
+        if (target.getRole() != role) throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
+        Status before = target.getStatus();
+        if (restore && before == Status.ARCHIVED) {
+            Status previous = target.getPreviousStatusBeforeArchive();
+            if (previous != Status.ACTIVE && previous != Status.INACTIVE) throw new AdminApiException(AdminApiException.Code.ACCOUNT_STATE_CONFLICT);
+            target.setStatus(previous);
+            target.setPreviousStatusBeforeArchive(null);
+        } else if (!restore && before != Status.ARCHIVED) {
+            if (before != Status.ACTIVE && before != Status.INACTIVE) throw new AdminApiException(AdminApiException.Code.ACCOUNT_STATE_CONFLICT);
+            target.setPreviousStatusBeforeArchive(before);
+            target.setStatus(Status.ARCHIVED);
+        }
+        if (before != target.getStatus()) {
+            target.setTokenVersion(target.getTokenVersion() + 1);
+            userRepository.saveAndFlush(target);
+            activityLogService.createLog(admin, ActivityType.ACCOUNT, (restore ? "Restored " : "Archived ") + role + " account ID " + id + ": " + before + " -> " + target.getStatus());
+        }
+        return role == Role.PROFESSOR ? viewProfessorById(id) : viewStudentById(id);
     }
     public List<StudentListResponse> viewAllStudents(){
 
@@ -276,7 +302,7 @@ public class AdminService {
     @org.springframework.transaction.annotation.Transactional
     public StudentListResponse changeStudentStatus(Long id, Status desiredStatus, UserEntity admin){
 
-        UserEntity student = userRepository.findById(id)
+        UserEntity student = userRepository.findForAssessmentLifecycle(id)
                 .orElseThrow(() ->
                         new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
                 );
@@ -285,6 +311,8 @@ public class AdminService {
             throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
         }
 
+        if (student.getStatus() == Status.ARCHIVED) throw new AdminApiException(AdminApiException.Code.ACCOUNT_STATE_CONFLICT);
+        if (student.getStatus() != desiredStatus) student.setTokenVersion(student.getTokenVersion() + 1);
         student.setStatus(desiredStatus);
 
 

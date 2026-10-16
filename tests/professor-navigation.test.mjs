@@ -34,7 +34,7 @@ async function mount(Component, route = '/professor', logout = () => {}) {
   await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Professor' }, logout } },
     React.createElement(ToastContext.Provider, { value: { showToast() {} } },
       React.createElement(Router.MemoryRouter, { initialEntries: [route] },
-        React.createElement(Router.Routes, {}, React.createElement(Router.Route, { path: '*', element: React.createElement(Component) })), React.createElement(Location))))));
+        React.createElement(Router.Routes, {}, React.createElement(Router.Route, { path: '/login', element: null }), React.createElement(Router.Route, { path: '*', element: React.createElement(Component) })), React.createElement(Location))))));
   return async () => { await act(async () => root.unmount()); host.remove(); };
 }
 const click = async element => act(async () => element.click());
@@ -45,12 +45,12 @@ test('all five Professor pages retain navigation during loading at desktop, tabl
       const cleanup = await mount(Page);
       try {
         const toggle = document.querySelector('[aria-label="Open navigation"]');
-        if (width > 1024) { assert.equal(toggle, null); assert.equal(document.querySelectorAll('nav a').length, 4); }
+        if (width > 1024) { assert.equal(toggle, null); assert.equal(document.querySelectorAll('nav a').length, 5); }
         else {
           assert.ok(toggle); assert.equal(document.querySelector('aside'), null);
           await click(toggle);
           assert.equal(toggle.getAttribute('aria-expanded'), 'true');
-          assert.equal(document.querySelectorAll('[role="dialog"] nav a').length, 4);
+          assert.equal(document.querySelectorAll('[role="dialog"] nav a').length, 5);
           await click(document.querySelector('[aria-label="Close navigation"]'));
           assert.equal(document.querySelector('[role="dialog"]'), null);
           assert.equal(document.activeElement, toggle);
@@ -67,7 +67,7 @@ test('compact navigation preserves links, active state, Escape, desktop transiti
     let toggle = document.querySelector('[aria-label="Open navigation"]');
     await click(toggle);
     assert.equal(document.querySelector('nav a[aria-current="page"]').getAttribute('href'), '/professor/subjects');
-    assert.deepEqual([...document.querySelectorAll('nav a')].map(a => a.getAttribute('href')), ['/professor', '/professor/subjects', '/professor/progress', '/professor/profile']);
+    assert.deepEqual([...document.querySelectorAll('nav a')].map(a => a.getAttribute('href')), ['/professor', '/professor/subjects', '/professor/progress', '/professor/profile', '/professor/settings']);
     await act(async () => document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     assert.equal(document.querySelector('[role="dialog"]'), null);
     assert.equal(document.activeElement, toggle);
@@ -84,6 +84,8 @@ test('compact navigation preserves links, active state, Escape, desktop transiti
     assert.equal(toggle.getAttribute('aria-expanded'), 'false');
     await click(toggle);
     await click(document.querySelector('[aria-label="Log out"]'));
+    assert.equal(logouts, 0);
+    await act(async () => [...document.querySelectorAll('[role="dialog"] button')].find(button => button.textContent === 'Log Out').click());
     assert.equal(logouts, 1);
     assert.equal(document.querySelector('output').textContent, '/login');
     assert.equal(document.querySelector('[role="dialog"]'), null);

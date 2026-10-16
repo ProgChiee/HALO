@@ -1,5 +1,5 @@
 /* HALO light-first palette. Shared across all roles and authentication pages. */
-:root, [data-theme="light"], [data-theme="dark"] {
+:root, [data-theme="light"] {
   color-scheme: light;
   --color-background: #F8FAFC;
   --color-surface: #FFFFFF;
@@ -128,4 +128,35 @@
   /* --- Transitions --- */
   --transition-fast: 150ms ease;
   --transition-base: 250ms ease;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-background: #0F172A;
+  --color-surface: #1E293B;
+  --color-primary: #5FAF88;
+  --color-primary-hover: #74C49C;
+  --color-primary-soft: #173D2D;
+  --color-text-primary: #F1F5F9;
+  --color-text-muted: #CBD5E1;
+  --color-border: #334155;
+  --color-accent-gold: #D4AF5A;
+  --color-accent-soft-bg: #3B321F;
+  --color-success: #4ADE80;
+  --color-warning: #FBBF24;
+  --color-danger: #F87171;
+  --color-info: #38BDF8;
+  --color-success-text: #86EFAC;
+  --color-warning-text: #FDE68A;
+  --color-danger-text: #FCA5A5;
+  --color-info-text: #7DD3FC;
+  --color-danger-soft: #45252C;
+  --color-danger-border: #86434D;
+  --color-info-soft: #173749;
+  --color-primary-border: #427B5F;
+  --color-warning-border: #856831;
+  --color-overlay: rgba(15, 23, 42, .75);
+  --color-text-on-button: #0F172A;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .16);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, .24);
+  --shadow-lg: 0 10px 24px rgba(15, 23, 42, .32);
 }

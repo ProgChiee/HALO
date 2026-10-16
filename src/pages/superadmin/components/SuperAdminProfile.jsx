@@ -15,6 +15,8 @@ import styles from '../styles/SuperAdminProfile.module.css';
 // dateJoined fields exist — those were mock-only. Avatar initial is
 // derived client-side from the name.
 
+const noProfilePhoto = async () => null;
+
 export default function SuperAdminProfile() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
@@ -74,11 +76,7 @@ export default function SuperAdminProfile() {
         <main className={styles.main}>
           {user?.mustChangePassword && <p role="alert">Change your temporary password before using Super Admin features.</p>}
           <div className={styles.profileHeader}>
-            <ProfilePhoto identity={profile.userId} initial={avatarInitial} />
-            <div>
-              <p className={styles.fullName}>{profile.name}</p>
-              <p className={styles.subMeta}>Super Admin</p>
-            </div>
+            <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={Boolean(user?.mustChangePassword)} getProfilePhoto={user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{profile.name}</p><p className={styles.subMeta}>Super Admin</p></div>} />
           </div>
 
           <div className={styles.infoCard}>

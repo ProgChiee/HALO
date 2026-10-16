@@ -21,7 +21,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class ModuleScopedMentorTest {
-    ChatClient.ChatClientRequestSpec gateSpec, replySpec;
+    ChatClient.ChatClientRequestSpec gateSpec, replySpec, intentSpec;
     ChatClient chat; ModuleMaterialIndex index; MentorService mentor;
     AiLearningModuleEntity module; UserEntity student;
     @TempDir Path directory;
@@ -40,6 +40,10 @@ class ModuleScopedMentorTest {
         when(chat.prompt().system(startsWith("You are HALO"))).thenReturn(replySpec);
         when(gateSpec.user(anyString())).thenReturn(gateSpec);
         when(replySpec.user(anyString())).thenReturn(replySpec);
+        intentSpec = mock(ChatClient.ChatClientRequestSpec.class, RETURNS_DEEP_STUBS);
+        when(chat.prompt().system(startsWith("Classify HALO"))).thenReturn(intentSpec);
+        when(intentSpec.user(anyString())).thenReturn(intentSpec);
+        when(intentSpec.call().content()).thenReturn("{\"intent\":\"LESSON_QUESTION\"}");
         index = new ModuleMaterialIndex(chat, mapper, new com.ptc.halo.service.LessonStoragePaths(directory.toString()));
         module = mock(AiLearningModuleEntity.class); when(module.getId()).thenReturn(15L);
         when(module.getStatus()).thenReturn(LessonStatus.APPROVED);
@@ -85,7 +89,7 @@ class ModuleScopedMentorTest {
         decision(true, ids(), "The front office welcomes guests and handles check-in.");
         var result = mentor.sendMessage(21L, student, "What is the role of the front office?");
         assertTrue(result.getHaloMessage().contains("welcomes guests"));
-        assertTrue(result.getHaloMessage().contains("material-1.pdf (page 1)"));
+        assertEquals("The front office welcomes guests and handles check-in.", result.getHaloMessage());
         var input = ArgumentCaptor.forClass(String.class);
         verify(replySpec).user(input.capture());
         assertTrue(input.getValue().contains("Front office welcomes hotel guests"));
@@ -120,7 +124,7 @@ class ModuleScopedMentorTest {
         var sources = ids(); assertEquals(2, sources.size());
         decision(true, sources, "Front office and restaurant teams coordinate guest service.");
         var answer = mentor.sendMessage(21L, student, "How do front office and food and beverage work together?").getHaloMessage();
-        assertTrue(answer.contains("material-1.pdf")); assertTrue(answer.contains("material-2.pdf"));
+        assertEquals("Front office and restaurant teams coordinate guest service.", answer);
     }
     @Test void changedAndRemovedFilesCannotReuseOldScope() throws Exception {
         var first = pdf(1, "Front office handles guest arrivals.", module); files.add(first); files.add(pdf(2, "Food service.", module));

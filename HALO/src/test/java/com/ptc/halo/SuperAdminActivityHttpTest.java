@@ -31,6 +31,17 @@ class SuperAdminActivityHttpTest {
   when(jwt.isCurrent(eq("test-token"), any())).thenReturn(true);
   when(details.loadUserByUsername("test@example.test")).thenReturn(User.withUsername("test@example.test").password("unused").roles(role).build());
  }
+ @Test void deleteIsSuperAdminOnlyAndReturnsNoContent() throws Exception {
+  token("SUPER_ADMIN");
+  var actor = new com.ptc.halo.entity.UserEntity(); actor.setRole(Role.SUPER_ADMIN); actor.setId(1L);
+  when(users.findByEmail("test@example.test")).thenReturn(java.util.Optional.of(actor));
+  mvc.perform(delete("/api/super-admin/admin/2").header("Authorization","Bearer test-token")).andExpect(status().isNoContent());
+  verify(admins).deleteAdmin(2L, actor);
+  for (String role : java.util.List.of("ADMIN", "STUDENT", "PROFESSOR")) {
+   token(role); mvc.perform(delete("/api/super-admin/admin/2").header("Authorization","Bearer test-token")).andExpect(status().isForbidden());
+  }
+  mvc.perform(delete("/api/super-admin/admin/2")).andExpect(status().isUnauthorized());
+ }
  @Test void superAdminCanReadLogs() throws Exception {
   token("SUPER_ADMIN"); when(logs.getSuperAdminLogs(0, 20, "", null)).thenReturn(org.springframework.data.domain.Page.empty());
   mvc.perform(get("/api/super-admin/activity-logs").header("Authorization","Bearer test-token")).andExpect(status().isOk()).andExpect(jsonPath("$.content").isArray());

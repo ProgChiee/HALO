@@ -1,4 +1,5 @@
 const MESSAGES = {
+  ACCOUNT_STATE_CONFLICT: 'Restore this archived account before changing its status.',
   RESOURCE_NOT_FOUND: 'This account or resource no longer exists. Reload the list.',
   INVALID_TARGET_ROLE: 'This account does not have the required role for this action. Reload the list.',
   PROFESSOR_ID_CONFLICT: 'This Professor ID is already in use. Enter a different Professor ID.',

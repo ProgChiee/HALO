@@ -124,3 +124,22 @@ test('Strict Mode remount keeps Professor requests usable',async()=>{
  try{assert.match(document.body.textContent,/Acting as Professor A/);assert.doesNotMatch(document.body.textContent,/Could not|Couldn.t|Retry/);assert.ok(calls.some(c=>c.url.endsWith('/dashboard')&&!c.signal.aborted));}
  finally{await cleanup();}
 });
+
+test('Professor selector highlights entry target and moves selection after a failed entry',async()=>{
+ const calls=[];let rejectEntry;
+ api.defaults.adapter=adapter(calls,config=>{
+  if(config.url==='/admin/acting/targets')return response(config,{content:[target,{...target,userId:8,name:'Professor B'}],totalPages:1});
+  if(config.method==='post')return new Promise((resolve,reject)=>{rejectEntry=()=>reject(failure(config,409,'ACTING_TARGET_INACTIVE'));});
+ });
+ const cleanup=await mount('/admin/professor-mode');
+ try {
+  const first=document.querySelector('[aria-label="Act as Professor A"]'),second=document.querySelector('[aria-label="Act as Professor B"]');
+  assert.equal(document.querySelector('#professor-mode-search').placeholder,'Search by professor name, email, or ID');
+  await click(first);assert.equal(first.getAttribute('aria-pressed'),'true');assert.match(first.closest('li').textContent,/Selected/);assert.equal(second.disabled,true);
+  const selectedClass=first.closest('li').className;assert.ok(selectedClass);
+  await act(async()=>rejectEntry());assert.equal(first.getAttribute('aria-pressed'),'true');
+  await click(second);assert.equal(first.getAttribute('aria-pressed'),'false');assert.doesNotMatch(first.closest('li').textContent,/Selected/);assert.equal(second.closest('li').className,selectedClass);
+  await act(async()=>rejectEntry());
+  assert.deepEqual(calls.filter(c=>c.method==='post').map(c=>JSON.parse(c.data).targetUserId),[7,8]);
+ }finally{await cleanup();}
+});

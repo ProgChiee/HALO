@@ -93,4 +93,33 @@ class AdminMonitoringPagingTest {
   assertEquals(8,logService.getLogs(null,null,0,1000,"").getTotalElements());
   assertEquals(100,logService.getLogs(null,null,0,1000,"").getSize());
  }
+
+ @Test void currentMonitoringExcludesNonActiveAccountsWithoutLosingHistory() {
+  logService.createLog(a,ActivityType.MODULE,"Preserved module action");
+  var zero=new StudentProfileEntity();zero.setUser(empty);zero.setStudentId("ZERO");profiles.saveAndFlush(zero);
+  long attemptCount=attempts.count(),progressCount=progress.count(),badgeCount=badges.count(),subjectCount=subjects.count(),moduleCount=modules.count(),logCount=logs.count();
+  for(Status status:new Status[]{Status.INACTIVE,Status.ARCHIVED,Status.BLOCKED}) {
+   student.setStatus(status);a.setStatus(status);users.saveAndFlush(student);users.saveAndFlush(a);
+   var students=studentMonitoring.getStudentMonitoring(0,1);
+   assertEquals(1,students.totalElements());assertEquals(1,students.totalPages());
+   assertEquals(empty.getId(),students.content().get(0).getUserId());
+   assertEquals(1,students.summary().getTotal());assertEquals(0,students.summary().getScored());assertNull(students.summary().getAverageScore());
+   assertEquals(0,students.summary().getPassedAssessments());assertTrue(students.highlights().isEmpty());
+   var professors=professorService.getProfessorMonitoring(0,1);
+   assertEquals(1,professors.totalElements());assertEquals(1,professors.summary().getTotal());assertEquals(1,professors.summary().getActive());
+   assertEquals(0,professors.summary().getModuleActivities());assertEquals(b.getId(),professors.content().get(0).getUserId());
+   assertTrue(professors.highlights().stream().noneMatch(row->row.getUserId().equals(a.getId())));
+   assertEquals(attemptCount,attempts.count());assertEquals(progressCount,progress.count());assertEquals(badgeCount,badges.count());
+   assertEquals(subjectCount,subjects.count());assertEquals(moduleCount,modules.count());assertEquals(logCount,logs.count());
+   assertEquals(1,logService.getLogs(Role.PROFESSOR,null,0,20,"").getTotalElements());
+  }
+  student.setStatus(Status.ACTIVE);a.setStatus(Status.ACTIVE);users.saveAndFlush(student);users.saveAndFlush(a);
+  var restored=studentMonitoring.getStudentMonitoring(0,1);
+  assertEquals(2,restored.totalElements());assertEquals(2,restored.totalPages());assertEquals(student.getId(),restored.content().get(0).getUserId());
+  assertEquals(90,restored.content().get(0).getLatestAssessmentScore());assertEquals(90.0,restored.summary().getAverageScore());
+  assertEquals(3,restored.summary().getPassedAssessments());assertEquals(student.getId(),restored.highlights().get(0).getUserId());
+  var restoredProfessors=professorService.getProfessorMonitoring(0,1);
+  assertEquals(2,restoredProfessors.totalElements());assertEquals(1,restoredProfessors.summary().getModuleActivities());
+  assertEquals(a.getId(),restoredProfessors.highlights().get(0).getUserId());
+ }
 }

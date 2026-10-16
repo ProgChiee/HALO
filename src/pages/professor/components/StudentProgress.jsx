@@ -54,7 +54,6 @@ function StudentProgressPage({ page, onPageChange }) {
       </header>
 
       <main className={styles.main}>
-        <LearningEngagement />
         <div className={styles.statsGrid}>
           <div className={styles.statCard}>
             <div className={styles.statIcon}><Users size={18} /></div>
@@ -102,6 +101,7 @@ function StudentProgressPage({ page, onPageChange }) {
           <span> Page {data.number + 1} of {Math.max(1, data.totalPages)} </span>
           <button disabled={data.last} onClick={() => onPageChange(page + 1)}>Next</button>
         </nav>
+        <LearningEngagement />
       </main>
     </PageShell>
   );

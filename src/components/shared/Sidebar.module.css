@@ -10,14 +10,13 @@
   border-right: 1px solid var(--nav-border);
   display: flex;
   flex-direction: column;
-  padding: var(--space-lg) var(--space-md);
+  padding: var(--space-6) var(--space-md) var(--space-lg);
   overflow-y: auto;
 }
 
 .logo {
-  align-self: flex-start;
-  margin-left: var(--space-2);
-  margin-bottom: var(--space-2);
+  align-self: center;
+  margin-bottom: var(--space-5);
   padding: 0;
   background: transparent;
   border: 0;
@@ -26,8 +25,7 @@
 }
 
 .roleBadge {
-  align-self: flex-start;
-  margin-left: var(--space-2);
+  align-self: center;
   margin-bottom: var(--space-5);
   padding: var(--space-1) var(--space-2);
   background: var(--nav-active);
@@ -189,8 +187,10 @@
 .userStatus::before { content: ''; display: inline-block; width: var(--space-2); height: var(--space-2); margin-right: var(--space-2); border-radius: var(--radius-pill); background: var(--nav-text); }
 .sidebar.sidebar :focus-visible { outline: 2px solid var(--nav-text); outline-offset: 2px; }
 
-/* Transparent brand icon retains its original colors against the green header. */
-.logo img { display: block; width: 64px; max-width: 100%; height: auto; }
+/* Shared transparent wordmark sits directly on the green header. */
+.logo img { display: block; width: 128px; max-width: 100%; height: auto; }
 .sidebar { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
 
-@media (max-width: 1024px) { .logo img { width: 52px; } }
+@media (max-width: 1024px) { .logo img { width: 96px; } }
+
+.avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }

@@ -419,7 +419,7 @@ test('all real role Profile pages expose the shared photo editor', async () => {
   const Component=(await server.ssrLoadModule(`/src/pages/${role}/components/${page}.jsx`)).default;
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
   try {await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'User',role},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{},React.createElement(Component))))));
-   const input=host.querySelector('input[type="file"]');assert.ok(input,role);assert.equal(input.accept,'image/jpeg,image/png,image/webp');assert.ok(host.querySelector(`label[for="${input.id}"]`));assert.equal(host.querySelector('img[alt="Profile photo"]')?.getAttribute('src')?.startsWith('blob:'),true);
+   const input=host.querySelector('input[type="file"]');assert.ok(input,role);assert.equal(input.hidden,true);const change=host.querySelector('button[aria-label="Change photo"]');assert.ok(change,role);assert.equal(change.getAttribute('aria-controls'),input.id);let picked=0;input.click=()=>picked++;await act(async()=>change.click());assert.equal(picked,1);assert.equal(input.accept,'image/jpeg,image/png,image/webp');assert.ok(host.querySelector(`label[for="${input.id}"]`));assert.equal(host.querySelector('img[alt="Profile photo"]')?.getAttribute('src')?.startsWith('blob:'),true);
   } finally {await act(async()=>root.unmount());host.remove();}
  }} finally {api.defaults.adapter=original;}
 });

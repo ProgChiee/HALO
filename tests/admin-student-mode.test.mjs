@@ -321,3 +321,24 @@ test('Preview and Support expose read-only Student calendar with the correct ses
   try{await click(button('View Study Calendar'));const call=calls.find(c=>c.url.endsWith('/study-calendar'));assert.equal(call.method,'get');assert.equal(call.url,preview?'/admin/preview/student/study-calendar':'/admin/acting/student/study-calendar');assert.equal(call.headers.get('X-Acting-Session'),id);assert.ok(document.querySelector('[aria-label="2026-10-01, Active study day"]'));}finally{await cleanup();}
  }
 });
+
+test('Student selector highlights only the selected row and retains distinct button state', async()=>{
+ const calls=[];api.defaults.adapter=adapter(calls,config=>config.url==='/admin/acting/targets'?response(config,{content:[target,{...target,userId:8,name:'Student B'}],totalPages:1}):undefined);
+ const cleanup=await mount('/admin/student-mode');
+ try {
+  const first=document.querySelector('button[aria-label="Select Student A"]');
+  const second=document.querySelector('button[aria-label="Select Student B"]');
+  assert.equal(first.getAttribute('aria-pressed'),'false');
+  await click(first);
+  assert.equal(first.getAttribute('aria-pressed'),'true');
+  assert.match(first.closest('li').textContent,/Selected/);
+  const selectedClass=first.closest('li').className;assert.ok(selectedClass);
+  second.focus();assert.equal(document.activeElement,second);
+  assert.equal(first.getAttribute('aria-pressed'),'true');
+  await click(second);
+  assert.equal(first.getAttribute('aria-pressed'),'false');assert.doesNotMatch(first.closest('li').textContent,/Selected/);
+  assert.equal(second.getAttribute('aria-pressed'),'true');assert.equal(second.closest('li').className,selectedClass);
+  assert.match(second.closest('li').textContent,/Selected/);
+  assert.equal(calls.filter(c=>c.method==='post').length,0);
+ } finally {await cleanup();}
+});

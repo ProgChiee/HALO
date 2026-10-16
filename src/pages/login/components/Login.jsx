@@ -42,7 +42,7 @@ export default function Login() {
       showToast('Welcome back!', 'success');
       navigate(user.mustChangePassword ? getPasswordChangeRoute(user.role) : ROLE_HOME[user.role], { replace: true });
     } catch (err) {
-      setError(err.response?.status === 401 || err.response?.status === 403
+      setError(['ACCOUNT_INACTIVE', 'ACCOUNT_ARCHIVED'].includes(err.response?.data?.code) ? apiErrorMessage(err) : err.response?.status === 401 || err.response?.status === 403
         ? 'Login failed. Check your credentials and account status.'
         : apiErrorMessage(err, 'Unable to sign in. Check that the backend is available and try again.'));
     } finally {

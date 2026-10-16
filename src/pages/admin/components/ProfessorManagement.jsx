@@ -1,9 +1,11 @@
+import { archiveProfessor, restoreProfessor } from '../../../services/admin/adminService';
+import AccountLifecycle, { AccountStateFilters } from '../../../components/shared/AccountLifecycle';
 import Dialog from '../../../components/shared/Dialog';
 import { accountText, accountDisplay, accountInitial } from '../../../utils/adminAccountDisplay';
 import { adminErrorMessage } from '../../../utils/adminErrors';
 import { validateProfessor, professorValidationError } from '../../../utils/adminProfessorValidation';
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { GraduationCap, Search, Plus, Eye, Pencil, Power, X } from 'lucide-react';
+import { GraduationCap, Search, Plus, Eye, Pencil, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
@@ -53,6 +55,7 @@ export default function ProfessorManagement() {
     return update && update.version > snapshot.version ? { ...professor, status: update.status } : professor;
   }), [snapshot, statusUpdates]);
   const toggleLock = useRef(false);
+  const [accountState, setAccountState] = useState('ACTIVE');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingProfessor, setViewingProfessor] = useState(null);
@@ -104,11 +107,11 @@ export default function ProfessorManagement() {
   }
 
   const filteredProfessors = useMemo(() => {
-    return professors.filter((p) =>
+    return professors.filter(item => item.status === accountState).filter((p) =>
       accountText(p.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
       accountText(p.email).toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [professors, searchQuery]);
+  }, [professors, searchQuery, accountState]);
 
   function openCreateModal() {
     if (!beginModal()) return;
@@ -143,12 +146,12 @@ export default function ProfessorManagement() {
     }
   }
 
-  async function handleToggleStatus(professor) {
+  async function handleToggleStatus(professor, action) {
     if (toggleLock.current) return;
     toggleLock.current = true;
     setTogglingId(professor.id);
     try {
-      const updated = await setProfessorStatus(professor.id, professor.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
+      const updated = await (action === 'Archive' ? archiveProfessor(professor.id) : action === 'Restore' ? restoreProfessor(professor.id) : setProfessorStatus(professor.id, action === 'Deactivate' ? 'INACTIVE' : 'ACTIVE'));
       if (!mounted.current) return;
       const version = ++mutationVersion.current;
       setStatusUpdates(previous => ({ ...previous, [updated.id]: { status: updated.status, version } }));
@@ -208,6 +211,7 @@ export default function ProfessorManagement() {
       </header>
 
       <main className={styles.main}>
+        <AccountStateFilters value={accountState} onChange={setAccountState} />
         <div className={styles.toolbarRow}>
           <div className={styles.searchWrapper}>
             <Search size={18} className={styles.searchIcon} />
@@ -260,15 +264,7 @@ export default function ProfessorManagement() {
                 <span role="cell" aria-describedby="professor-column-2" className={styles.profEmail}>{accountDisplay(prof.email, 'Email not provided')}</span>
                 <span role="cell" aria-describedby="professor-column-3" className={styles.profCount}>{prof.professorId}</span>
                 <span role="cell" aria-describedby="professor-column-4" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    className={`${styles.actionBtn} ${prof.status === 'ACTIVE' ? styles.actionBtnOff : ''}`}
-                    onClick={() => handleToggleStatus(prof)}
-                    disabled={togglingId !== null}
-                    aria-label={prof.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
-                  >
-                    <Power size={15} aria-hidden="true" />
-                    {prof.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
-                  </button>
+                  <AccountLifecycle account={prof} kind="Professor" onConfirm={handleToggleStatus} disabled={togglingId !== null || isSubmitting} />
                 </span>
                 <span role="cell" aria-describedby="professor-column-5" className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button
@@ -279,14 +275,14 @@ export default function ProfessorManagement() {
                   >
                     <Eye size={15} aria-hidden="true" /> View
                   </button>
-                  <button
+{prof.status === 'ACTIVE' &&                   <button
                     className={styles.actionBtn}
                     onClick={() => openEditModal(prof)}
                     disabled={isSubmitting}
                     aria-label="Edit"
                   >
                     <Pencil size={15} aria-hidden="true" /> Edit
-                  </button>
+                  </button>}
 
                 </span>
               </div>

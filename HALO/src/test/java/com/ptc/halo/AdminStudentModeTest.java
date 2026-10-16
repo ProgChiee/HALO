@@ -87,6 +87,7 @@ class AdminStudentModeTest {
   doAnswer(inv->{
    assertFalse(active(),"AI must run outside a database transaction");duringAi.run();return "{\"inScope\":false,\"chunkIds\":[]}";
   }).when(response).content();
+  stubIntent();
  }
 
  org.springframework.security.core.Authentication authentication(UserEntity user) {
@@ -218,5 +219,12 @@ class AdminStudentModeTest {
   doThrow(new IllegalStateException("Audit unavailable")).when(auditTarget).createActingLog(any(),eq(ActivityType.MODULE),eq("Study audit"));
   assertThrows(IllegalStateException.class,()->mode.execute(auth,actingId,s->{study.record(weekId,s.getTarget());audit.createActingLog(s,ActivityType.MODULE,"Study audit");return null;}));
   assertEquals(0,studyDays.count());
+ }
+
+ void stubIntent() {
+  var spec=mock(org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec.class,org.mockito.Answers.RETURNS_DEEP_STUBS);
+  when(builder.build().prompt().system(startsWith("Classify HALO"))).thenReturn(spec);
+  when(spec.user(anyString())).thenReturn(spec);
+  when(spec.call().content()).thenAnswer(inv->{assertFalse(active());return "{\"intent\":\"LESSON_QUESTION\"}";});
  }
 }

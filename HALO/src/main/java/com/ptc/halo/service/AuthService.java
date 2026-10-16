@@ -110,14 +110,18 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest loginRequest){
 
-        authenticationManager.authenticate(
+        try { authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getEmail(),
                         loginRequest.getPassword()
                 )
         );
-
-
+        } catch (org.springframework.security.authentication.DisabledException disabled) {
+            UserEntity disabledUser = userRepository.findByEmail(loginRequest.getEmail()).orElse(null);
+            if (disabledUser != null && passwordEncoder.matches(loginRequest.getPassword(), disabledUser.getPassword()))
+                throw new AccountStateException(disabledUser.getStatus() == Status.ARCHIVED);
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
+        }
         UserEntity user =
                 userRepository.findByEmail(loginRequest.getEmail())
                         .orElseThrow();

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 @Import({SuperAdminService.class, ActivityLogService.class, SuperAdminDataIntegrityTest.Config.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SuperAdminDataIntegrityTest {
+    @org.springframework.boot.test.mock.mockito.MockBean ProfilePhotoService photos;
     @TestConfiguration static class Config {
         @Bean PasswordEncoder encoder() { return new BCryptPasswordEncoder(4); }
     }
@@ -37,7 +38,7 @@ class SuperAdminDataIntegrityTest {
 
     @BeforeEach void prepare() {
         reset(logs);
-        repository.deleteAll(); users.deleteAll();
+        repository.deleteAll(); jdbc.update("delete from admin_acting_session"); jdbc.update("delete from password_reset_otps"); users.deleteAll();
         jdbc.execute("ALTER TABLE user_entity ADD COLUMN IF NOT EXISTS email_normalized VARCHAR(255) GENERATED ALWAYS AS (LOWER(TRIM(email)))");
         jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_user_email_normalized ON user_entity(email_normalized)");
         actor = user("super@example.test", Role.SUPER_ADMIN);
@@ -49,6 +50,36 @@ class SuperAdminDataIntegrityTest {
     }
     AdminRequest create(String email) {
         AdminRequest r = new AdminRequest(); r.setName("  Test Admin  "); r.setEmail(email); r.setPassword("safe-test-password"); return r;
+    }
+    @Test void deleteRemovesAccountAndOtpAndLoginIdentity() {
+        var target=user("remove@example.test",Role.ADMIN);
+        jdbc.update("insert into password_reset_otps (user_id,otp,expires_at,created_at) values (?, '123456', CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",target.getId());
+        var student=user("session-target@example.test",Role.STUDENT);
+        jdbc.update("insert into admin_acting_session (id,admin_id,target_id,target_role,admin_token_version,target_token_version,created_at,expires_at) values ('delete-test',?,?,'STUDENT',0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",target.getId(),student.getId());
+        admins.deleteAdmin(target.getId(),actor);
+        assertEquals(0,jdbc.queryForObject("select count(*) from admin_acting_session",Integer.class));
+        assertTrue(users.findById(student.getId()).isPresent());
+        assertTrue(users.findById(target.getId()).isEmpty());
+        assertThrows(org.springframework.security.core.userdetails.UsernameNotFoundException.class, () -> new com.ptc.halo.service.CustomUserDetailsService(users).loadUserByUsername(target.getEmail()));
+        assertEquals(0,jdbc.queryForObject("select count(*) from password_reset_otps",Integer.class));
+        verify(photos).removeDeletedAccountPhoto(target.getId());
+    }
+    @Test void protectedHistoryAndWrongTargetsRemainSafe() {
+        var target=user("history@example.test",Role.ADMIN);
+        logs.createLog(target,ActivityType.ACCOUNT,"Historical action");
+        assertEquals("ACCOUNT_HAS_PROTECTED_REFERENCES",assertThrows(SuperAdminApiException.class,()->admins.deleteAdmin(target.getId(),actor)).getCode());
+        assertTrue(users.findById(target.getId()).isPresent()); assertEquals(1,repository.count());
+        assertEquals("ADMIN_NOT_FOUND",assertThrows(SuperAdminApiException.class,()->admins.deleteAdmin(999999L,actor)).getCode());
+        var student=user("wrong@example.test",Role.STUDENT);
+        assertEquals("CANNOT_DELETE_ACCOUNT",assertThrows(SuperAdminApiException.class,()->admins.deleteAdmin(student.getId(),actor)).getCode());
+        assertThrows(SuperAdminApiException.class,()->admins.deleteAdmin(actor.getId(),actor));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->admins.deleteAdmin(target.getId(),target));
+    }
+    @Test void deleteAuditFailureRollsBack() {
+        var target=user("rollback-delete@example.test",Role.ADMIN);
+        doThrow(new IllegalStateException("audit failed")).when(logs).createLog(any(),any(),anyString());
+        assertThrows(IllegalStateException.class,()->admins.deleteAdmin(target.getId(),actor));
+        assertTrue(users.findById(target.getId()).isPresent());
     }
     @Test void normalizedDuplicatesAndDatabaseConstraint() {
         admins.createAdmin(create("  Mixed@Example.test  "),actor);

@@ -49,5 +49,11 @@ public class ProfilePhotoService {
             Files.move(temp, root.resolve(userId + ".png"), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } finally { Files.deleteIfExists(temp); }
     }
+    public void removeDeletedAccountPhoto(long userId) {
+        try { Files.deleteIfExists(root.resolve(userId + ".png")); }
+        catch (IOException failure) {
+            org.slf4j.LoggerFactory.getLogger(getClass()).error("deleted_account_photo_cleanup_failed userId={}", userId);
+        }
+    }
     private ResponseStatusException invalid() { return new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_PROFILE_PHOTO"); }
 }

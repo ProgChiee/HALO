@@ -235,6 +235,34 @@ class AdminProfessorUpdateTransactionTest {
     }
 
 
+    @ParameterizedTest @ValueSource(strings={"professor", "student"})
+    void archiveRestorePreservesOriginalStateAndProfiles(String role) {
+        var target=role.equals("professor") ? account : student();
+        for (Status original : new Status[]{Status.ACTIVE, Status.INACTIVE}) {
+            if(role.equals("professor")) service.changeProfessorStatus(target.getId(),original,admin);
+            else service.changeStudentStatus(target.getId(),original,admin);
+            assertEquals(original,users.findById(target.getId()).orElseThrow().getStatus());
+            service.archiveOrRestore(target.getId(),target.getRole(),admin,false);
+            service.archiveOrRestore(target.getId(),target.getRole(),admin,false);
+            var stored=users.findById(target.getId()).orElseThrow();
+            assertEquals(Status.ARCHIVED,stored.getStatus()); assertEquals(original,stored.getPreviousStatusBeforeArchive());
+            assertFalse(new com.ptc.halo.security.CustomUserDetails(stored).isEnabled());
+            assertThrows(AdminApiException.class,()-> { if(role.equals("professor")) service.changeProfessorStatus(target.getId(),Status.ACTIVE,admin); else service.changeStudentStatus(target.getId(),Status.ACTIVE,admin); });
+            service.archiveOrRestore(target.getId(),target.getRole(),admin,true);
+            stored=users.findById(target.getId()).orElseThrow(); assertEquals(original,stored.getStatus());
+            assertEquals(original==Status.ACTIVE,new com.ptc.halo.security.CustomUserDetails(stored).isEnabled());
+            assertNull(stored.getPreviousStatusBeforeArchive());
+            assertTrue(role.equals("professor") ? professors.findByUserId(target.getId()).isPresent() : students.findByUserId(target.getId()).isPresent());
+        }
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.archiveOrRestore(target.getId(),target.getRole(),target,false));
+    }
+    @Test void archiveAuditFailureRollsBackAndPreservesHistory() {
+        audit.createLog(account,ActivityType.ACCOUNT,"Existing history");
+        doThrow(new IllegalStateException("audit failed")).when(audit).createLog(eq(admin),any(),anyString());
+        assertThrows(IllegalStateException.class,()->service.archiveOrRestore(account.getId(),Role.PROFESSOR,admin,false));
+        assertEquals(account.getStatus(),users.findById(account.getId()).orElseThrow().getStatus());
+        assertEquals(1,logs.count());
+    }
     @Test void databaseUniquenessRejectsRaceAndRollsBackAccount() {
         // H2 equivalent of the production migration's binary normalized key.
         jdbc.execute("ALTER TABLE professor_entity ADD COLUMN professor_id_normalized VARBINARY(1020) GENERATED ALWAYS AS (CAST(TRIM(professor_id) AS VARBINARY))");

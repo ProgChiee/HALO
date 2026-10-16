@@ -19,6 +19,8 @@ export default function Dialog({ children, labelledBy, describedBy, onClose, bus
     const node = dialog.current;
     (node.querySelector(initialFocus) || node).focus();
     const containFocus = event => {
+      // A nested confirmation owns focus until it closes.
+      if (!node.isConnected || [...document.querySelectorAll('[aria-modal="true"]')].at(-1) !== node) return;
       if (!node.contains(event.target)) (node.querySelector(focusable) || node).focus();
     };
     document.addEventListener('focusin', containFocus);
@@ -48,6 +50,7 @@ export default function Dialog({ children, labelledBy, describedBy, onClose, bus
       if (!busy) onClose();
     }
     if (event.key === 'Tab') {
+      event.stopPropagation();
       const items = [...dialog.current.querySelectorAll(focusable)]
         .filter(element => !element.hidden && element.getAttribute('aria-hidden') !== 'true')
         .sort((a, b) => a.compareDocumentPosition(b) & 4 ? -1 : 1);

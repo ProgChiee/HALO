@@ -143,8 +143,9 @@ public class ModuleMaterialIndex {
                     .user(u -> u.text("Extract this professor-uploaded material.")
                             .media(MimeTypeUtils.parseMimeType(type), new ByteArrayResource(bytes)))
                     .call().content();
-            if (text == null) throw problem("MODULE_MATERIAL_UNREADABLE");
-            return text;
+            // A textless page may have nothing to transcribe. addChunks skips it;
+            // getOrBuild still rejects each file that yields no usable chunks.
+            return text == null ? "" : text;
         } catch (ResponseStatusException error) { throw error;
         } catch (Exception error) {
             logFailure(file.getModule().getId(), file.getId(), "transcription", error);

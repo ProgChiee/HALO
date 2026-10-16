@@ -3,7 +3,7 @@ import { useProfessorWorkflow } from '../../../context/professor/useProfessorWor
 import styles from '../../admin/acting/ProfessorMode.module.css';
 export default function ProfessorPageShell({ navItems, children, ...props }) {
   const workflow = useProfessorWorkflow();
-  const items = workflow.acting ? navItems.map(item => ({ ...item, path: item.path.replace('/professor', workflow.basePath) })) : navItems;
+  const items = workflow.acting ? navItems.filter(item => !item.path.endsWith('/settings')).map(item => ({ ...item, path: item.path.replace('/professor', workflow.basePath) })) : navItems;
   return <PageShell {...props} navItems={items}>
     {workflow.acting && <section className={styles.banner} aria-label="Professor acting mode">
       <strong>Professor Mode — Acting as {workflow.target.name || 'Professor'}</strong>

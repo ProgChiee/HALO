@@ -1,13 +1,14 @@
+import AccountLifecycle, { AccountStateFilters } from '../../../components/shared/AccountLifecycle';
 import Dialog from '../../../components/shared/Dialog';
 import { accountText, accountDisplay, accountInitial } from '../../../utils/adminAccountDisplay';
 import { adminErrorMessage } from '../../../utils/adminErrors';
 import { useState, useRef, useMemo } from 'react';
-import { Users, Search, Eye, Power, X } from 'lucide-react';
+import { Users, Search, Eye, X } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import { useToast } from '../../../context/notifications/useToast';
 import { useAuth } from '../../../context/login/useAuth';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getStudents, setStudentStatus } from '../../../services/admin/adminService';
+import { getStudents, setStudentStatus, archiveStudent, restoreStudent } from '../../../services/admin/adminService';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/StudentManagement.module.css';
@@ -25,24 +26,25 @@ export default function StudentManagement() {
 
   const { data: students, setData: setStudents, isLoading, error: loadError, reload: loadStudents } = useRemoteData(getStudents, []);
   const toggleLock = useRef(false);
+  const [accountState, setAccountState] = useState('ACTIVE');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingStudent, setViewingStudent] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
 
 
   const filteredStudents = useMemo(() => {
-    return students.filter((s) =>
+    return students.filter(item => item.status === accountState).filter((s) =>
       accountText(s.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
       accountText(s.email).toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [students, searchQuery]);
+  }, [students, searchQuery, accountState]);
 
-  async function handleToggleStatus(student) {
+  async function handleToggleStatus(student, action) {
     if (toggleLock.current) return;
     toggleLock.current = true;
     setTogglingId(student.id);
     try {
-      const updated = await setStudentStatus(student.id, student.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
+      const updated = await (action === 'Archive' ? archiveStudent(student.id) : action === 'Restore' ? restoreStudent(student.id) : setStudentStatus(student.id, action === 'Deactivate' ? 'INACTIVE' : 'ACTIVE'));
       setStudents((previous) => previous.map((item) => item.id === updated.id ? updated : item));
       setViewingStudent((previous) => previous?.id === updated.id ? updated : previous);
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
@@ -68,6 +70,7 @@ export default function StudentManagement() {
       </header>
 
       <main className={styles.main}>
+        <AccountStateFilters value={accountState} onChange={setAccountState} />
         <div className={styles.searchWrapper}>
           <Search size={18} className={styles.searchIcon} />
           <input
@@ -116,15 +119,7 @@ export default function StudentManagement() {
                 <span role="cell" aria-describedby="student-column-3" className={styles.studentYear}>{yearLevelLabel(student.yearLevel)}</span>
                 <span role="cell" aria-describedby="student-column-4" className={styles.studentProgress}>—</span>
                 <span role="cell" aria-describedby="student-column-5" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    className={`${styles.actionBtn} ${student.status === 'ACTIVE' ? styles.actionBtnOff : ''}`}
-                    onClick={() => handleToggleStatus(student)}
-                    disabled={togglingId !== null}
-                    aria-label={student.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
-                  >
-                    <Power size={15} aria-hidden="true" />
-                    {student.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
-                  </button>
+                  <AccountLifecycle account={student} kind="Student" onConfirm={handleToggleStatus} disabled={togglingId !== null} />
                 </span>
                 <span role="cell" aria-describedby="student-column-6" className={styles.actions} onClick={(e) => e.stopPropagation()}>
                   <button

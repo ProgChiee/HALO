@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import { ROLES } from '../utils/roles';
 
+const Settings = lazy(() => import('../components/shared/Settings'));
 const Login = lazy(() => import('../pages/login/components/Login'));
 const Register = lazy(() => import('../pages/login/components/Register'));
 const ForgotPassword = lazy(() => import('../pages/login/components/ForgotPassword'));
@@ -51,6 +52,10 @@ export default function AppRoutes() {
   return (
     <Suspense fallback={<p role="status">Loading page...</p>}>
     <Routes>
+      <Route path="/superadmin/settings" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><Settings role="superadmin" /></ProtectedRoute>} />
+      <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><Settings role="admin" /></ProtectedRoute>} />
+      <Route path="/professor/settings" element={<ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}><Settings role="professor" /></ProtectedRoute>} />
+      <Route path="/student/settings" element={<ProtectedRoute allowedRoles={[ROLES.STUDENT]}><Settings role="student" /></ProtectedRoute>} />
       {/* Root path redirects straight to the login screen */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 

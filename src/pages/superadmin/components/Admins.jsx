@@ -6,7 +6,7 @@ import Dialog from '../../../components/shared/Dialog';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getAdmins, addAdmin, setAdminStatus } from '../../../services/superadmin/superadminService';
+import { getAdmins, addAdmin, setAdminStatus, deleteAdmin } from '../../../services/superadmin/superadminService';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/Admins.module.css';
@@ -18,15 +18,16 @@ const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
 // (Only the create-admin response is limited to name/email/role — not
 // used for display here.)
 //
-// ⚠️ Still no DELETE endpoint for admins — only status toggling
-// (ACTIVE/INACTIVE/BLOCKED). "Remove" stays disabled below; ask your
-// backend team for DELETE /api/super-admin/admin/{id} if a true removal
-// action is needed.
-
 export default function Admins() {
   const { showToast } = useToast();
 
   const { data: admins, isLoading, error: loadError, reload: loadAdmins } = useRemoteData(getAdmins, []);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
+  const [protectedHistory, setProtectedHistory] = useState(false);
+  const protectedDelete = useRef(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteLock = useRef(false);
   const statusLock = useRef(false);
   const createLock = useRef(false);
   const instance = useRef(0);
@@ -63,7 +64,7 @@ export default function Admins() {
   }
 
   function openAddModal(event) {
-    if (createLock.current || statusLock.current) return;
+    if (deleteTarget || createLock.current || statusLock.current) return;
     event?.currentTarget?.focus();
     instance.current += 1;
     setName('');
@@ -114,7 +115,7 @@ export default function Admins() {
   }
 
   async function handleSetStatus(admin) {
-    if (statusLock.current || createLock.current) return;
+    if (deleteTarget || statusLock.current || createLock.current) return;
     statusLock.current = true;
     const isCurrent = () => mounted.current;
     setUpdatingStatusId(admin.id);
@@ -133,9 +134,37 @@ export default function Admins() {
     }
   }
 
-  function handleDelete() {
-    // ⚠️ Disabled: no DELETE endpoint for admins yet — see note above.
-    showToast('Removing admins is not available yet — deactivate instead.', 'error');
+  function closeDelete() { if (!deleteLock.current) { setDeleteTarget(null); setDeleteError(''); } }
+  async function confirmDelete() {
+    if (!deleteTarget || deleteLock.current || protectedDelete.current) return;
+    deleteLock.current = true; setDeleting(true); setDeleteError('');
+    try {
+      await deleteAdmin(deleteTarget.id);
+      if (!mounted.current) return;
+      setDeleteTarget(null); showToast('Admin account deleted.', 'success');
+      await loadAdmins();
+    } catch (error) {
+      if (mounted.current) {
+        if (error?.response?.status === 409 && error.response.data?.code === 'ACCOUNT_HAS_PROTECTED_REFERENCES') {
+          protectedDelete.current = true;
+          setProtectedHistory(true);
+        }
+        setDeleteError(apiErrorMessage(error, 'Could not delete this Admin account. Please try again.'));
+      }
+    } finally { deleteLock.current = false; if (mounted.current) setDeleting(false); }
+  }
+
+  async function deactivateProtectedAdmin() {
+    if (!deleteTarget || !protectedDelete.current || deleteLock.current || deleteTarget.status === 'INACTIVE') return;
+    deleteLock.current = true; setDeleting(true);
+    try {
+      await setAdminStatus(deleteTarget.id, 'INACTIVE');
+      if (!mounted.current) return;
+      setDeleteTarget(null); showToast('Admin account deactivated.', 'success');
+      await loadAdmins();
+    } catch (error) {
+      if (mounted.current) setDeleteError(apiErrorMessage(error, 'Could not deactivate this Admin account. Please try again.'));
+    } finally { deleteLock.current = false; if (mounted.current) setDeleting(false); }
   }
 
   return (
@@ -192,10 +221,9 @@ export default function Admins() {
                     </button>
                     <button
                       className={styles.deleteBtn}
-                      onClick={() => handleDelete(admin)}
-                      disabled
-                      title="Not available yet — no delete endpoint on the backend"
-                      aria-label={`Remove ${admin.name} (not available yet)`}
+                      onClick={event => { event.currentTarget.focus(); setDeleteError(''); protectedDelete.current = false; setProtectedHistory(false); setDeleteTarget(admin); }}
+                      disabled={isSubmitting || updatingStatusId !== null || deleting}
+                      aria-label={`Delete ${admin.name}`}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -211,6 +239,17 @@ export default function Admins() {
           )}
         </main>
 
+      {deleteTarget && <Dialog labelledBy="delete-admin-title" onClose={closeDelete} busy={deleting} className={styles.modal}>
+        <h3 id="delete-admin-title" className={styles.modalTitle}>Delete Admin Account?</h3>
+        <p>This will permanently remove this Admin account. This action cannot be undone.</p>
+        <p>{deleteTarget.name}</p>
+        {protectedHistory && <p role="alert" className={styles.formError}>This Admin has protected history and cannot be deleted. Deactivate the account instead.</p>}
+        {deleteError && (!protectedHistory || deleteError !== 'This Admin has protected history and cannot be deleted. Deactivate the account instead.') && <p role="alert" className={styles.formError}>{deleteError}</p>}
+        <Button variant="secondary" onClick={closeDelete} disabled={deleting}>Cancel</Button>
+        {protectedHistory
+          ? deleteTarget.status !== 'INACTIVE' && <Button key="deactivate" variant="secondary" onClick={deactivateProtectedAdmin} isLoading={deleting}>Deactivate Account</Button>
+          : <Button key="delete" variant="danger" onClick={confirmDelete} isLoading={deleting}>Delete Account</Button>}
+      </Dialog>}
       {showAddModal && (
         <Dialog labelledBy="add-admin-title" describedBy={formError ? 'add-admin-error' : undefined} onClose={closeAddModal} busy={isSubmitting} className={styles.modal}>
             <div className={styles.modalHeader}>

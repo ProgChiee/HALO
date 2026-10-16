@@ -8,3 +8,11 @@
   --nav-hover: rgba(255, 255, 255, .02);
   --nav-active: rgba(255, 255, 255, .04);
 }
+
+/* Keep light navigation text readable instead of using the pale dark-theme CTA green. */
+:global([data-theme="dark"]) .frame {
+  --nav-sidebar: linear-gradient(180deg, #214B3A, #193C30);
+  --nav-topbar: linear-gradient(90deg, #214B3A, #193C30);
+  --nav-active: rgba(255, 255, 255, .12);
+  --nav-hover: rgba(255, 255, 255, .08);
+}

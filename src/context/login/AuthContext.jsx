@@ -1,3 +1,4 @@
+import ProfilePhotoProvider from './ProfilePhotoProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './useAuth';
 import { clearSession, readSession, writeSession } from '../../utils/session';
@@ -20,6 +21,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    window.haloTheme?.bindAccount(null);
     clearSession();
     setSession({ user: null, token: null });
   }, []);
@@ -33,5 +35,6 @@ export function AuthProvider({ children }) {
     logout,
   }), [session, login, logout]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}><ProfilePhotoProvider>{children}</ProfilePhotoProvider></AuthContext.Provider>;
 }
+

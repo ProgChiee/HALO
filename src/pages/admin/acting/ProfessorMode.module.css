@@ -1,4 +1,11 @@
-.selector { composes: selector from "./ActingMode.module.css"; }
+.selector { composes: selector from "./ModeSelector.module.css"; }
+.targets { composes: targets from "./ModeSelector.module.css"; }
+.pagination { composes: pagination from "./ModeSelector.module.css"; }
+.selectedTarget { composes: selectedTarget from "./ModeSelector.module.css"; }
+.selectedBadge { composes: selectedBadge from "./ModeSelector.module.css"; }
+.pageTitle { composes: pageTitle from "./ModeSelector.module.css"; }
+.subtitle { composes: subtitle from "./ModeSelector.module.css"; }
+.searchArea { composes: searchArea from "./ModeSelector.module.css"; }
+.searchField { composes: searchField from "./ModeSelector.module.css"; }
 .banner { composes: banner from "./ActingMode.module.css"; }
 .actions { composes: actions from "./ActingMode.module.css"; }
-.targets { composes: targets from "./ActingMode.module.css"; }

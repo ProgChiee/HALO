@@ -88,3 +88,11 @@ export async function getActivityLog({ role, activityType, signal, params = {} }
   });
   return res.data;
 }
+
+export async function archiveProfessor(id) { return (await apiClient.patch(`/admin/professors/${id}/archive`)).data; }
+
+export async function restoreProfessor(id) { return (await apiClient.patch(`/admin/professors/${id}/restore`)).data; }
+
+export async function archiveStudent(id) { return (await apiClient.patch(`/admin/students/${id}/archive`)).data; }
+
+export async function restoreStudent(id) { return (await apiClient.patch(`/admin/students/${id}/restore`)).data; }

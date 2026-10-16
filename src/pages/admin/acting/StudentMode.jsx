@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Button from '../../../components/shared/Button';
@@ -46,22 +47,30 @@ export function StudentModeSelector() {
   }
   return <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
     <main className={styles.selector}>
-      <h1>Student Mode</h1><p>Select a Student to preview their learning experience safely. Support Mode is available separately for real, audited actions.</p>
+      <h1 className={styles.pageTitle}>Student Mode</h1><p className={styles.subtitle}>Select a Student to preview their learning experience safely. Support Mode is available separately for real, audited actions.</p>
       {location.state?.actingNotice && <p role="status">Student Mode ended. Select an active account to start a new session.</p>}
+      <div className={styles.searchArea}>
       <label htmlFor="student-mode-search">Search Students</label>
-      <input id="student-mode-search" value={search} disabled={pending !== null} onChange={e => { setSearch(e.target.value); setPage(0); }} maxLength={100} />
+      <div className={styles.searchField}><Search size={18} aria-hidden="true" />
+      <input id="student-mode-search" placeholder="Search by student name, email, or ID" value={search} disabled={pending !== null} onChange={e => { setSearch(e.target.value); setPage(0); }} maxLength={100} />
+      </div></div>
       {error && <p role="alert">{error}</p>}
       {result.isLoading ? <p role="status">Loading Students...</p> : result.error ? <div role="alert">Could not load Students. <button onClick={result.reload}>Retry</button></div>
         : !result.data?.content?.length ? <p>No active Students found.</p> : <ul className={styles.targets}>
-          {result.data.content.map(target => <li key={target.userId}>
-            <div><strong>{target.name || 'Student'}</strong><p>{target.email || 'Email not specified'}</p></div>
-            <button disabled={pending !== null} onClick={() => { setSelected(target); setError(''); }} aria-label={'Select ' + (target.name || 'Student')}>
+          {result.data.content.map(target => <li key={target.userId} className={selected?.userId === target.userId ? styles.selectedTarget : undefined}>
+            <div>{selected?.userId === target.userId && <span className={styles.selectedBadge}><span aria-hidden="true">&#10003;</span> Selected</span>}<strong>{target.name || 'Student'}</strong><p>{target.email || 'Email not specified'}</p></div>
+            <button disabled={pending !== null} onClick={() => { setSelected(target); setError(''); }} aria-pressed={selected?.userId === target.userId} aria-label={'Select ' + (target.name || 'Student')}>
               {pending === target.userId ? 'Starting...' : 'Select Student'}
             </button>
           </li>)}
         </ul>}
+      <nav aria-label="Student selection pages" className={styles.pagination}>
+        <button disabled={page === 0 || result.isLoading || pending !== null} onClick={() => setPage(p => p - 1)}>Previous</button>
+        <span>Page {page + 1}</span>
+        <button disabled={result.isLoading || pending !== null || page + 1 >= (result.data?.totalPages ?? 0)} onClick={() => setPage(p => p + 1)}>Next</button>
+      </nav>
       {selected && <section className={styles.choices} aria-label="Student mode choices">
-        <h2>{selected.name || 'Student'}</h2>
+        <h2>{selected.name || 'Student'} <span className={styles.selectedBadge}><span aria-hidden="true">&#10003;</span> Selected</span></h2>
         <div><h3>Student Preview Mode <small>Recommended</small></h3>
           <p>Safely explore the Student experience without changing real Student data.</p>
           <button disabled={pending !== null} onClick={() => select(selected, true)}>Preview as Student</button></div>
@@ -77,11 +86,7 @@ export function StudentModeSelector() {
         <div className={styles.actions}><Button variant="secondary" disabled={pending !== null} onClick={() => { if (!lock.current) setConfirmSupport(false); }}>Cancel</Button>
           <Button disabled={pending !== null} onClick={() => select(selected, false)}>{pending !== null ? 'Starting...' : 'Confirm Support Mode'}</Button></div>
       </Dialog>}
-      <nav aria-label="Student selection pages" className={styles.actions}>
-        <button disabled={page === 0 || result.isLoading || pending !== null} onClick={() => setPage(p => p - 1)}>Previous</button>
-        <span>Page {page + 1}</span>
-        <button disabled={result.isLoading || pending !== null || page + 1 >= (result.data?.totalPages ?? 0)} onClick={() => setPage(p => p + 1)}>Next</button>
-      </nav>
+
     </main>
   </PageShell>;
 }

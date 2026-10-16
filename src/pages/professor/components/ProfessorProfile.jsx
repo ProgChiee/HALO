@@ -80,11 +80,7 @@ export default function ProfessorProfile() {
 
         <main className={styles.main}>
           <div className={styles.profileHeader}>
-            <ProfilePhoto identity={`${workflow.basePath}:${profile.userId}`} initial={avatarInitial} readOnly={workflow.acting} getProfilePhoto={workflow.acting ? workflow.api.getProfilePhoto : undefined} />
-            <div>
-              <p className={styles.fullName}>{profile.name}</p>
-              <p className={styles.subMeta}>Professor</p>
-            </div>
+            <ProfilePhoto identity={`${workflow.basePath}:${profile.userId}`} initial={avatarInitial} readOnly={workflow.acting} getProfilePhoto={workflow.acting ? workflow.api.getProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{profile.name}</p><p className={styles.subMeta}>Professor</p></div>} />
           </div>
 
           <div className={styles.infoCard}>

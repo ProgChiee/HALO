@@ -2,6 +2,7 @@ package com.ptc.halo.service;
 
 public class AdminApiException extends RuntimeException {
     public enum Code {
+        ACCOUNT_STATE_CONFLICT(409, "Restore archived accounts before changing activation status. Only Active or Inactive accounts can be archived."),
         ACTING_INPUT_INVALID(400, "Please provide a valid target, role, and paging parameters."),
         ACTING_TARGET_INACTIVE(409, "Select an active account to start acting mode."),
         ACTING_SESSION_INVALID(409, "This acting session is no longer valid. Start a new acting session."),

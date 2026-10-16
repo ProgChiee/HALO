@@ -1,18 +1,37 @@
-.selector { composes: selector from "./ActingMode.module.css"; }
+
 .banner { composes: banner from "./ActingMode.module.css"; }
 .actions { composes: actions from "./ActingMode.module.css"; }
-.targets { composes: targets from "./ActingMode.module.css"; }
+
 
 .previewBanner { background: var(--color-info-soft); }
 .previewBanner strong { color: var(--color-info-text); }
 .supportBanner { background: var(--color-accent-soft-bg); border-bottom-color: var(--color-warning-border); }
 .supportBanner strong { color: var(--color-warning-text); }
-.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: var(--space-4); margin-block: var(--space-6); }
-.choices > h2 { grid-column: 1 / -1; overflow-wrap: anywhere; }
-.choices > div { padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
-.choices small { display: block; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin-block: var(--space-4); }
+.choices > h2 { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin: 0; font-size: var(--font-size-lg); overflow-wrap: anywhere; min-width: 0; }
+.choices > div { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); min-width: 0; padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.choices h3 { margin: 0; font-size: var(--font-size-md); line-height: var(--line-height-heading); }
+.choices small { display: block; margin-top: var(--space-1); font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); color: var(--color-text-muted); }
+.choices p { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); overflow-wrap: anywhere; }
+.choices > div > button { margin-top: auto; min-height: var(--space-10); padding: var(--space-2) var(--space-4); font-size: var(--font-size-sm); line-height: var(--line-height-base); max-width: 100%; }
+.choices > div:first-of-type { border-color: var(--color-primary-border); }
+.choices > div:first-of-type small { color: var(--color-primary); }
 .choices > div:first-of-type button { background: var(--color-primary); color: var(--color-surface); }
 .choices > div:first-of-type button:hover:not(:disabled) { background: var(--color-primary-hover); }
+.choices > div:last-of-type button { border-color: var(--color-warning-border); color: var(--color-warning-text); }
+.choices > div:last-of-type button:hover:not(:disabled) { background: var(--color-accent-soft-bg); }
+@media (max-width: 1024px) { .choices { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .choices > div > button { width: 100%; } }
 
 .confirmDialog { width: min(100%, 34rem); padding: var(--space-6); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-dialog); }
 .confirmDialog p { margin-block: var(--space-4); }
+
+.selector { composes: selector from "./ModeSelector.module.css"; }
+.targets { composes: targets from "./ModeSelector.module.css"; }
+.pagination { composes: pagination from "./ModeSelector.module.css"; }
+.selectedTarget { composes: selectedTarget from "./ModeSelector.module.css"; }
+.selectedBadge { composes: selectedBadge from "./ModeSelector.module.css"; }
+.pageTitle { composes: pageTitle from "./ModeSelector.module.css"; }
+.subtitle { composes: subtitle from "./ModeSelector.module.css"; }
+.searchArea { composes: searchArea from "./ModeSelector.module.css"; }
+.searchField { composes: searchField from "./ModeSelector.module.css"; }

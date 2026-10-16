@@ -70,6 +70,7 @@ class MentorExternalTransactionTest {
   doAnswer(inv->{
    assertFalse(active(),"AI must run outside a database transaction");duringAi.run();return "{\"inScope\":false,\"chunkIds\":[]}";
   }).when(response).content();
+  stubIntent();
  }
  @Test void normalOpenAndSendUseShortTransactions(){
   prepareIndex();Long id=modules.findAll().get(0).getId();
@@ -137,5 +138,12 @@ class MentorExternalTransactionTest {
   var other=new UserEntity();other.setId(Long.MAX_VALUE);
   assertEquals("SESSION_NOT_OWNED",assertThrows(ResponseStatusException.class,()->mentor.getExchange(opened.getSessionId(),other,key)).getReason());
   assertEquals("EXCHANGE_NOT_FOUND",assertThrows(ResponseStatusException.class,()->mentor.getExchange(opened.getSessionId(),student,java.util.UUID.randomUUID().toString())).getReason());
+ }
+
+ void stubIntent() {
+  var spec=mock(org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec.class,org.mockito.Answers.RETURNS_DEEP_STUBS);
+  when(builder.build().prompt().system(startsWith("Classify HALO"))).thenReturn(spec);
+  when(spec.user(anyString())).thenReturn(spec);
+  when(spec.call().content()).thenAnswer(inv->{assertFalse(active());return "{\"intent\":\"LESSON_QUESTION\"}";});
  }
 }

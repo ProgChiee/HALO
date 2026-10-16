@@ -38,6 +38,10 @@ public class AuthController {
     return ResponseEntity.ok(response);
     }
 
+    @org.springframework.web.bind.annotation.ExceptionHandler(com.ptc.halo.service.AccountStateException.class)
+    public ResponseEntity<?> accountState(com.ptc.halo.service.AccountStateException error) {
+        return ResponseEntity.status(403).body(java.util.Map.of("status", 403, "code", error.code, "message", error.getMessage()));
+    }
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> loginUser(@RequestBody LoginRequest loginRequest){
     LoginResponse response = authService.login(loginRequest);

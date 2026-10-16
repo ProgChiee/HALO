@@ -1,0 +1,62 @@
+.selector { composes: selector from "./ActingMode.module.css"; }
+.targets { composes: targets from "./ActingMode.module.css"; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: var(--space-2); margin-top: var(--space-4); font-size: var(--font-size-sm); }
+.pagination button { min-height: var(--space-10); padding: var(--space-2) var(--space-3); }
+.pagination span { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pagination button:disabled { background: var(--color-bg-content); color: var(--color-text-muted); border-color: var(--color-border); cursor: not-allowed; }
+.targets li {
+  padding: var(--space-3) var(--space-4);
+  margin-block: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-inline-start: var(--space-1) solid transparent;
+  border-radius: var(--radius-md);
+}
+/* Selection belongs to the whole row; focus remains a separate button outline. */
+.targets li.selectedTarget {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  border-inline-start: var(--space-1) solid var(--color-primary);
+}
+.selectedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: var(--space-2);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+.targets button:focus-visible {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 3px;
+}
+
+.pageTitle { margin: 0 0 var(--space-2); font-size: var(--font-size-3xl); font-weight: var(--font-weight-bold); line-height: var(--line-height-tight); }
+.subtitle { max-width: 65ch; margin: 0 0 var(--space-6); color: var(--color-text-muted); font-size: var(--font-size-sm); line-height: var(--line-height-base); }
+.searchArea { width: 100%; max-width: 35rem; margin-bottom: var(--space-4); }
+.searchArea label { display: block; margin-bottom: var(--space-2); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.searchField { position: relative; }
+.searchField > svg { position: absolute; inset-inline-start: var(--space-3); top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; }
+.selector .searchField input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--space-12);
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-10);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+.selector .searchField input::placeholder { color: var(--color-text-muted); opacity: 1; }
+.selector .searchField input:hover:not(:disabled) { border-color: var(--color-primary-border); }
+.selector .searchField input:focus { border-color: var(--color-primary); outline: 2px solid var(--color-primary-soft); outline-offset: 2px; box-shadow: none; }
+.targets { margin-block: 0; }
+.targets li { background: var(--color-surface); gap: var(--space-3); }
+.targets strong { font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.targets li p { margin: var(--space-1) 0 0; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.targets button { min-height: var(--space-10); padding: var(--space-2) var(--space-3); font-size: var(--font-size-sm); flex-shrink: 0; }

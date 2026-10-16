@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../../../components/shared/PageShell';
@@ -17,6 +18,7 @@ export function ProfessorModeSelector() {
   const navigate = useNavigate();
   const location = useLocation();
   const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
   const [page, setPage] = useState(0);
   const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
@@ -27,7 +29,7 @@ export function ProfessorModeSelector() {
   const result = useRemoteData(loader);
   async function select(target) {
     if (lock.current) return;
-    lock.current = true; setPending(target.userId); setError('');
+    lock.current = true; setSelectedId(target.userId); setPending(target.userId); setError('');
     try {
       const session = await createProfessorSession(target.userId);
       if (!alive.current) { revokeProfessorSession(session.id).catch(() => {}); return; }
@@ -42,21 +44,22 @@ export function ProfessorModeSelector() {
   }
   return <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
     <main className={styles.selector}>
-      <h1>Professor Mode</h1><p>Select an active Professor. Changes will affect that Professor’s real teaching data and record you as the Admin actor.</p>
+      <h1 className={styles.pageTitle}>Professor Mode</h1><p className={styles.subtitle}>Select an active Professor. Changes will affect that Professor’s real teaching data and record you as the Admin actor.</p>
       {location.state?.actingNotice && <p role="status">Professor Mode ended. Select an active account to start a new session.</p>}
-      <label htmlFor="professor-mode-search">Search Professors</label>
-      <input id="professor-mode-search" value={search} disabled={pending !== null} onChange={e => { setSearch(e.target.value); setPage(0); }} maxLength={100} />
+      <div className={styles.searchArea}><label htmlFor="professor-mode-search">Search Professors</label>
+      <div className={styles.searchField}><Search size={18} aria-hidden="true" />
+      <input id="professor-mode-search" placeholder="Search by professor name, email, or ID" value={search} disabled={pending !== null} onChange={e => { setSearch(e.target.value); setPage(0); }} maxLength={100} /></div></div>
       {error && <p role="alert">{error}</p>}
       {result.isLoading ? <p role="status">Loading Professors...</p> : result.error ? <div role="alert">Could not load Professors. <button onClick={result.reload}>Retry</button></div>
         : !result.data?.content?.length ? <p>No active Professors found.</p> : <ul className={styles.targets}>
-          {result.data.content.map(target => <li key={target.userId}>
-            <div><strong>{target.name || 'Professor'}</strong><p>{target.email || 'Email not specified'}</p></div>
-            <button disabled={pending !== null} onClick={() => select(target)} aria-label={'Act as ' + (target.name || 'Professor')}>
+          {result.data.content.map(target => <li key={target.userId} className={selectedId === target.userId ? styles.selectedTarget : undefined}>
+            <div>{selectedId === target.userId && <span className={styles.selectedBadge}><span aria-hidden="true">&#10003;</span> Selected</span>}<strong>{target.name || 'Professor'}</strong><p>{target.email || 'Email not specified'}</p></div>
+            <button disabled={pending !== null} onClick={() => select(target)} aria-pressed={selectedId === target.userId} aria-label={'Act as ' + (target.name || 'Professor')}>
               {pending === target.userId ? 'Starting...' : 'Enter Professor Mode'}
             </button>
           </li>)}
         </ul>}
-      <nav aria-label="Professor selection pages" className={styles.actions}>
+      <nav aria-label="Professor selection pages" className={styles.pagination}>
         <button disabled={page === 0 || result.isLoading || pending !== null} onClick={() => setPage(p => p - 1)}>Previous</button>
         <span>Page {page + 1}</span>
         <button disabled={result.isLoading || pending !== null || page + 1 >= (result.data?.totalPages ?? 0)} onClick={() => setPage(p => p + 1)}>Next</button>

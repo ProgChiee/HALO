@@ -23,6 +23,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class SuperAdminService {
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+    @org.springframework.beans.factory.annotation.Autowired private ProfilePhotoService photos;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ActivityLogService activityLogService;
@@ -193,6 +195,31 @@ public class SuperAdminService {
         response.setStatus(updatedAdmin.getStatus());
 
         return response;
+    }
+    @Transactional
+    public void deleteAdmin(Long id, UserEntity actor) {
+        if (actor == null || actor.getRole() != Role.SUPER_ADMIN)
+            throw new org.springframework.security.access.AccessDeniedException("Super Admin required");
+        if (id.equals(actor.getId())) throw new SuperAdminApiException(400, "CANNOT_DELETE_ACCOUNT", "You cannot delete your own account.");
+        UserEntity target = entityManager.find(UserEntity.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        if (target == null) throw SuperAdminApiException.notFound();
+        if (target.getRole() != Role.ADMIN)
+            throw new SuperAdminApiException(400, "CANNOT_DELETE_ACCOUNT", "Only Admin accounts can be deleted here.");
+        long history = entityManager.createQuery("select count(l) from ActivityLogEntity l left join l.actingSession session where l.user.id = :id or l.actingTarget.id = :id or session.admin.id = :id or session.target.id = :id", Long.class).setParameter("id", id).getSingleResult();
+        if (history > 0) throw protectedReferences();
+        entityManager.createQuery("delete from PasswordResetOtpEntity o where o.user.id = :id").setParameter("id", id).executeUpdate();
+        entityManager.createQuery("delete from AdminActingSessionEntity s where s.admin.id = :id or s.target.id = :id").setParameter("id", id).executeUpdate();
+        activityLogService.createLog(actor, ActivityType.ACCOUNT, "Deleted Admin account ID " + id + ": " + target.getName());
+        try { userRepository.delete(target); userRepository.flush(); }
+        catch (org.springframework.dao.DataIntegrityViolationException failure) { throw protectedReferences(); }
+        // A failed DB transaction must never delete the account's photo.
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+            new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override public void afterCommit() { photos.removeDeletedAccountPhoto(id); }
+            });
+    }
+    private SuperAdminApiException protectedReferences() {
+        return new SuperAdminApiException(409, "ACCOUNT_HAS_PROTECTED_REFERENCES", "This Admin has protected history and cannot be deleted. Deactivate the account instead.");
     }
     public SuperAdminDashboardResponse getDashboard(){
 

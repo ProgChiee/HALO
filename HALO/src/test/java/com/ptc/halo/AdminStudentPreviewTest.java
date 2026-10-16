@@ -88,6 +88,7 @@ class AdminStudentPreviewTest {
   doAnswer(inv->{
    assertFalse(active(),"AI must run outside a database transaction");duringAi.run();return "{\"inScope\":false,\"chunkIds\":[]}";
   }).when(response).content();
+  stubIntent();
  }
 
  org.springframework.security.core.Authentication authentication(UserEntity user) {
@@ -144,15 +145,16 @@ class AdminStudentPreviewTest {
   assertTrue(preview.read(auth,actingId,s->progressService.getProgress(s)).isEmpty());
   assertTrue(preview.read(auth,actingId,s->badgeService.getStudentBadges(s)).isEmpty());noHistory();
  }
- @Test void temporaryMentorUsesExistingScopedAiCitationsAndIdempotency(){
+ @Test void temporaryMentorValidatesScopedSourcesWithoutDisplayingCitationsAndKeepsIdempotency(){
   var chunk=new com.ptc.halo.component.ModuleMaterialIndex.Chunk("c1",1L,"Hospitality.pdf",2,"Hospitality topic","Service");
   when(index.getOrBuild(any())).thenAnswer(inv->{assertFalse(active());var m=(AiLearningModuleEntity)inv.getArgument(0);assertEquals(moduleId(),m.getId());return new com.ptc.halo.component.ModuleMaterialIndex.Index(m.getId(),"fixture",List.of(chunk));});
   var response=builder.build().prompt().system(anyString()).user(anyString()).call();
   var count=new java.util.concurrent.atomic.AtomicInteger();
   doAnswer(inv->{assertFalse(active());return count.getAndIncrement()%2==0 ? "{\"inScope\":true,\"chunkIds\":[\"c1\"]}" : "{\"inScope\":true,\"sourceIds\":[\"c1\"],\"answer\":\"A supported explanation.\"}";}).when(response).content();
+  stubIntent();
   var chat=preview.open(auth,actingId,moduleId());assertTrue(chat.getMessages().isEmpty());
   String key=UUID.randomUUID().toString();var result=preview.send(auth,actingId,chat.getSessionId(),"Explain service",key);
-  assertTrue(result.getHaloMessage().contains("Hospitality.pdf"));assertTrue(result.getHaloMessage().contains("page 2"));
+  assertEquals("A supported explanation.",result.getHaloMessage());
   assertEquals(result,preview.send(auth,actingId,chat.getSessionId(),"Explain service",key));assertEquals(2,count.get());
   assertEquals(result,preview.exchange(auth,actingId,chat.getSessionId(),key));assertEquals(2,preview.conversation(auth,actingId,chat.getSessionId(),null).getMessages().size());noHistory();
  }
@@ -232,5 +234,12 @@ class AdminStudentPreviewTest {
   var weekId=weeks.findAll().get(0).getId();
   preview.read(auth,actingId,s->lessonService.byWeek(weekId,s));
   assertEquals(0,studyDays.count());
+ }
+
+ void stubIntent() {
+  var spec=mock(org.springframework.ai.chat.client.ChatClient.ChatClientRequestSpec.class,org.mockito.Answers.RETURNS_DEEP_STUBS);
+  when(builder.build().prompt().system(startsWith("Classify HALO"))).thenReturn(spec);
+  when(spec.user(anyString())).thenReturn(spec);
+  when(spec.call().content()).thenAnswer(inv->{assertFalse(active());return "{\"intent\":\"LESSON_QUESTION\"}";});
  }
 }

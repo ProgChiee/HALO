@@ -37,12 +37,6 @@ export async function setAdminStatus(id, status) {
   return res.data;
 }
 
-// ⚠️ There is no DELETE endpoint for admins on the backend — only status
-// toggling (active/inactive/blocked). If you need a true "remove this
-// admin" action, ask your backend team to add
-// DELETE /api/super-admin/admin/{id}; otherwise use setAdminStatus()
-// to deactivate instead of removing.
-
 export async function getSuperAdminDashboardData(config = {}) {
   const res = await apiClient.get('/super-admin/dashboard', config);
   return res.data;
@@ -76,3 +70,5 @@ export async function getRecentActivityLogs(config = {}) {
   }
   return page.content;
 }
+
+export async function deleteAdmin(id) { await apiClient.delete(`/super-admin/admin/${id}`); }

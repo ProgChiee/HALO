@@ -103,7 +103,7 @@ class AdminMonitoringMariaDbLiveTest {
         System.out.println("LIVE MariaDB "+role+" monitoring: HTTP 200; "+expected.size()+" real accounts; every page, row and summary verified");
     }
     @Test void professorActivityMatchesRealDatabase() {
-        var expected=jdbc.queryForList("select u.id as userId,p.professor_id as professorId,u.name,u.email,u.status from professor_entity p join user_entity u on u.id=p.user_id where u.role='PROFESSOR'");
+        var expected=jdbc.queryForList("select u.id as userId,p.professor_id as professorId,u.name,u.email,u.status from professor_entity p join user_entity u on u.id=p.user_id where u.role='PROFESSOR' and u.status='ACTIVE'");
         long totalActivities=0,active=0;
         for(var row:expected) {
             long activities=count("select count(*) from activity_log_entity where user_id=? and activity_type='MODULE'",row.get("userId"));
@@ -118,7 +118,7 @@ class AdminMonitoringMariaDbLiveTest {
         pages("professors",expected,highlights,s->{assertEquals(expected.size(),s.path("total").asLong());assertEquals(finalActive,s.path("active").asLong());assertEquals(finalActivities,s.path("moduleActivities").asLong());});
     }
     @Test void studentPerformanceMatchesRealDatabase() {
-        var expected=jdbc.queryForList("select u.id as userId,p.student_id as studentId,u.name,u.email,u.status,p.section,p.year_level as yearLevel from student_profile_entity p join user_entity u on u.id=p.user_id where u.role='STUDENT'");
+        var expected=jdbc.queryForList("select u.id as userId,p.student_id as studentId,u.name,u.email,u.status,p.section,p.year_level as yearLevel from student_profile_entity p join user_entity u on u.id=p.user_id where u.role='STUDENT' and u.status='ACTIVE'");
         long passed=0,scored=0;double scoreSum=0;
         for(var row:expected) {
             Object id=row.get("userId");

@@ -1,4 +1,8 @@
 const SAFE_MESSAGES = {
+  ACCOUNT_INACTIVE: 'This account is currently inactive. Please contact an administrator.',
+  ACCOUNT_ARCHIVED: 'This account is archived. Please contact an administrator if you believe this is a mistake.',
+  CANNOT_DELETE_ACCOUNT: 'Only another Admin account can be deleted here.',
+  ACCOUNT_HAS_PROTECTED_REFERENCES: 'This Admin has protected history and cannot be deleted. Deactivate the account instead.',
   INCORRECT_CURRENT_PASSWORD: 'Your current password is incorrect. Try again.',
   INVALID_NEW_PASSWORD: 'Choose a different password with at least 8 characters, within 72 UTF-8 bytes.',
   EMAIL_ALREADY_EXISTS: 'An account with this email already exists.',

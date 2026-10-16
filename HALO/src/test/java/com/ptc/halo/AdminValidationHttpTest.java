@@ -224,4 +224,13 @@ class AdminValidationHttpTest {
             .header("Authorization", "Bearer test-token")).andExpect(status().isOk());
         verify(logs).getLogs(Role.SUPER_ADMIN,ActivityType.ACCOUNT,0,20,"Created");
     }
+
+    @Test void lifecycleRoutesRetainRoleRestrictions() throws Exception {
+        for(String resource:List.of("students","professors")) for(String action:List.of("archive","restore")) {
+            role("ADMIN"); mvc.perform(patch("/api/admin/"+resource+"/7/"+action).header("Authorization","Bearer test-token")).andExpect(status().isOk());
+            for(String denied:List.of("STUDENT","PROFESSOR","SUPER_ADMIN")) {
+                role(denied); mvc.perform(patch("/api/admin/"+resource+"/7/"+action).header("Authorization","Bearer test-token")).andExpect(status().isForbidden());
+            }
+        }
+    }
 }

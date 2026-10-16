@@ -73,11 +73,10 @@ export default function Profile() {
 
         <main className={styles.main}>
           <div className={styles.profileHeader}>
-            <ProfilePhoto key={workflow.identity} initial={avatarInitial} readOnly={workflow.acting} />
-            <div>
+            <ProfilePhoto key={workflow.identity} initial={avatarInitial} readOnly={workflow.acting} identityContent={<div>
               <p className={styles.fullName}>{profile.name}</p>
               <p className={styles.subMeta}>{profile.section} · {yearLevelLabel}</p>
-            </div>
+            </div>} />
           </div>
 
           <div className={styles.detailsGrid}>

@@ -1,8 +1,10 @@
+import AccountAvatar from './AccountAvatar';
+import LogoutButton from './LogoutButton';
 import { Fragment } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../../context/login/useAuth';
-import haloLogo from '../../assets/login/Icon.png';
+import haloLogo from '../../assets/login/Logo.png';
 import styles from './Sidebar.module.css';
 
 /**
@@ -16,18 +18,13 @@ import styles from './Sidebar.module.css';
  * />
  */
 export default function Sidebar({ navItems = [], progress, sectionLabel = 'Overview', roleBadge }) {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  function handleLogout() {
-    logout();
-    navigate('/login');
-  }
 
   return (
     <aside className={styles.sidebar}>
       <div className={styles.logo}>
-        <img src={haloLogo} alt="HALO" width="64" height="64" />
+        <img src={haloLogo} alt="HALO" width="2172" height="724" />
       </div>
 
       {roleBadge && <div className={styles.roleBadge}>{roleBadge === 'Superadmin' ? 'Super Admin' : roleBadge}</div>}
@@ -71,20 +68,12 @@ export default function Sidebar({ navItems = [], progress, sectionLabel = 'Overv
 
       {user && (
         <div className={styles.userFooter}>
-          <div className={styles.avatar}>{user.name?.charAt(0) ?? '?'}</div>
+          <div className={styles.avatar}><AccountAvatar initial={user.name?.trim().charAt(0) || '?'} /></div>
           <div>
             <p className={styles.userName}>{user.name}</p>
             <p className={styles.userStatus}>Online</p>
           </div>
-          <button
-            type="button"
-            className={styles.logoutBtn}
-            onClick={handleLogout}
-            aria-label="Log out"
-            title="Log out"
-          >
-            <LogOut size={16} />
-          </button>
+          <LogoutButton className={styles.logoutBtn}><LogOut size={16} /></LogoutButton>
         </div>
       )}
     </aside>

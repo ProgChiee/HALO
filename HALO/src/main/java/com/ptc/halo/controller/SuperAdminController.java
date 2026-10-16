@@ -105,6 +105,16 @@ public class SuperAdminController {
         );
     }
     @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @DeleteMapping("/admin/{id}")
+    public ResponseEntity<Void> deleteAdmin(@PathVariable @Positive Long id, Authentication authentication) {
+        try { superAdminService.deleteAdmin(id, getCurrentSuperAdmin(authentication)); }
+        catch (org.springframework.dao.DataIntegrityViolationException failure) {
+            throw new com.ptc.halo.service.SuperAdminApiException(409, "ACCOUNT_HAS_PROTECTED_REFERENCES",
+                "This Admin has protected history and cannot be deleted. Deactivate the account instead.");
+        }
+        return ResponseEntity.noContent().build();
+    }
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @GetMapping("/dashboard")
     public ResponseEntity<SuperAdminDashboardResponse> getDashboard(){
 
