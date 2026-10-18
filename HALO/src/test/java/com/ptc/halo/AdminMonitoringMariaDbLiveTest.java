@@ -42,8 +42,8 @@ class AdminMonitoringMariaDbLiveTest {
     @EnableJpaRepositories("com.ptc.halo.repository")
     @Import({SecurityConfig.class, JwtAuthenticationFilter.class, JwtService.class,
         CustomUserDetailsService.class, AdminProfessorMonitoringController.class,
-        AdminStudentMonitoringController.class, AdminProfessorMonitoringService.class,
-        AdminStudentMonitoringService.class, AdminValidationHandler.class})
+        AdminStudentMonitoringController.class, AdminDashboardController.class, AdminProfessorMonitoringService.class,
+        AdminStudentMonitoringService.class, AdminDashboardService.class, AdminValidationHandler.class})
     @ImportAutoConfiguration({
         org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration.class,
         org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration.class,
@@ -68,6 +68,7 @@ class AdminMonitoringMariaDbLiveTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired JwtService jwt;
     @Autowired UserRepository users;
+    @Autowired AdminDashboardService dashboard;
     HttpEntity<Void> request;
 
     @BeforeEach void authenticateExistingAdmin() {
@@ -102,8 +103,17 @@ class AdminMonitoringMariaDbLiveTest {
         assertEquals(0,page(role,pageCount).path("content").size());
         System.out.println("LIVE MariaDB "+role+" monitoring: HTTP 200; "+expected.size()+" real accounts; every page, row and summary verified");
     }
+    @Test void profileUpdateSchemaDiagnostics() {
+        var columns=jdbc.queryForList("select column_name, column_type, is_nullable from information_schema.columns where table_schema=database() and table_name='activity_log_entity'");
+        System.out.println("PROFILE AUDIT SCHEMA: "+columns);
+        var name=jdbc.queryForList("select column_name,column_type from information_schema.columns where table_schema=database() and table_name='user_entity' and column_name='name'");
+        System.out.println("PROFILE NAME SCHEMA: "+name);
+        assertTrue(columns.stream().anyMatch(c->"auth_event".equals(c.get("column_name"))));
+        assertTrue(columns.stream().anyMatch(c->"auth_display".equals(c.get("column_name"))));
+        assertTrue(columns.stream().anyMatch(c->"auth_event_key".equals(c.get("column_name"))));
+    }
     @Test void professorActivityMatchesRealDatabase() {
-        var expected=jdbc.queryForList("select u.id as userId,p.professor_id as professorId,u.name,u.email,u.status from professor_entity p join user_entity u on u.id=p.user_id where u.role='PROFESSOR' and u.status='ACTIVE'");
+        var expected=jdbc.queryForList("select u.id as userId,p.professor_id as professorId,u.name,u.email,u.status from user_entity u left join professor_entity p on p.user_id=u.id where u.role='PROFESSOR' and u.status='ACTIVE'");
         long totalActivities=0,active=0;
         for(var row:expected) {
             long activities=count("select count(*) from activity_log_entity where user_id=? and activity_type='MODULE'",row.get("userId"));
@@ -118,7 +128,12 @@ class AdminMonitoringMariaDbLiveTest {
         pages("professors",expected,highlights,s->{assertEquals(expected.size(),s.path("total").asLong());assertEquals(finalActive,s.path("active").asLong());assertEquals(finalActivities,s.path("moduleActivities").asLong());});
     }
     @Test void studentPerformanceMatchesRealDatabase() {
-        var expected=jdbc.queryForList("select u.id as userId,p.student_id as studentId,u.name,u.email,u.status,p.section,p.year_level as yearLevel from student_profile_entity p join user_entity u on u.id=p.user_id where u.role='STUDENT' and u.status='ACTIVE'");
+        var expected=jdbc.queryForList("select u.id as userId,p.student_id as studentId,u.name,u.email,u.status,p.section,p.year_level as yearLevel from user_entity u left join student_profile_entity p on p.user_id=u.id where u.role='STUDENT' and u.status='ACTIVE'");
+        assertEquals(expected.size(),dashboard.getDashboard().getTotalStudents());
+        var dashboardResponse=http.exchange("/api/admin/dashboard",HttpMethod.GET,request,JsonNode.class);
+        assertEquals(HttpStatus.OK,dashboardResponse.getStatusCode());
+        assertEquals(expected.size(),dashboardResponse.getBody().path("totalStudents").asInt());
+        System.out.println("LIVE MariaDB dashboard: HTTP 200; active Students="+expected.size());
         long passed=0,scored=0;double scoreSum=0;
         for(var row:expected) {
             Object id=row.get("userId");
@@ -130,10 +145,27 @@ class AdminMonitoringMariaDbLiveTest {
             if(score!=null){scored++;scoreSum+=score;}
         }
         expected.sort(Comparator.<Map<String,Object>,Integer>comparing(r->(Integer)r.get("latestAssessmentScore"),Comparator.nullsLast(Comparator.reverseOrder())).thenComparingLong(r->((Number)r.get("userId")).longValue()));
-        var highlights=new ArrayList<>(expected.stream().filter(r->r.get("latestAssessmentScore")!=null).toList());
+        var highlights=new ArrayList<>(expected.stream().filter(r->r.get("latestAssessmentScore") instanceof Integer score && score>=0 && score<60).toList());
         highlights.sort(Comparator.<Map<String,Object>>comparingInt(r->(Integer)r.get("latestAssessmentScore")).thenComparingLong(r->((Number)r.get("userId")).longValue()));
         long finalPassed=passed,finalScored=scored;double average=scored==0?0:scoreSum/scored;
         // MariaDB AVG(integer) returns a decimal rounded to four fractional digits by default.
         pages("students",expected,highlights,s->{assertEquals(expected.size(),s.path("total").asLong());assertEquals(finalScored,s.path("scored").asLong());assertEquals(finalPassed,s.path("passedAssessments").asLong());if(finalScored==0)assertTrue(s.path("averageScore").isNull());else assertEquals(average,s.path("averageScore").asDouble(),0.0001);});
+    }
+
+    @Test void missingStudentProfilesReadOnlyDiagnostics() {
+        var rows=jdbc.queryForList("select u.id,u.email,u.status from user_entity u left join student_profile_entity p on p.user_id=u.id where u.role='STUDENT' and u.status='ACTIVE' and p.id is null order by u.id");
+        System.out.println("LIVE missing Student profiles: "+rows);
+        System.out.println("LIVE Student status totals: "+jdbc.queryForList("select status,count(*) as total from user_entity where role='STUDENT' group by status"));
+        System.out.println("LIVE user creation timestamp columns: "+jdbc.queryForList("select column_name from information_schema.columns where table_schema=database() and table_name='user_entity' and (column_name like '%created%' or column_name like '%registered%')"));
+        for(var row:rows) {
+            System.out.println("LIVE linked account-history user "+row.get("id")+": "+jdbc.queryForList("select id,activity_type,action,created_at from activity_log_entity where activity_type='ACCOUNT' and (user_id=? or acting_target_id=?) order by id",row.get("id"),row.get("id")));
+            System.out.println("LIVE missing-profile user "+row.get("id")+": audit rows="+count("select count(*) from activity_log_entity where user_id=? or acting_target_id=?",row.get("id"),row.get("id"))+
+                ", assessment rows="+count("select count(*) from assessment_attempts where student_id=?",row.get("id"))+
+                ", Mentor sessions="+count("select count(*) from mentor_sessions where student_id=?",row.get("id")));
+        }
+    }
+
+    @Test void incompleteProfessorProfilesReadOnlyDiagnostics() {
+        System.out.println("LIVE incomplete ACTIVE Professor profiles: "+jdbc.queryForList("select u.id,u.email,p.professor_id from user_entity u left join professor_entity p on p.user_id=u.id where u.role='PROFESSOR' and u.status='ACTIVE' and (p.id is null or p.professor_id is null or trim(p.professor_id)='') order by u.id"));
     }
 }

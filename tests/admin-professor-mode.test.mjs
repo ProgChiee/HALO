@@ -30,7 +30,7 @@ before(async()=>{
 });
 after(async()=>{await server.close();dom.window.close();});
 const click=async el=>act(async()=>el.click());
-const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent===text);
+const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===text);
 async function mount(path, strict = false) {
  sessionStore.writeSession({id:1,name:'Admin',email:'admin@example.test',role:'ADMIN'},'admin-test-token',false);
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
@@ -39,6 +39,10 @@ async function mount(path, strict = false) {
  React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{initialEntries:[path]},
  React.createElement(Router.Routes,{},
  React.createElement(Router.Route,{path:'/admin',element:React.createElement('p',{},'Admin home')}),
+ React.createElement(Router.Route,{path:'/admin/professor-preview/:actingSessionId',element:React.createElement(Mode,{preview:true})},
+ React.createElement(Router.Route,{index:true,element:React.createElement(Dashboard)}),
+ React.createElement(Router.Route,{path:'subjects',element:React.createElement(Subjects)}),
+ React.createElement(Router.Route,{path:'profile',element:React.createElement(Profile)})),
  React.createElement(Router.Route,{path:'/admin/professor-mode',element:React.createElement(Selector)}),
  React.createElement(Router.Route,{path:'/admin/professor-mode/:actingSessionId',element:React.createElement(Mode)},
  React.createElement(Router.Route,{index:true,element:React.createElement(Dashboard)}),
@@ -49,8 +53,8 @@ async function mount(path, strict = false) {
 function adapter(calls,overrides=()=>undefined){return async config=>{
  calls.push(config);const custom=overrides(config);if(custom!==undefined)return await custom;
  if(config.url==='/admin/acting/targets')return response(config,{content:[target],totalPages:1});
- if(config.method==='post'&&config.url==='/admin/acting/sessions')return response(config,makeSession(),201);
- if(config.url.startsWith('/admin/acting/sessions/'))return response(config,makeSession());
+ if(config.method==='post'&&(config.url==='/admin/acting/sessions'||config.url==='/admin/preview/professor/sessions'))return response(config,makeSession(),201);
+ if(config.url.startsWith('/admin/acting/sessions/')||config.url.startsWith('/admin/preview/professor/sessions/'))return response(config,makeSession());
  if(config.url.endsWith('/subjects'))return response(config,[]);
  if(config.url.endsWith('/profile'))return response(config,{...target,status:'ACTIVE',professorId:'P7'});
  return response(config,{totalSubjects:3,totalStudents:10,totalModules:4});
@@ -58,8 +62,8 @@ function adapter(calls,overrides=()=>undefined){return async config=>{
 test('selection enters acting routes, keeps Admin login and hides credentials',async()=>{
  const calls=[];api.defaults.adapter=adapter(calls);const cleanup=await mount('/admin/professor-mode');
  try{
-  const login=sessionStore.readSession();await click(button('Enter Professor Mode'));
-  assert.match(document.body.textContent,/Professor Mode — Acting as Professor A/);
+  const login=sessionStore.readSession();await click(button('Act as Professor'));assert.ok(document.querySelector('[role="dialog"]'));assert.equal(calls.filter(c=>c.method==='post').length,0);await click(button('Continue as Professor'));
+  assert.match(document.body.textContent,/Act as Professor .*Acting as Professor A/);
   assert.equal(document.querySelector('output').textContent,'/admin/professor-mode/'+id);
   const create=calls.find(c=>c.method==='post');assert.deepEqual(JSON.parse(create.data),{targetUserId:7,targetRole:'PROFESSOR'});
   await click(document.querySelector('a[href$="/subjects"]'));assert.ok(button('Create Subject'));
@@ -103,7 +107,7 @@ test('Change Account aborts old requests and clears old page state before new ta
   if(c.url.endsWith('/sessions/'+id2))return response(c,makeSession(id2,{...target,name:'Professor B'}));
  });const cleanup=await mount('/admin/professor-mode/'+id);
  try{await click(button('Change Account'));assert.equal(document.querySelector('output').textContent,'/admin/professor-mode');
-  await click(button('Enter Professor Mode'));await act(async()=>resolveOld());
+  await click(button('Act as Professor'));assert.ok(document.querySelector('[role="dialog"]'));await click(button('Continue as Professor'));await act(async()=>resolveOld());
   assert.match(document.body.textContent,/Acting as Professor B/);assert.doesNotMatch(document.body.textContent,/999/);
   assert.ok(calls.find(c=>c.url.endsWith('/dashboard')&&c.headers.get('X-Acting-Session')===id).signal.aborted);
  }finally{await cleanup();}
@@ -133,13 +137,29 @@ test('Professor selector highlights entry target and moves selection after a fai
  });
  const cleanup=await mount('/admin/professor-mode');
  try {
-  const first=document.querySelector('[aria-label="Act as Professor A"]'),second=document.querySelector('[aria-label="Act as Professor B"]');
+  const [first,second]=[...document.querySelectorAll('li button')].filter(b=>b.textContent.trim()==='Preview');
   assert.equal(document.querySelector('#professor-mode-search').placeholder,'Search by professor name, email, or ID');
-  await click(first);assert.equal(first.getAttribute('aria-pressed'),'true');assert.match(first.closest('li').textContent,/Selected/);assert.equal(second.disabled,true);
+  await click(first);assert.match(first.closest('li').textContent,/Selected/);assert.match(first.closest('li').textContent,/Selected/);assert.equal(second.disabled,true);
   const selectedClass=first.closest('li').className;assert.ok(selectedClass);
-  await act(async()=>rejectEntry());assert.equal(first.getAttribute('aria-pressed'),'true');
-  await click(second);assert.equal(first.getAttribute('aria-pressed'),'false');assert.doesNotMatch(first.closest('li').textContent,/Selected/);assert.equal(second.closest('li').className,selectedClass);
+  await act(async()=>rejectEntry());assert.match(first.closest('li').textContent,/Selected/);
+  await click(second);assert.doesNotMatch(first.closest('li').textContent,/Selected/);assert.equal(second.closest('li').className,selectedClass);
   await act(async()=>rejectEntry());
   assert.deepEqual(calls.filter(c=>c.method==='post').map(c=>JSON.parse(c.data).targetUserId),[7,8]);
  }finally{await cleanup();}
+});
+
+test('Preview uses separate reads, disables editing, restores and exits without changing Admin identity',async()=>{
+ const calls=[];api.defaults.adapter=adapter(calls);let cleanup=await mount('/admin/professor-mode');
+ try{
+  const login=sessionStore.readSession();await click(button('Preview'));
+  assert.match(document.body.textContent,/Professor Preview .*Viewing as Professor A/);assert.match(document.body.textContent,/Read-only/);
+  assert.equal(document.querySelector('output').textContent,'/admin/professor-preview/'+id);
+  await click(document.querySelector('a[href$="/subjects"]'));assert.equal(button('Create Subject').disabled,true);
+  const scope=services.createActingProfessorScope(id,()=>{},true);const before=calls.length;
+  await assert.rejects(scope.api.createSubject({}),/read-only/);assert.equal(calls.length,before);scope.dispose();
+  assert.ok(calls.every(c=>!c.url.startsWith('/admin/acting/professor/')&&!c.url.startsWith('/professor/')));
+  await click(button('Exit Preview'));assert.equal(document.querySelector('output').textContent,'/admin');assert.deepEqual(sessionStore.readSession(),login);
+ }finally{await cleanup();}
+ cleanup=await mount('/admin/professor-preview/'+id+'/profile');
+ try{assert.match(document.body.textContent,/Read-only/);assert.equal(button('Change password'),undefined);assert.equal(document.querySelector('input[type=file]'),null);}finally{await cleanup();}
 });

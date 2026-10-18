@@ -13,6 +13,9 @@ public class AdminRecentActivityResponse {
     private Role role;
     private ActivityType activityType;
     private String action;
+    private String displayAction;
+    public String getDisplayAction() { return displayAction; }
+    public void setDisplayAction(String value) { displayAction = value; }
     private LocalDateTime createdAt;
 
     public AdminRecentActivityResponse() {

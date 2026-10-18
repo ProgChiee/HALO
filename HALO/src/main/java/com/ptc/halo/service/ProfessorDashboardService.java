@@ -18,6 +18,7 @@ import org.springframework.security.access.AccessDeniedException;
 public class ProfessorDashboardService {
 
     private final UserRepository userRepository;
+    private final com.ptc.halo.repository.ProfessorDashboardRepository overview;
 
     private final SubjectRepository subjectRepository;
 
@@ -36,7 +37,8 @@ public class ProfessorDashboardService {
             SubjectRepository subjectRepository,
             AiLearningModuleRepository aiLearningModuleRepository,
             AssessmentRepository assessmentRepository,
-            AssessmentAttemptRepository assessmentAttemptRepository) {
+            AssessmentAttemptRepository assessmentAttemptRepository,com.ptc.halo.repository.ProfessorDashboardRepository overview) {
+        this.overview=overview;
 
         this.userRepository =
                 userRepository;
@@ -60,11 +62,10 @@ public class ProfessorDashboardService {
         if (professor == null || professor.getId() == null || professor.getRole() != Role.PROFESSOR) {
             throw new AccessDeniedException("Professor access required");
         }
-        // Account directory metric is intentionally institution-wide, not a teaching roster.
+        // Current roster: ACTIVE Students eligible for an owned subject.
 
         long totalStudents =
-                userRepository
-                        .countByRole(Role.STUDENT);
+                overview.students(professor.getId());
 
 
         long totalSubjects =
@@ -87,8 +88,7 @@ public class ProfessorDashboardService {
 
 
         long totalPassedAttempts =
-                assessmentAttemptRepository
-                        .countByPassedTrueAndAssessment_Module_Week_Subject_Professor_User_Id(professor.getId());
+                overview.passed(professor.getId());
 
 
         ProfessorDashboardResponse response =
@@ -120,6 +120,16 @@ public class ProfessorDashboardService {
         );
 
 
+        var today=java.time.LocalDate.now();var start=today.minusDays(27);
+        response.setPerformanceFrom(start);response.setPerformanceThrough(today);
+        response.setPerformance(overview.performance(professor.getId(),start.atStartOfDay(),today.plusDays(1).atStartOfDay()).stream()
+            .map(row->new ProfessorDashboardResponse.Performance(row.getDay(),row.getAverageScore(),row.getAttempts())).toList());
+        response.setAttention(java.util.List.of("assessment","revision","approval").stream().map(kind->new ProfessorDashboardResponse.Attention(kind,
+            overview.attentionCount(professor.getId(),kind),overview.attentionLessons(professor.getId(),kind,org.springframework.data.domain.PageRequest.of(0,3)).stream()
+            .map(row->new ProfessorDashboardResponse.Lesson(row.getModuleId(),row.getSubjectId(),row.getWeekId(),row.getTitle())).toList())).toList());
+        var recent=overview.recent(professor.getId(),org.springframework.data.domain.PageRequest.of(0,6));
+        var display=ActivityDisplay.prepare(recent,userRepository);
+        response.setRecentActivity(recent.stream().map(log->new ProfessorDashboardResponse.Activity(log.getId(),display.apply(log),log.getCreatedAt())).toList());
         return response;
     }
 }

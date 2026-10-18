@@ -87,7 +87,7 @@ export function DashboardSections({ statistics, logs }) {
             <div key={item.id} className={styles.activityRow}>
               <div>
                 <p className={styles.activityText}>
-                  <span className={styles.activityActor}>{item.userName}</span> {item.action}
+                  {item.displayAction || <><span className={styles.activityActor}>{item.userName}</span> {item.action}</>}
                 </p>
               </div>
               <span className={styles.activityTime}>{new Date(item.createdAt).toLocaleString()}</span>

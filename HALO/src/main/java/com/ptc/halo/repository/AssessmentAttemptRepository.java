@@ -8,6 +8,10 @@ import java.util.Optional;
 
 public interface AssessmentAttemptRepository
         extends JpaRepository<AssessmentAttemptEntity, Long> {
+    // Status/resume needs the pinned quiz, not its questions or other history.
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "assessment")
+    Optional<AssessmentAttemptEntity> findTopByStudentIdAndAssessment_Module_IdAndSubmittedAtIsNullOrderByStartedAtDesc(Long studentId,Long moduleId);
+    List<AssessmentAttemptEntity> findByStudentIdAndAssessment_Module_IdOrderByStartedAtDesc(Long studentId,Long moduleId);
     long countByPassedTrueAndAssessment_Module_Week_Subject_Professor_User_Id(Long professorId);
 
 

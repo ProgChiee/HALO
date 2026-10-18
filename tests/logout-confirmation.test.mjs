@@ -45,3 +45,21 @@ test('confirmation works inside mobile navigation dialog without competing focus
   await act(async()=>dialogs[1].querySelector('button').click());assert.equal(document.activeElement,opener);assert.equal(document.querySelectorAll('[role="dialog"]').length,1);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+test('real logout reports once with captured Admin credentials and clears theme/session despite audit failure',async()=>{
+ globalThis.localStorage=window.localStorage;globalThis.sessionStorage=window.sessionStorage;
+ const {AuthProvider}=await server.ssrLoadModule('/src/context/login/AuthContext.jsx');
+ const {useAuth}=await server.ssrLoadModule('/src/context/login/useAuth.js');
+ const {writeSession,readSession}=await server.ssrLoadModule('/src/utils/session.js');
+ const api=(await server.ssrLoadModule('/src/services/apiClient.js')).default;
+ writeSession({id:20,name:'Admin',email:'admin@example.test',role:'admin'},'actor-token',false);localStorage.setItem('halo-theme-20','dark');
+ let resets=0;window.haloTheme={bindAccount(value){if(value===null)resets++;}};const calls=[];
+ api.defaults.adapter=async config=>{calls.push(config);if(config.url==='/auth/logout')throw new Error('offline');return {config,status:204,data:null,headers:{}};};
+ let logout;function Consumer(){logout=useAuth().logout;return null;}
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(React.createElement(AuthProvider,null,React.createElement(Consumer))));
+ await act(async()=>{const first=logout();logout();assert.equal(readSession().token,null);await first;});
+ const events=calls.filter(c=>c.url==='/auth/logout');assert.equal(events.length,1);assert.equal(events[0].headers.get('Authorization'),'Bearer actor-token');assert.equal(events[0].data,undefined);
+ assert.ok(resets>=1);assert.equal(localStorage.getItem('halo-theme-20'),'dark');
+ }finally{await act(async()=>root.unmount());host.remove();delete window.haloTheme;}
+});

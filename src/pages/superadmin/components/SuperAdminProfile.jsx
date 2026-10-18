@@ -1,3 +1,4 @@
+import ProfileName from '../../../components/shared/ProfileName';
 import ProfilePhoto from '../../../components/shared/ProfilePhoto';
 import { useAuth } from '../../../context/login/useAuth';
 import { apiErrorMessage } from '../../../utils/apiErrors';
@@ -62,7 +63,8 @@ export default function SuperAdminProfile() {
     );
   }
 
-  const avatarInitial = profile.name?.trim().charAt(0).toUpperCase() || '?';
+  const displayName = (user?.name ?? profile.name);
+  const avatarInitial = displayName?.trim().charAt(0).toUpperCase() || '?';
 
   return (
     <PageShell responsive navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
@@ -76,12 +78,11 @@ export default function SuperAdminProfile() {
         <main className={styles.main}>
           {user?.mustChangePassword && <p role="alert">Change your temporary password before using Super Admin features.</p>}
           <div className={styles.profileHeader}>
-            <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={Boolean(user?.mustChangePassword)} getProfilePhoto={user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{profile.name}</p><p className={styles.subMeta}>Super Admin</p></div>} />
+            <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={Boolean(user?.mustChangePassword)} getProfilePhoto={user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{displayName}</p><p className={styles.subMeta}>Super Admin</p></div>} />
           </div>
 
           <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Full name</span>
-            <span className={styles.infoValue}>{profile.name}</span>
+            <ProfileName key={profile.userId} name={displayName} readOnly={Boolean(user?.mustChangePassword)} />
           </div>
 
           <div className={styles.infoCard}>

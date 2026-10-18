@@ -9,3 +9,6 @@
 .searchField { composes: searchField from "./ModeSelector.module.css"; }
 .banner { composes: banner from "./ActingMode.module.css"; }
 .actions { composes: actions from "./ActingMode.module.css"; }
+
+.confirmDialog { composes: confirmDialog from "./StudentMode.module.css"; }
+.confirmDialog p { margin-block: var(--space-4); }

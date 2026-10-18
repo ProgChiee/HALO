@@ -135,24 +135,39 @@ async function getProfessorProfile(config = {}) {
 }
 
 async function getModuleEngagement(studentId, page = 0, size = 20, config = {}) {
-  const { data } = await apiClient.get(`/professor/students/${studentId}/engagement/modules`, { ...config, params: { page, size } });
+  const { data } = await apiClient.get(`/professor/students/${studentId}/engagement/modules`, { ...config, params: { ...config.params, page, size } });
   return data;
 }
 
 async function getLearningEngagement(page = 0, size = 20, config = {}) {
-  const { data } = await apiClient.get('/professor/students/engagement', { ...config, params: { page, size } });
+  const { data } = await apiClient.get('/professor/students/engagement', { ...config, params: { ...config.params, page, size } });
   return data;
 }
 
 async function getStudentProgressSummaries(page = 0, size = 20, config = {}) {
   const { data } = await apiClient.get('/professor/students/progress-summaries', {
-    ...config, params: { page, size },
+    ...config, params: { ...config.params, page, size },
   });
   return data;
 }
 
   async function getProfilePhoto(config = {}) { return (await apiClient.get('/professor/profile/photo', { ...config, responseType: 'blob' })).data; }
-  return { getProfilePhoto, createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement };
+  const revisionPath = id => '/professor/ai-learning-modules/' + id + '/revision';
+  const getRevision = async (id, config = {}) => (await apiClient.get(revisionPath(id), config)).data;
+  const startRevision = async id => (await apiClient.post(revisionPath(id))).data;
+  const saveRevision = async (id, revision, files) => {
+    const data = new FormData(); data.append('revision', new Blob([JSON.stringify(revision)], { type: 'application/json' }));
+    files.forEach(file => data.append('files', file));
+    return (await apiClient.put(revisionPath(id), data)).data;
+  };
+  const reviewRevision = async (id, version) => (await apiClient.post(revisionPath(id) + '/review', { version }, { timeout: 180000 })).data;
+  const publishRevision = async (id, version) => apiClient.post(revisionPath(id) + '/publish', { version }, { timeout: 180000 });
+  const discardRevision = async (id, version) => apiClient.delete(revisionPath(id), { params: { version } });
+  const quizPath = id => '/professor/ai-learning-modules/' + id + '/quiz-revision';
+  const getQuizRevision = async (id, config = {}) => (await apiClient.get(quizPath(id), config)).data;
+  const generateQuizRevision = async id => (await apiClient.post(quizPath(id) + '/generate', undefined, { timeout: 180000 })).data;
+  const approveQuizRevision = async (id, draftId) => (await apiClient.post(quizPath(id) + '/approve', { draftId })).data;
+  return { getQuizRevision, generateQuizRevision, approveQuizRevision, getRevision, startRevision, saveRevision, reviewRevision, publishRevision, discardRevision, getProfilePhoto, createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement };
 }
 
 export const { createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement } = createProfessorService();

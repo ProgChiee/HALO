@@ -694,6 +694,7 @@ public class AdminService {
                 new ArrayList<>();
 
 
+        var display = ActivityDisplay.prepare(logs, userRepository);
         for (ActivityLogEntity log : logs) {
 
             AdminRecentActivityResponse response =
@@ -704,21 +705,22 @@ public class AdminService {
             );
 
             response.setUserName(
-                    log.getUser().getName()
+                    log.getUser() == null && log.getAuthEvent() != null ? "Unknown account" : ActivityDisplay.name(log.getUser(), "Admin")
             );
 
             response.setEmail(
-                    log.getUser().getEmail()
+                    log.getUser() == null ? null : log.getUser().getEmail()
             );
 
             response.setRole(
-                    log.getUser().getRole()
+                    log.getUser() == null ? null : log.getUser().getRole()
             );
 
             response.setActivityType(
                     log.getActivityType()
             );
 
+            response.setDisplayAction(display.apply(log));
             response.setAction(
                     log.getAction()
             );

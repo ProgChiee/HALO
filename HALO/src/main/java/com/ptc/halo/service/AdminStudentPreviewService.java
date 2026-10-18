@@ -117,6 +117,9 @@ public class AdminStudentPreviewService {
     public AssessmentStatusResponse status(Authentication auth,String id,Long moduleId) {
         return temporary(auth,id,p -> read(auth,id,s -> {
             var status=assessments.getAssessmentStatus(moduleId,s);
+            var current=assessmentRepository.findByModuleId(moduleId);
+            status.setAssessmentExists(current.isPresent());
+            status.setAssessmentAvailable(current.filter(a->a.getStatus()==AssessmentStatus.AVAILABLE).isPresent());
             // Practice is allowed for eligible published assessments, even if already completed in real history.
             status.setAlreadyPassed(false);
             status.setHasUnfinishedAttempt(p.quizzes.values().stream().anyMatch(q -> q.moduleId==moduleId && q.result==null));

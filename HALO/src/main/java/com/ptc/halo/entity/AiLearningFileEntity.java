@@ -32,6 +32,9 @@ public class AiLearningFileEntity {
     public AiLearningFileEntity() {
     }
 
+    // Used for detached revision snapshots; persisted attachments retain generated IDs.
+    public void setId(Long id) { this.id = id; }
+
     public Long getId() {
         return id;
     }

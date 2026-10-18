@@ -16,7 +16,7 @@ class AccountStateLoginTest {
   when(users.findByEmail(target.getEmail())).thenReturn(Optional.of(target));
   var provider=new org.springframework.security.authentication.dao.DaoAuthenticationProvider();provider.setUserDetailsService(new CustomUserDetailsService(users));provider.setPasswordEncoder(encoder);
   var jwt=mock(JwtService.class);
-  var auth=new AuthService(users,mock(StudentProfileRepository.class),encoder,new org.springframework.security.authentication.ProviderManager(provider),jwt);
+  var auth=new AuthService(users,mock(StudentProfileRepository.class),encoder,new org.springframework.security.authentication.ProviderManager(provider),jwt,mock(com.ptc.halo.service.AuthAuditService.class));
   var request=new LoginRequest();request.setEmail(target.getEmail());request.setPassword("secret-password");
   for(Status state:new Status[]{Status.INACTIVE,Status.ARCHIVED}) {
    target.setStatus(state);

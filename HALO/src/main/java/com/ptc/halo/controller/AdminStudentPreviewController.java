@@ -59,7 +59,7 @@ public class AdminStudentPreviewController {
     }
     @GetMapping("/assessment/{id}")
     public Object assessment(@PathVariable @Positive Long id, @RequestHeader("X-Acting-Session") UUID actingSessionId, Authentication authentication) {
-        return mode.read(authentication,actingSessionId.toString(),s -> assessments.getAssessment(id,s));
+        return mode.read(authentication,actingSessionId.toString(),s -> assessments.getCurrentAssessment(id,s));
     }
     @GetMapping("/assessment/status/{id}")
     public Object status(@PathVariable @Positive Long id,@RequestHeader("X-Acting-Session") UUID session,Authentication auth) { return mode.status(auth,session.toString(),id); }

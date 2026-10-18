@@ -56,8 +56,8 @@ public class ProfessorStudentController {
     @GetMapping("/progress-summaries")
     public ResponseEntity<Map<String, Object>> getProgressSummaries(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size, Authentication authentication) {
-        var result = professorStudentService.getProgressSummaries(currentProfessor(authentication), page, size);
+            @RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size, Authentication authentication) {
+        var result = professorStudentService.getProgressSummaries(currentProfessor(authentication),page,size,view);
         return ResponseEntity.ok(Map.of("content", result.getContent(), "number", result.getNumber(),
                 "size", result.getSize(), "totalElements", result.getTotalElements(),
                 "totalPages", result.getTotalPages(), "first", result.isFirst(), "last", result.isLast(),

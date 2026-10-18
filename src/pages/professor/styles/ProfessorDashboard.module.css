@@ -1,162 +1,53 @@
-.layout {
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  max-width: 100vw;
-  overflow: hidden;
-  background: var(--color-bg-content);
-}
-
-.contentArea {
-  flex: 1;
-  min-width: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.topbar {
- composes: topbar from "../../../components/shared/Navigation.module.css";
-  padding: var(--space-md) var(--space-xl);
-}
-
-.breadcrumb {
- composes: breadcrumb from "../../../components/shared/Navigation.module.css";
-}
-
-.main {
- composes: content from "../../../components/shared/DashboardPresentation.module.css";
-  composes: wide from "../../../components/shared/PageLayout.module.css";
-  padding: var(--space-xl);
-}
-
-.loadingText {
-  composes: loading from "../../../components/shared/UIPrimitives.module.css";
-  padding: var(--space-xl);
-}
-
-.greeting {
- composes: greeting from "../../../components/shared/DashboardPresentation.module.css";
-  font-size: var(--font-size-3xl);
-  color: var(--color-text-primary);
-
-  font-weight: var(--font-weight-bold);
-
-  line-height: var(--line-height-tight);
-}
-
-.subtext {
- composes: subtitle from "../../../components/shared/DashboardPresentation.module.css";
-}
-
-.statsGrid {
- composes: metrics from "../../../components/shared/DashboardPresentation.module.css";
-  composes: metrics from "../../../components/shared/PageLayout.module.css";
-}
-
-.statCard {
- composes: metric from "../../../components/shared/DashboardPresentation.module.css";
-  composes: surface from "../../../components/shared/UIPrimitives.module.css";
-}
-
-.statIcon {
- composes: icon from "../../../components/shared/DashboardPresentation.module.css";
-}
-
-.statValue {
- composes: value from "../../../components/shared/DashboardPresentation.module.css";
-  font-size: var(--text-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-}
-
-.statLabel {
- composes: label from "../../../components/shared/DashboardPresentation.module.css";
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  margin-top: var(--space-xs);
-}
-
-.sectionHeaderRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-md);
-}
-
-.sectionTitle {
- composes: heading from "../../../components/shared/DashboardPresentation.module.css";
-
-  font-weight: var(--font-weight-semibold);
-
-  line-height: var(--line-height-heading);
-}
-
-.manageLink {
-  font-size: var(--text-sm);
-  color: var(--color-accent-active);
-  font-weight: var(--font-weight-semibold);
-}
-
-.subjectsList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.subjectRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-stat-card);
-  border-radius: var(--radius-md);
-  padding: var(--space-md) var(--space-lg);
-}
-
-.subjectIcon {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-bg-nav-active);
-  border: 1px solid var(--color-primary-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-accent-active);
-}
-
-.subjectInfo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.subjectName {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.subjectMeta {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-.subjectStatus {
-  font-size: var(--text-xs);
-  color: var(--color-accent-active);
-  font-weight: var(--font-weight-semibold);
-}
-@media (max-width: 1024px) {
-  .contentArea { height: auto; min-height: 0; overflow-wrap: anywhere; }
-  .main {
- composes: content from "../../../components/shared/DashboardPresentation.module.css"; min-width: 0; overflow-wrap: anywhere; }
-}
-@media (max-width: 768px) {
-  .main, .topbar { padding: var(--space-4); }
-}
+.contentArea { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; overflow-x: hidden; background: var(--color-bg-content); }
+.topbar { composes: topbar from "../../../components/shared/Navigation.module.css"; padding: var(--space-md) var(--space-xl); }
+.breadcrumb { composes: breadcrumb from "../../../components/shared/Navigation.module.css"; }
+.main { composes: wide from "../../../components/shared/PageLayout.module.css"; padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-lg); }
+.pageHeader, .sectionHeaderRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; }
+.greeting { font-size: var(--font-size-2xl); line-height: var(--line-height-heading); color: var(--color-text-primary); margin: 0; }
+.subtext, .helper, .scopeNote, .emptyText { color: var(--color-text-muted); font-size: var(--text-sm); line-height: var(--line-height-base); }
+.subtext { margin: var(--space-xs) 0 0; }
+.scopeNote { margin: calc(-1 * var(--space-sm)) 0 0; }
+.helper { margin: var(--space-xs) 0 var(--space-md); }
+.statsGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--space-md); }
+.statCard { composes: surface from "../../../components/shared/UIPrimitives.module.css"; display: flex; align-items: center; gap: var(--space-md); padding: var(--space-lg); text-decoration: none; color: var(--color-text-primary); min-width: 0; }
+.statCard:hover { border-color: var(--color-primary); }
+.statIcon, .activityIcon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--color-primary); background: var(--color-primary-soft); border-radius: var(--radius-md); width: 40px; height: 40px; }
+.statValue { font-size: var(--text-2xl); font-weight: var(--font-weight-semibold); margin: 0; line-height: 1.2; }
+.statLabel { color: var(--color-text-muted); font-size: var(--text-sm); margin: var(--space-xs) 0 0; }
+.overviewGrid { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(280px,1fr); gap: var(--space-lg); align-items: start; }
+.panel { composes: surface from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-lg); min-width: 0; overflow-wrap: anywhere; }
+.sectionTitle { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); margin: 0; color: var(--color-text-primary); }
+.manageLink { color: var(--color-primary); font-size: var(--text-sm); display: inline-flex; align-items: center; gap: var(--space-xs); text-decoration: none; }
+.manageLink:hover, .lessonLinks a:hover { text-decoration: underline; }
+.main a:focus-visible, .chartDetails summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: var(--radius-sm); }
+.chart { width: 100%; height: 240px; min-width: 0; }
+.chartDetails { margin-top: var(--space-sm); color: var(--color-text-muted); font-size: var(--text-sm); }
+.chartDetails summary { cursor: pointer; padding: var(--space-xs) 0; }
+.tableScroll { overflow-x: auto; }
+.tableScroll table { width: 100%; border-collapse: collapse; text-align: left; }
+.tableScroll th, .tableScroll td { padding: var(--space-sm); border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+.tableScroll caption { text-align: left; padding: var(--space-sm); }
+.empty { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: var(--space-sm); color: var(--color-text-muted); }
+.empty h3 { font-size: var(--text-base); color: var(--color-text-primary); margin: 0; }
+.empty p { font-size: var(--text-sm); max-width: 40ch; margin: 0; }
+.mutedIcon { color: var(--color-text-muted); }
+.attentionGroup { padding: var(--space-md) 0; border-top: 1px solid var(--color-border); }
+.attentionGroup:last-child { padding-bottom: 0; }
+.attentionHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+.attentionHeading h3 { font-size: var(--text-sm); font-weight: var(--font-weight-medium); margin: 0; }
+.count, .zeroCount { border-radius: var(--radius-pill); padding: var(--space-xs) var(--space-sm); font-size: var(--text-xs); background: var(--color-primary-soft); color: var(--color-primary); font-weight: var(--font-weight-semibold); }
+.zeroCount { color: var(--color-text-muted); background: var(--color-background); }
+.lessonLinks { list-style: none; margin: var(--space-sm) 0 0; padding: 0; }
+.lessonLinks a { display: flex; justify-content: space-between; align-items: center; gap: var(--space-sm); padding: var(--space-xs) 0; font-size: var(--text-sm); color: var(--color-text-primary); text-decoration: none; }
+.lessonLinks svg { flex-shrink: 0; }
+.activityList { list-style: none; margin: var(--space-md) 0 0; padding: 0; }
+.activityList li { display: flex; gap: var(--space-md); align-items: center; padding: var(--space-md) 0; border-top: 1px solid var(--color-border); }
+.activityList li:first-child { border-top: 0; }
+.activityList p { flex: 1; min-width: 0; margin: 0; font-size: var(--text-sm); }
+.activityList time { color: var(--color-text-muted); font-size: var(--text-xs); flex-shrink: 0; }
+.activityIcon { width: 32px; height: 32px; }
+.loadingText { composes: loading from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-lg); }
+@media(max-width:1100px) { .overviewGrid { grid-template-columns: minmax(0,1fr); } }
+@media(max-width:1024px) { .contentArea { height: auto; min-height: 0; } }
+@media(max-width:768px) { .main,.topbar { padding: var(--space-md); } .main { gap: var(--space-md); } .statsGrid { grid-template-columns: repeat(2,minmax(0,1fr)); } .statCard { padding: var(--space-md); } .activityList li { flex-wrap: wrap; } .activityList time { margin-left: calc(32px + var(--space-md)); } }
+@media(max-width:480px) { .statsGrid { grid-template-columns: minmax(0,1fr); } }

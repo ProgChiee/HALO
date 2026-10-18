@@ -1,3 +1,4 @@
+import IncompleteProfiles from './IncompleteProfiles';
 import { accountDisplay, accountTick } from '../../../utils/adminAccountDisplay';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState, useMemo, useCallback } from 'react';
@@ -138,7 +139,7 @@ function ActivityLogTab({ loader, paginated = false }) {
     return paginated ? logs : logs.filter((log) => {
       const matchesCategory = activeCategory === 'all' || log.activityType === activeCategory;
       const matchesSearch =
-        (log.action ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (log.displayAction ?? log.action ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (log.userName ?? '').toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
@@ -218,7 +219,7 @@ function ActivityLogTab({ loader, paginated = false }) {
           <div key={log.id} className={styles.logRow}>
             <div className={styles.logContent}>
               <p className={styles.logText}>
-                <span className={styles.activityActor}>{accountDisplay(log.userName)}</span> {log.action}
+                {log.displayAction || <><span className={styles.activityActor}>{accountDisplay(log.userName)}</span> {log.action}</>}
               </p>
               <p className={styles.logTime}>{new Date(log.createdAt).toLocaleString()}</p>
             </div>
@@ -280,7 +281,7 @@ function AiUsageTab() {
         <div className={styles.statCard}>
           <div className={styles.statIcon}><Users size={18} /></div>
           <p className={styles.statValue}>{data.totalElements}</p>
-          <p className={styles.statLabel}>Total professors</p>
+          <p className={styles.statLabel}>Active Professors</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><Bot size={18} /></div>
@@ -358,6 +359,7 @@ function AiUsageTab() {
           </div>
         </div>
       </div>
+      <IncompleteProfiles accounts={professors} role="professor" />
       {!data.content.length && <p className={styles.emptyState}>No monitoring records on this page.</p>}
       <nav aria-label="Monitoring pages" className={styles.toolbarRow}>
         <button className={styles.retryBtn} disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button>
@@ -378,6 +380,7 @@ function QuizPerformanceTab() {
   const isLoading = loading || (!loadError && data.requestPage !== page);
   const students = data.content;
 
+
   // Only students with at least one scored assessment show up in the chart
   const scoredStudents = useMemo(
     () => students.filter((s) => s.latestAssessmentScore != null),
@@ -388,7 +391,8 @@ function QuizPerformanceTab() {
     return [...scoredStudents].sort((a, b) => b.latestAssessmentScore - a.latestAssessmentScore);
   }, [scoredStudents]);
 
-  const lowestScoring = data.highlights;
+  const needsSupport = score => Number.isFinite(score) && score >= 0 && score < 60;
+  const lowestScoring = data.highlights.filter(student => needsSupport(student.latestAssessmentScore));
 
   if (isLoading) {
     return <div className={styles.main}><p className={styles.loadingText}>Loading quiz performance data...</p></div>;
@@ -415,7 +419,7 @@ function QuizPerformanceTab() {
   const totalPassedAssessments = data.summary.passedAssessments ?? 0;
 
   return (
-    <main className={styles.main}>
+    <main className={`${styles.main} ${styles.studentPerformance}`}>
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><GraduationCap size={18} /></div>
@@ -435,7 +439,7 @@ function QuizPerformanceTab() {
         <div className={styles.statCard}>
           <div className={styles.statIcon}><MessageSquare size={18} /></div>
           <p className={styles.statValue}>{data.totalElements}</p>
-          <p className={styles.statLabel}>Total students</p>
+          <p className={styles.statLabel}>Active Students</p>
         </div>
       </div>
 
@@ -490,23 +494,24 @@ function QuizPerformanceTab() {
           <div className={styles.topicList}>
             {lowestScoring.map((student) => (
               <div key={student.userId} className={styles.topicRow}>
-                <div className={`${styles.topicRank} ${styles.topicRankAlert}`}>
-                  <AlertTriangle size={14} />
+                <div className={`${styles.topicRank} ${needsSupport(student.latestAssessmentScore) ? styles.topicRankAlert : ''}`}>
+                  {needsSupport(student.latestAssessmentScore) && <AlertTriangle size={14} aria-label="Needs support: score below 60%" />}
                 </div>
                 <div>
                   <p className={styles.topicText}>{accountDisplay(student.name)}</p>
                   <p className={styles.topicSubject}>
-                    {student.section} · {student.latestAssessmentScore}% latest score
+                    {student.profilePresent === false ? 'Profile incomplete' : (student.section || 'Section not set')} · {student.latestAssessmentScore}% latest score
                   </p>
                 </div>
               </div>
             ))}
             {lowestScoring.length === 0 && (
-              <p className={styles.loadingText}>No scored assessments yet.</p>
+              <p className={styles.loadingText}>No students currently need extra support.</p>
             )}
           </div>
         </div>
       </div>
+      <IncompleteProfiles accounts={students} role="student" />
       {!data.content.length && <p className={styles.emptyState}>No monitoring records on this page.</p>}
       <nav aria-label="Monitoring pages" className={styles.toolbarRow}>
         <button className={styles.retryBtn} disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button>

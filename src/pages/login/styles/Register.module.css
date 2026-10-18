@@ -186,3 +186,8 @@ select.input { padding-left: var(--space-4); }
   .wrapper { padding: var(--space-4); }
   .formCard { padding: var(--space-5); }
 }
+
+.hint, .fieldError { margin: 0; font-size: var(--text-xs); line-height: var(--line-height-base); }
+.hint { color: var(--color-text-secondary); }
+.fieldError { color: var(--color-danger-text); }
+.input[aria-invalid="true"] { border-color: var(--color-danger); }

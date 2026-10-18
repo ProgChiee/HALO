@@ -64,6 +64,12 @@ public class AiGenerationService {
 
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public AiLearningModuleEntity generatePrepared(Long moduleId, AiLearningModuleEntity module) {
+        return generatePrepared(moduleId, module, false);
+    }
+    public AiLearningModuleEntity generateRevision(AiLearningModuleEntity module) {
+        return generatePrepared(module.getId(), module, true);
+    }
+    private AiLearningModuleEntity generatePrepared(Long moduleId, AiLearningModuleEntity module, boolean revision) {
 
 
         try {
@@ -74,7 +80,7 @@ public class AiGenerationService {
 
 
             if (module.getFiles() != null && !module.getFiles().isEmpty()) {
-                validateMaterialRelevance(module, materialIndex.getOrBuild(module));
+                validateMaterialRelevance(module, revision ? materialIndex.buildRevision(module) : materialIndex.getOrBuild(module));
             }
 
             // =====================================================

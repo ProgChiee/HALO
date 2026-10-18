@@ -1,3 +1,4 @@
+import apiClient from '../../services/apiClient';
 import ProfilePhotoProvider from './ProfilePhotoProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './useAuth';
@@ -20,10 +21,23 @@ export function AuthProvider({ children }) {
     setSession(writeSession(user, token, rememberMe));
   }, []);
 
+  const updateFullName = useCallback(async fullName => {
+    const captured = readSession();
+    const { data } = await apiClient.patch('/profile', { fullName });
+    const current = readSession();
+    if (!captured.token || current.token !== captured.token || current.user?.email !== captured.user?.email) {
+      throw Object.assign(new Error('Account changed. Please reopen your profile.'), { code: 'PROFILE_ACCOUNT_CHANGED' });
+    }
+    setSession(writeSession({ ...current.user, name: data.name }, current.token, localStorage.getItem('halo_token') === current.token));
+    return data.name;
+  }, []);
+
   const logout = useCallback(() => {
+    const { token } = readSession();
     window.haloTheme?.bindAccount(null);
     clearSession();
     setSession({ user: null, token: null });
+    if (token) return apiClient.post('/auth/logout', undefined, { skipAuth: true, timeout: 2000, headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
   }, []);
 
   const value = useMemo(() => ({
@@ -33,7 +47,8 @@ export function AuthProvider({ children }) {
     isLoading: false,
     login,
     logout,
-  }), [session, login, logout]);
+    updateFullName,
+  }), [session, login, logout, updateFullName]);
 
   return <AuthContext.Provider value={value}><ProfilePhotoProvider>{children}</ProfilePhotoProvider></AuthContext.Provider>;
 }

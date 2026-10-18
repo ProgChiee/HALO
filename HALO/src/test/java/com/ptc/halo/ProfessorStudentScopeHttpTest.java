@@ -50,13 +50,13 @@ class ProfessorStudentScopeHttpTest {
  @Test void summaryUsesAuthenticatedOwnerAndReturnsStablePageShape() throws Exception {
   var actor=token("PROFESSOR");
   var row=new com.ptc.halo.dtoResponse.ProfessorStudentSummary(10L,"Student",null,1,2,3);
-  when(service.getProgressSummaries(actor,0,20)).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(row),org.springframework.data.domain.PageRequest.of(0,20),1));
+  when(service.getProgressSummaries(actor,0,20,com.ptc.halo.enums.ProfessorStudentView.CURRENT)).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(row),org.springframework.data.domain.PageRequest.of(0,20),1));
   mvc.perform(get("/api/professor/students/progress-summaries").param("professorId","999").header("Authorization","Bearer test-token"))
    .andExpect(status().isOk()).andExpect(jsonPath("$.content[0].completedModules").value(1))
    .andExpect(jsonPath("$.content[0].email").doesNotExist()).andExpect(jsonPath("$.totalElements").value(1))
    .andExpect(jsonPath("$.size").value(20)).andExpect(jsonPath("$.badgeScope").value("INSTITUTION_WIDE"));
-  verify(service).getProgressSummaries(actor,0,20);
-  when(service.getProgressSummaries(actor,-1,20)).thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST,"INVALID_PAGINATION"));
+  verify(service).getProgressSummaries(actor,0,20,com.ptc.halo.enums.ProfessorStudentView.CURRENT);
+  when(service.getProgressSummaries(actor,-1,20,com.ptc.halo.enums.ProfessorStudentView.CURRENT)).thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST,"INVALID_PAGINATION"));
   mvc.perform(get("/api/professor/students/progress-summaries").param("page","-1").header("Authorization","Bearer test-token"))
    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_PAGINATION"));
  }
@@ -65,5 +65,15 @@ class ProfessorStudentScopeHttpTest {
   mvc.perform(get("/api/professor/students/progress-summaries")).andExpect(status().isUnauthorized());
   for(String role:List.of("ADMIN","STUDENT","SUPER_ADMIN")){token(role);for(String suffix:List.of("","/progress-summaries"))mvc.perform(get("/api/professor/students"+suffix).header("Authorization","Bearer test-token")).andExpect(status().isForbidden());}
   verifyNoInteractions(service);
+ }
+
+ @Test void historicalViewIsExplicitAndUsesAuthenticatedScope() throws Exception {
+  var actor=token("PROFESSOR");
+  when(service.getProgressSummaries(actor,0,20,com.ptc.halo.enums.ProfessorStudentView.FORMER)).thenReturn(org.springframework.data.domain.Page.empty());
+  mvc.perform(get("/api/professor/students/progress-summaries").param("view","FORMER").header("Authorization","Bearer test-token"))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+  verify(service).getProgressSummaries(actor,0,20,com.ptc.halo.enums.ProfessorStudentView.FORMER);
+  mvc.perform(get("/api/professor/students/progress-summaries").param("view","ALL").header("Authorization","Bearer test-token"))
+   .andExpect(status().isBadRequest());
  }
 }

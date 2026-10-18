@@ -6,7 +6,7 @@ import com.ptc.halo.enums.*;
 import com.ptc.halo.repository.*;
 import com.ptc.halo.service.AdminDashboardService;
 import org.hibernate.Hibernate;
-import org.hibernate.LazyInitializationException;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,12 +53,14 @@ class AdminDashboardTransactionTest {
 
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
         var detached = logs.findTop10ByOrderByCreatedAtDesc().get(0);
-        assertFalse(Hibernate.isInitialized(detached.getUser()));
-        assertThrows(LazyInitializationException.class, () -> detached.getUser().getName());
+        assertTrue(Hibernate.isInitialized(detached.getUser()));
+        assertEquals("Admin Actor", detached.getUser().getName());
 
         var result = service.getRecentActivity();
         assertEquals(10, result.size());
         assertEquals("Action 11", result.get(0).getAction());
+        assertEquals("Admin Actor action 11", result.get(0).getDisplayAction());
+        assertEquals("Action 11", logs.findTop10ByOrderByCreatedAtDesc().get(0).getAction());
         assertEquals("Action 2", result.get(9).getAction());
         result.forEach(row -> {
             assertNotNull(row.getId());

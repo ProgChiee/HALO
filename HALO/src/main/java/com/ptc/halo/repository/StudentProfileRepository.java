@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface StudentProfileRepository extends JpaRepository<StudentProfileEntity, Long> {
+    boolean existsByStudentId(String studentId);
     Optional<StudentProfileEntity>
     findByUserId(Long userId);
 }

@@ -193,3 +193,7 @@
 .metricNotes { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-xs); }
 .metricNotes summary { cursor: pointer; padding-block: var(--space-2); }
 .progressTable caption { text-align: left; padding: var(--space-3); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+
+.viewControls { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.viewControls button[aria-pressed="true"] { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-text-primary); }
+.statusBadge { display: inline-block; margin-inline-start: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-muted); font-weight: 400; }

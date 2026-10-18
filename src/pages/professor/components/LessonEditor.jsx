@@ -1,3 +1,5 @@
+import LessonRevision from './LessonRevision';
+import QuizRevision from './QuizRevision';
 import { youtubeVideoId } from '../../../utils/youtubeVideo';
 import { VideoPreview } from '../../../components/shared/VideoLearning';
 import { professorErrorMessage } from '../../../utils/professorErrors';
@@ -83,7 +85,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
     aiNotes !== (module.aiNotes ?? '')
   );
   const hasUnsavedChanges = textChanged || files.length > 0;
-  const editingDisabled = isBusy || isPublished;
+  const editingDisabled = isBusy || isPublished || workflow.preview;
 
   function handleFilesPicked(e) {
     if (editingDisabled) return;
@@ -320,11 +322,13 @@ function RouteLessonEditor({ subjectId, weekId }) {
         )}
         {!loading && !loadError && <>
         <p role="status">
-          {isPublished
+          {workflow.preview ? "Read-only Professor Preview. Lesson materials and generated content cannot be changed." : isPublished
             ? 'Published: this lesson is available to eligible students. Published materials are read-only.'
             : 'Draft: Save Materials, Generate Lesson with AI, Review, then Approve & Publish.'}
           {hasUnsavedChanges && module ? ' Save your changes before generating or publishing.' : ''}
         </p>
+        {isPublished && !workflow.preview && <QuizRevision key={'quiz-' + module.id + '-' + reloadKey} moduleId={module.id} />}
+        {isPublished && !workflow.preview && <LessonRevision key={module.id} moduleId={module.id} onPublished={() => { setLoading(true); setReloadKey(key => key + 1); }} />}
         {/* --- Step 1: Raw materials --- */}
         <div className={styles.panelCard}>
           <div className={styles.panelHeader}>
@@ -401,8 +405,8 @@ function RouteLessonEditor({ subjectId, weekId }) {
                   <li key={file.id} className={styles.fileListItem}>
                     <FileText size={15} />
                     <span className={styles.fileListName}>{file.originalFileName} (saved)</span>
-                    {!isPublished && (
-                      <button className={styles.removeBtn} disabled={isBusy} onClick={() => handleDeleteSavedFile(file.id)} aria-label={`Delete ${file.originalFileName}`}>
+                    {!isPublished && !workflow.preview && (
+                      <button className={styles.removeBtn} disabled={workflow.preview || isBusy} onClick={() => handleDeleteSavedFile(file.id)} aria-label={`Delete ${file.originalFileName}`}>
                         <X size={14} />
                       </button>
                     )}
@@ -416,8 +420,8 @@ function RouteLessonEditor({ subjectId, weekId }) {
                   <li key={`${f.name}-${i}`} className={styles.fileListItem}>
                     {f.type.startsWith('image/') ? <ImageIcon size={15} /> : <FileText size={15} />}
                     <span className={styles.fileListName}>{f.name}</span>
-                    {!isPublished && (
-                      <button className={styles.removeBtn} disabled={isBusy} onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
+                    {!isPublished && !workflow.preview && (
+                      <button className={styles.removeBtn} disabled={workflow.preview || isBusy} onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}>
                         <X size={14} />
                       </button>
                     )}
@@ -427,9 +431,9 @@ function RouteLessonEditor({ subjectId, weekId }) {
             )}
           </div>
 
-          {!isPublished && (
+          {!isPublished && !workflow.preview && (
             <div className={styles.saveRow}>
-              <Button onClick={handleSaveMaterials} isLoading={isSaving} disabled={isBusy || (!!module && !hasUnsavedChanges)}>Save Materials</Button>
+              <Button onClick={handleSaveMaterials} isLoading={isSaving} disabled={workflow.preview || isBusy || (!!module && !hasUnsavedChanges)}>Save Materials</Button>
             </div>
           )}
         </div>
@@ -445,9 +449,9 @@ function RouteLessonEditor({ subjectId, weekId }) {
               </div>
             </div>
 
-            {!hasGeneratedContent && !isPublished && (
+            {!hasGeneratedContent && !isPublished && !workflow.preview && (
               <div className={styles.generateRow}>
-                <Button onClick={handleGenerate} isLoading={isGenerating} disabled={isBusy || hasUnsavedChanges}>
+                <Button onClick={handleGenerate} isLoading={isGenerating} disabled={workflow.preview || isBusy || hasUnsavedChanges}>
                   <Sparkles size={15} style={{ marginRight: 6 }} />
                   {aiStatus === 'FAILED' ? 'Retry Generation' : 'Generate Lesson with AI'}
                 </Button>
@@ -488,15 +492,15 @@ function RouteLessonEditor({ subjectId, weekId }) {
 
                 {lessonStatus !== 'APPROVED' && (
                   <div className={styles.aiReviewActions}>
-                    <Button onClick={handleApprove} isLoading={isApproving} disabled={isBusy || hasUnsavedChanges}>
+                    <Button onClick={handleApprove} isLoading={isApproving} disabled={workflow.preview || isBusy || hasUnsavedChanges}>
                       <Check size={15} style={{ marginRight: 6 }} />
                       Approve & Publish
                     </Button>
-                    <Button variant="secondary" onClick={handleDecline} isLoading={isDeclining} disabled={isBusy || hasUnsavedChanges}>
+                    <Button variant="secondary" onClick={handleDecline} isLoading={isDeclining} disabled={workflow.preview || isBusy || hasUnsavedChanges}>
                       <X size={15} style={{ marginRight: 6 }} />
                       Decline
                     </Button>
-                    <Button variant="secondary" onClick={handleGenerate} isLoading={isGenerating} disabled={isBusy || hasUnsavedChanges}>
+                    <Button variant="secondary" onClick={handleGenerate} isLoading={isGenerating} disabled={workflow.preview || isBusy || hasUnsavedChanges}>
                       <RefreshCw size={15} style={{ marginRight: 6 }} />
                       Regenerate
                     </Button>

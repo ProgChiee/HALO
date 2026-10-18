@@ -59,6 +59,7 @@ export default function SubjectManagement() {
   }, []);
 
   function beginModal() {
+    if (workflow.preview) return false;
     if (!mounted.current || pendingOperation.current || isDeleting) return false;
     modalIdentity.current = Symbol('modal');
     setSubjectModal(null);
@@ -261,7 +262,7 @@ export default function SubjectManagement() {
           <BookOpen size={16} />
           Subjects
         </div>
-        <Button onClick={openCreateSubject} disabled={isSubmitting}>
+        <Button onClick={openCreateSubject} disabled={isSubmitting || workflow.preview}>
           <Plus size={16} style={{ marginRight: 6 }} />
           Create Subject
         </Button>
@@ -297,12 +298,12 @@ export default function SubjectManagement() {
                     </button>
 
                     <div className={styles.subjectActions}>
-                      <button className={styles.iconBtn} disabled={isSubmitting} onClick={() => openEditSubject(subject)} aria-label="Edit subject">
+                      <button className={styles.iconBtn} disabled={isSubmitting || workflow.preview} onClick={() => openEditSubject(subject)} aria-label="Edit subject">
                         <Pencil size={14} />
                       </button>
                       <button
                         className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-                        disabled={isSubmitting} onClick={() => { if (beginModal()) setDeletingSubject(subject); }}
+                        disabled={isSubmitting || workflow.preview} onClick={() => { if (beginModal()) setDeletingSubject(subject); }}
                         aria-label="Delete subject"
                       >
                         <Trash2 size={14} />
@@ -320,16 +321,16 @@ export default function SubjectManagement() {
                         <div key={week.id} className={styles.weekRow}>
                           <Sparkles size={14} className={styles.weekIcon} />
                           <span className={styles.weekTitle}>Week {week.weekNumber}: {week.title}</span>
-                          <button className={styles.weekEditLink} disabled={isSubmitting} onClick={() => openEditWeek(subject, week)} aria-label={`Edit module title: ${week.title}`}>
+                          <button className={styles.weekEditLink} disabled={isSubmitting || workflow.preview} onClick={() => openEditWeek(subject, week)} aria-label={`Edit module title: ${week.title}`}>
                             Edit title
                           </button>
                           <button className={styles.weekEditLink} onClick={() => goToLessonEditor(subject, week)}>
-                            Author Lesson
+                            {workflow.preview ? "View Lesson" : "Author Lesson"}
                           </button>
                         </div>
                       ))}
 
-                      <button className={styles.addWeekBtn} disabled={isSubmitting} onClick={() => openAddWeek(subject)}>
+                      <button className={styles.addWeekBtn} disabled={isSubmitting || workflow.preview} onClick={() => openAddWeek(subject)}>
                         <Plus size={14} />
                         Add New Module
                       </button>
@@ -340,7 +341,7 @@ export default function SubjectManagement() {
             })}
 
             {subjects.length === 0 && (
-              <p className={styles.emptyState}>No subjects yet. Click "Create Subject" to add one.</p>
+              <p className={styles.emptyState}>{workflow.preview ? "No subjects yet." : 'No subjects yet. Click "Create Subject" to add one.'}</p>
             )}
           </div>
         )}
@@ -350,7 +351,7 @@ export default function SubjectManagement() {
         <Dialog labelledBy="subject-dialog" busy={isSubmitting} onClose={closeModal} className={styles.modal}>
             <div className={styles.modalHeader}>
               <h3 id="subject-dialog" className={styles.modalTitle}>{subjectModal === 'create' ? 'Create Subject' : 'Edit Subject'}</h3>
-              <button className={styles.closeBtn} disabled={isSubmitting} onClick={closeModal} aria-label="Close">
+              <button className={styles.closeBtn} disabled={isSubmitting || workflow.preview} onClick={closeModal} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
@@ -424,17 +425,17 @@ export default function SubjectManagement() {
         <Dialog labelledBy="edit-module-title" busy={isSubmitting} onClose={closeModal} className={styles.modal}>
           <div className={styles.modalHeader}>
             <h3 id="edit-module-title" className={styles.modalTitle}>Edit Module Title</h3>
-            <button className={styles.closeBtn} disabled={isSubmitting} onClick={closeModal} aria-label="Close"><X size={18} /></button>
+            <button className={styles.closeBtn} disabled={isSubmitting || workflow.preview} onClick={closeModal} aria-label="Close"><X size={18} /></button>
           </div>
           <p className={styles.modalSubtitle}>{editingWeek.subject.subjectName} · Week {editingWeek.week.weekNumber}</p>
           <form onSubmit={handleSaveTitle} className={styles.form}>
             <div className={styles.field}>
               <label htmlFor="module-title" className={styles.label}>Module title</label>
-              <input id="module-title" className={styles.input} value={weekTitle} onChange={e => setWeekTitle(e.target.value)} maxLength={255} disabled={isSubmitting} aria-invalid={Boolean(formError)} aria-describedby={formError ? 'module-title-error' : undefined} />
+              <input id="module-title" className={styles.input} value={weekTitle} onChange={e => setWeekTitle(e.target.value)} maxLength={255} disabled={isSubmitting || workflow.preview} aria-invalid={Boolean(formError)} aria-describedby={formError ? 'module-title-error' : undefined} />
             </div>
             {formError && <p id="module-title-error" role="alert" className={styles.formError}>{formError}</p>}
             <div className={styles.modalActions}>
-              <Button variant="secondary" onClick={closeModal} disabled={isSubmitting}>Cancel</Button>
+              <Button variant="secondary" onClick={closeModal} disabled={isSubmitting || workflow.preview}>Cancel</Button>
               <Button type="submit" isLoading={isSubmitting}>Save</Button>
             </div>
           </form>
@@ -445,7 +446,7 @@ export default function SubjectManagement() {
         <Dialog labelledBy="week-dialog" busy={isSubmitting} onClose={closeModal} className={styles.modal}>
             <div className={styles.modalHeader}>
               <h3 id="week-dialog" className={styles.modalTitle}>Add New Module</h3>
-              <button className={styles.closeBtn} disabled={isSubmitting} onClick={closeModal} aria-label="Close">
+              <button className={styles.closeBtn} disabled={isSubmitting || workflow.preview} onClick={closeModal} aria-label="Close">
                 <X size={18} />
               </button>
             </div>

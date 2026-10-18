@@ -31,9 +31,19 @@ public class AuthController {
     }
 
 
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(Authentication authentication,@org.springframework.web.bind.annotation.RequestHeader("Authorization") String authorization) {
+        authService.logout(authentication,authorization);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/register/student")
     public ResponseEntity<StudentResponse> registerStudent(@RequestBody StudentRequest studentRequest){
-    StudentResponse response = authService.registerStudent(studentRequest);
+    StudentResponse response;
+    try { response = authService.registerStudent(studentRequest); }
+    catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+        throw new com.ptc.halo.service.RegistrationValidationException(java.util.Map.of("email","Check whether this email is already registered.","studentId","Check whether this Student ID is already registered."),409);
+    }
 
     return ResponseEntity.ok(response);
     }

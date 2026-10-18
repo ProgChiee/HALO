@@ -121,6 +121,15 @@ export default function AppRoutes() {
         <Route path="profile" element={<ProfessorProfile />} />
         <Route path="*" element={<Navigate to="subjects" replace />} />
       </Route>
+
+      <Route path="/admin/professor-preview/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><ProfessorMode preview /></ProtectedRoute>}>
+        <Route index element={<ProfessorDashboard />} />
+        <Route path="subjects" element={<ProfessorSubjectManagement />} />
+        <Route path="subjects/:subjectId/week/:weekId" element={<LessonEditorRoute />} />
+        <Route path="progress" element={<StudentProgress />} />
+        <Route path="profile" element={<ProfessorProfile />} />
+        <Route path="*" element={<Navigate to="subjects" replace />} />
+      </Route>
       <Route
         path="/admin"
         element={

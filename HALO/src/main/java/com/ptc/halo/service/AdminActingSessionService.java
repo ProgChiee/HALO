@@ -110,26 +110,45 @@ public class AdminActingSessionService {
     // cannot authorize the real acting endpoints, even if the client changes its URL.
     @Transactional
     public AdminActingSessionEntity createStudentPreview(Authentication authentication, Long targetId) {
+        return createPreview(authentication, targetId, Role.STUDENT);
+    }
+    @Transactional
+    public AdminActingSessionEntity createProfessorPreview(Authentication authentication, Long targetId) {
+        return createPreview(authentication, targetId, Role.PROFESSOR);
+    }
+    private AdminActingSessionEntity createPreview(Authentication authentication, Long targetId, Role role) {
         var actor = admin(authentication);
         if (targetId == null || targetId <= 0) throw new AdminApiException(ACTING_INPUT_INVALID);
         var target = users.findById(targetId).orElseThrow(() -> new AdminApiException(RESOURCE_NOT_FOUND));
-        if (target.getRole() != Role.STUDENT) throw new AdminApiException(INVALID_TARGET_ROLE);
+        if (target.getRole() != role) throw new AdminApiException(INVALID_TARGET_ROLE);
         if (target.getStatus() != Status.ACTIVE) throw new AdminApiException(ACTING_TARGET_INACTIVE);
         var now = Instant.now();
         var context = new AdminActingSessionEntity(UUID.randomUUID().toString(), actor, target, now, now.plus(LIFETIME));
-        audit.createPreviewLog(actor, target, "Started Student preview");
+        audit.createPreviewLog(actor, target, "Started " + (role == Role.STUDENT ? "Student" : "Professor") + " preview");
         return context;
     }
 
     public UserEntity validateStudentPreview(Authentication authentication, AdminActingSessionEntity context) {
+        return validatePreview(authentication, context, Role.STUDENT);
+    }
+    public UserEntity validateProfessorPreview(Authentication authentication, AdminActingSessionEntity context) {
+        return validatePreview(authentication, context, Role.PROFESSOR);
+    }
+    private UserEntity validatePreview(Authentication authentication, AdminActingSessionEntity context, Role role) {
         var actor = admin(authentication);
         if (!actor.getId().equals(context.getAdmin().getId())) throw new AdminApiException(RESOURCE_NOT_FOUND);
         var target = users.findById(context.getTarget().getId()).orElseThrow(() -> new AdminApiException(ACTING_SESSION_INVALID));
         if (context.getRevokedAt() != null || !context.getExpiresAt().isAfter(Instant.now())
-                || context.getTargetRole() != Role.STUDENT || target.getRole() != Role.STUDENT
+                || context.getTargetRole() != role || target.getRole() != role
                 || target.getStatus() != Status.ACTIVE || actor.getTokenVersion() != context.getAdminTokenVersion()
                 || target.getTokenVersion() != context.getTargetTokenVersion()) throw new AdminApiException(ACTING_SESSION_INVALID);
         return target;
+    }
+
+    @Transactional
+    public void endProfessorPreview(Authentication authentication, AdminActingSessionEntity context) {
+        var target = validateProfessorPreview(authentication, context);
+        audit.createPreviewLog(admin(authentication), target, "Ended Professor preview");
     }
 
     @Transactional

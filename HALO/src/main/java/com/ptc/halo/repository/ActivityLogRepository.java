@@ -10,24 +10,26 @@ import java.util.Optional;
 
 public interface ActivityLogRepository
         extends JpaRepository<ActivityLogEntity, Long> {
+    boolean existsByAuthEventKey(String key);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "user")
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "actingTarget"})
     @org.springframework.data.jpa.repository.Query("""
-        select l from ActivityLogEntity l join l.user u
+        select l from ActivityLogEntity l left join l.user u
         where (u.role = com.ptc.halo.enums.Role.ADMIN
-            or (u.role = com.ptc.halo.enums.Role.SUPER_ADMIN and l.activityType = com.ptc.halo.enums.ActivityType.ACCOUNT))
+            or (u.role = com.ptc.halo.enums.Role.SUPER_ADMIN and l.activityType in (com.ptc.halo.enums.ActivityType.ACCOUNT, com.ptc.halo.enums.ActivityType.AUTH))
+            or (u is null and l.activityType = com.ptc.halo.enums.ActivityType.AUTH))
         and (:type is null or l.activityType = :type)
-        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0)
+        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0 or locate(:search, lower(u.email)) > 0 or locate(:search, lower(l.authDisplay)) > 0)
         """)
     org.springframework.data.domain.Page<ActivityLogEntity> findSuperAdminLogs(
         @org.springframework.data.repository.query.Param("type") ActivityType type,
         @org.springframework.data.repository.query.Param("search") String search,
         org.springframework.data.domain.Pageable pageable);
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "user")
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "actingTarget"})
     @org.springframework.data.jpa.repository.Query("""
-        select l from ActivityLogEntity l join l.user u
+        select l from ActivityLogEntity l left join l.user u
         where (:role is null or u.role = :role) and (:type is null or l.activityType = :type)
-        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0)
+        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0 or locate(:search, lower(u.email)) > 0 or locate(:search, lower(l.authDisplay)) > 0)
         """)
     org.springframework.data.domain.Page<ActivityLogEntity> findAdminLogs(
         @org.springframework.data.repository.query.Param("role") Role role,
@@ -62,6 +64,7 @@ public interface ActivityLogRepository
             Role role,
             ActivityType activityType
     );
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "actingTarget"})
     List<ActivityLogEntity>
     findTop10ByOrderByCreatedAtDesc();
 

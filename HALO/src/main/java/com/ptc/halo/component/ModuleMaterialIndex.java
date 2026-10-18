@@ -41,8 +41,18 @@ public class ModuleMaterialIndex {
         Arrays.setAll(locks, i -> new Object());
     }
 
-    public Index getOrBuild(AiLearningModuleEntity module) {
-        synchronized (locks[Math.floorMod(module.getId().hashCode(), locks.length)]) {
+    public Index getOrBuild(AiLearningModuleEntity module) { return build(module, true); }
+    // Draft validation never reads or replaces the live module cache.
+    public Index buildRevision(AiLearningModuleEntity module) { return build(module, false); }
+    public void invalidate(Long moduleId) {
+        synchronized (locks[Math.floorMod(moduleId.hashCode(), locks.length)]) {
+            try { Files.deleteIfExists(storage.resolve(".module-index/" + moduleId + ".json")); }
+            catch (java.io.IOException error) { throw new IllegalStateException("Index invalidation failed", error); }
+        }
+    }
+    private Index build(AiLearningModuleEntity module, boolean cacheEnabled) {
+        // Draft extraction does not hold the live module cache lock while calling AI.
+        synchronized (cacheEnabled ? locks[Math.floorMod(module.getId().hashCode(), locks.length)] : module) {
             try {
                 List<AiLearningFileEntity> files = module.getFiles();
                 log.info("module_index_start moduleId={} files={}", module.getId(), files == null ? 0 : files.size());
@@ -67,7 +77,7 @@ public class ModuleMaterialIndex {
                 }
                 String fingerprint = HexFormat.of().formatHex(digest.digest());
                 Path cache = storage.resolve(".module-index/" + module.getId() + ".json");
-                if (Files.isRegularFile(cache)) {
+                if (cacheEnabled && Files.isRegularFile(cache)) {
                     try {
                         Index existing = mapper.readValue(cache.toFile(), Index.class);
                         if (Objects.equals(existing.moduleId(), module.getId()) && fingerprint.equals(existing.fingerprint())
@@ -89,6 +99,7 @@ public class ModuleMaterialIndex {
                 }
                 if (chunks.isEmpty()) throw problem("MODULE_MATERIAL_UNREADABLE");
                 Index built = new Index(module.getId(), fingerprint, List.copyOf(chunks));
+                if (!cacheEnabled) return built;
                 Files.createDirectories(cacheDirectory);
                 Path temporary = Files.createTempFile(cacheDirectory, module.getId() + "-", ".tmp");
                 try {

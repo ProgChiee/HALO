@@ -5,6 +5,12 @@ import java.util.List;
 public class AssessmentResponse {
 
     private Long id;
+    private Integer quizVersion;
+    private Integer currentQuizVersion;
+    public Integer getQuizVersion(){return quizVersion;}
+    public void setQuizVersion(Integer value){quizVersion=value;}
+    public Integer getCurrentQuizVersion(){return currentQuizVersion;}
+    public void setCurrentQuizVersion(Integer value){currentQuizVersion=value;}
     private String title;
     private Integer passingScore;
     private List<AssessmentQuestionResponse> questions;

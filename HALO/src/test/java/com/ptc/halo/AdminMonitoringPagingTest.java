@@ -13,9 +13,10 @@ import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect","spring.jpa.open-in-view=false"},showSql=false)
-@Import({AdminProfessorMonitoringService.class,AdminStudentMonitoringService.class,ActivityLogService.class})
+@Import({AdminProfessorMonitoringService.class,AdminStudentMonitoringService.class,AdminDashboardService.class,ActivityLogService.class})
 class AdminMonitoringPagingTest {
  @Autowired AdminProfessorMonitoringService professorService;
+ @Autowired AdminDashboardService dashboard;
  @Autowired AdminStudentMonitoringService studentMonitoring;
  @Autowired ActivityLogService logService;
  @Autowired ActivityLogRepository logs;
@@ -117,9 +118,64 @@ class AdminMonitoringPagingTest {
   var restored=studentMonitoring.getStudentMonitoring(0,1);
   assertEquals(2,restored.totalElements());assertEquals(2,restored.totalPages());assertEquals(student.getId(),restored.content().get(0).getUserId());
   assertEquals(90,restored.content().get(0).getLatestAssessmentScore());assertEquals(90.0,restored.summary().getAverageScore());
-  assertEquals(3,restored.summary().getPassedAssessments());assertEquals(student.getId(),restored.highlights().get(0).getUserId());
+  assertEquals(3,restored.summary().getPassedAssessments());assertTrue(restored.highlights().isEmpty());
   var restoredProfessors=professorService.getProfessorMonitoring(0,1);
   assertEquals(2,restoredProfessors.totalElements());assertEquals(1,restoredProfessors.summary().getModuleActivities());
   assertEquals(a.getId(),restoredProfessors.highlights().get(0).getUserId());
+ }
+
+ @Test void supportHighlightsUseLatestScoreThresholdWhileRankingKeepsAllStudents() {
+  var assessment=assessments.findAll().get(0);
+  for(Integer score:new Integer[]{100,80,75,65,60,59,0,null}) {
+   var u=user("score"+score,Role.STUDENT);
+   var p=new StudentProfileEntity();p.setUser(u);p.setStudentId("SCORE"+score);profiles.saveAndFlush(p);
+   var attempt=new AssessmentAttemptEntity();attempt.setStudent(u);attempt.setAssessment(assessment);
+   attempt.setPassed(score != null && score >= 75);attempt.setScore(score == null ? 0 : score);attempt.setStartedAt(LocalDateTime.now());attempt.setSubmittedAt(score == null ? null : LocalDateTime.now());attempts.saveAndFlush(attempt);
+  }
+  var p=new StudentProfileEntity();p.setUser(empty);p.setStudentId("NO-ATTEMPTS");profiles.saveAndFlush(p);
+  var result=studentMonitoring.getStudentMonitoring(0,25);
+  assertEquals(10,result.totalElements());
+  assertEquals(java.util.List.of(0,59),result.highlights().stream().map(r->r.getLatestAssessmentScore()).toList());
+  assertTrue(result.content().stream().map(r->r.getLatestAssessmentScore()).toList().containsAll(java.util.List.of(100,80,65,59,0)));
+  // A later good score removes a previously struggling student from support, not ranking.
+  var low=users.findByEmail("score59@example.test").orElseThrow();
+  var latest=new AssessmentAttemptEntity();latest.setStudent(low);latest.setAssessment(assessment);latest.setScore(100);latest.setPassed(true);
+  latest.setStartedAt(LocalDateTime.now());latest.setSubmittedAt(LocalDateTime.now().plusSeconds(1));attempts.saveAndFlush(latest);
+  assertTrue(studentMonitoring.getStudentMonitoring(0,25).highlights().stream().noneMatch(r->r.getUserId().equals(low.getId())));
+ }
+
+ @Test void dashboardAndMonitoringCountActiveUsersIncludingMissingProfiles() {
+  for(Status status:new Status[]{Status.INACTIVE,Status.ARCHIVED,Status.BLOCKED}) {
+   var u=user("excluded"+status,Role.STUDENT);u.setStatus(status);users.saveAndFlush(u);
+   var p=new StudentProfileEntity();p.setUser(u);p.setStudentId("EX"+status);profiles.saveAndFlush(p);
+  }
+  var result=studentMonitoring.getStudentMonitoring(0,1);
+  assertEquals(2,dashboard.getDashboard().getTotalStudents());
+  assertEquals(2,result.totalElements());assertEquals(2,result.summary().getTotal());assertEquals(2,result.totalPages());
+  assertTrue(result.content().get(0).getProfilePresent());
+  var missing=studentMonitoring.getStudentMonitoring(1,1).content().get(0);
+  assertEquals(empty.getId(),missing.getUserId());assertFalse(missing.getProfilePresent());
+  assertNull(missing.getStudentId());assertNull(missing.getYearLevel());assertNull(missing.getLatestAssessmentScore());
+  assertEquals(0,missing.getCompletedModules());
+  assertEquals(3,attempts.count());assertEquals(3,progress.count());assertEquals(1,badges.count());
+ }
+
+ @Test void incompleteProfilesRemainInActivePopulation() {
+  var complete=profiles.findByUserId(student.getId()).orElseThrow();complete.setSection("A");profiles.saveAndFlush(complete);
+  var studentRows=studentMonitoring.getStudentMonitoring(0,25).content();
+  assertFalse(studentRows.stream().filter(r->r.getUserId().equals(student.getId())).findFirst().orElseThrow().getProfileIncomplete());
+  assertTrue(studentRows.stream().filter(r->r.getUserId().equals(empty.getId())).findFirst().orElseThrow().getProfileIncomplete());
+  complete.setSection(" ");profiles.saveAndFlush(complete);
+  assertTrue(studentMonitoring.getStudentMonitoring(0,25).content().stream().filter(r->r.getUserId().equals(student.getId())).findFirst().orElseThrow().getProfileIncomplete());
+  var missing=user("missingProfessor",Role.PROFESSOR);
+  var blank=user("blankProfessor",Role.PROFESSOR);var p=new ProfessorEntity();p.setUser(blank);p.setProfessorId(" ");professors.saveAndFlush(p);
+  var result=professorService.getProfessorMonitoring(0,25);
+  assertEquals(4,result.totalElements());assertEquals(4,result.summary().getActive());
+  assertEquals(2,result.content().stream().filter(r->r.getProfileIncomplete()).count());
+  assertFalse(result.content().stream().filter(r->r.getUserId().equals(a.getId())).findFirst().orElseThrow().getProfileIncomplete());
+  for(Status status:new Status[]{Status.INACTIVE,Status.ARCHIVED,Status.BLOCKED}) {
+   missing.setStatus(status);users.saveAndFlush(missing);
+   assertEquals(3,professorService.getProfessorMonitoring(0,25).totalElements());
+  }
  }
 }

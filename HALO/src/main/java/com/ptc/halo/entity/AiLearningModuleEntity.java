@@ -22,6 +22,9 @@ public class AiLearningModuleEntity {
     @Column(length = 36)
     private String generationToken;
 
+    @Column(nullable=false) private boolean assessmentNeedsReview;
+    public boolean isAssessmentNeedsReview(){return assessmentNeedsReview;}
+    public void setAssessmentNeedsReview(boolean value){assessmentNeedsReview=value;}
     public Long getVersion() { return version; }
     public String getGenerationToken() { return generationToken; }
     public void setGenerationToken(String generationToken) { this.generationToken = generationToken; }

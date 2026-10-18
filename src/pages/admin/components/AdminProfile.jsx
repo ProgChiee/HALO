@@ -1,3 +1,4 @@
+import ProfileName from '../../../components/shared/ProfileName';
 import ProfilePhoto from '../../../components/shared/ProfilePhoto';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/login/useAuth';
@@ -13,8 +14,6 @@ import styles from '../styles/AdminProfile.module.css';
 // { userId, name, email, role, status }. No adminId, avatarInitial,
 // title, or dateJoined fields exist for Admins on this backend — those
 // were mock-only. Avatar initial is derived client-side from the name.
-// There's also no update endpoint yet, so "Edit" actions are removed
-// until one exists.
 
 const noProfilePhoto = async () => null;
 
@@ -57,7 +56,8 @@ export default function AdminProfile() {
     );
   }
 
-  const avatarInitial = profile.name?.trim().charAt(0).toUpperCase() || '?';
+  const displayName = (user?.name ?? profile.name);
+  const avatarInitial = displayName?.trim().charAt(0).toUpperCase() || '?';
 
   return (
     <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
@@ -71,12 +71,11 @@ export default function AdminProfile() {
       <main className={styles.main}>
         {user?.mustChangePassword && <p role="alert">Change your temporary password before using Admin features.</p>}
         <div className={styles.profileHeader}>
-          <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={Boolean(user?.mustChangePassword)} getProfilePhoto={user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{profile.name}</p><p className={styles.subMeta}>Admin</p></div>} />
+          <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={Boolean(user?.mustChangePassword)} getProfilePhoto={user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{displayName}</p><p className={styles.subMeta}>Admin</p></div>} />
         </div>
 
         <div className={styles.infoCard}>
-          <span className={styles.infoLabel}>Full name</span>
-          <span className={styles.infoValue}>{profile.name}</span>
+          <ProfileName key={profile.userId} name={displayName} readOnly={Boolean(user?.mustChangePassword)} />
         </div>
 
         <div className={styles.infoCard}>

@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 
 @Service
 public class PasswordResetService {
+    private final AuthAuditService audit;
 
     private final PasswordResetOtpRepository passwordResetOtpRepository;
     private final UserRepository userRepository;
@@ -23,7 +24,7 @@ public class PasswordResetService {
     public PasswordResetService(
             PasswordResetOtpRepository passwordResetOtpRepository,
             UserRepository userRepository,
-            EmailService emailService, PasswordEncoder passwordEncoder) {
+            EmailService emailService, PasswordEncoder passwordEncoder, AuthAuditService audit) {
 
         this.passwordResetOtpRepository =
                 passwordResetOtpRepository;
@@ -33,7 +34,7 @@ public class PasswordResetService {
 
         this.emailService =
                 emailService;
-        this.passwordEncoder = passwordEncoder;
+        this.passwordEncoder = passwordEncoder; this.audit = audit;
     }
 
 
@@ -68,6 +69,7 @@ public class PasswordResetService {
                 user.getEmail(),
                 otp
         );
+        audit.record(com.ptc.halo.enums.AuthEvent.PASSWORD_RESET_REQUESTED,user.getEmail());
     }
 
 
@@ -115,6 +117,8 @@ public class PasswordResetService {
         userRepository.save(user);
 
         passwordResetOtpRepository.deleteByUserId(user.getId());
+        audit.record(com.ptc.halo.enums.AuthEvent.OTP_VERIFIED,user.getEmail());
+        audit.record(com.ptc.halo.enums.AuthEvent.PASSWORD_RESET_COMPLETED,user.getEmail());
     }
     @Transactional
     public void changePassword(

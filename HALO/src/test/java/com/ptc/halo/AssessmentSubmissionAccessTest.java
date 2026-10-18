@@ -155,4 +155,38 @@ class AssessmentSubmissionAccessTest {
   assertThrows(RuntimeException.class,()->service.submitAttempt(attempt.getId(),other,request(item(q1.getId(),"A"),item(q2.getId(),"B"))));
   assertUnchanged();
  }
+
+ @Test void statusLoadsUnfinishedAssessmentWithoutCallerTransactionOrOpenSessionInView() throws Exception {
+  assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+  Long moduleId=modules.findAll().get(0).getId();
+  var status=service.getAssessmentStatus(moduleId,student);
+  assertTrue(status.getAssessmentAvailable());assertTrue(status.getHasUnfinishedAttempt());assertTrue(status.getCanTakeAssessment());
+  var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+    new com.ptc.halo.controller.StudentAssessmentController(service,users)).build();
+  mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/student/assessment/status/"+moduleId)
+    .principal(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(student.getEmail(),"unused")))
+    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.hasUnfinishedAttempt").value(true));
+  assertUnchanged();
+ }
+ @Test void statusResumesRetiredVersionThenUsesCurrentVersionWithoutChangingHistory() {
+  assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());
+  var old=assessments.findAll().get(0);var module=modules.findAll().get(0);old.setStatus(AssessmentStatus.RETIRED);assessments.saveAndFlush(old);
+  var current=new AssessmentEntity();current.setModule(module);current.setTitle("New quiz");current.setQuizVersion(4);current.setPassingScore(70);current.setStatus(AssessmentStatus.INACTIVE);current.setCreatedAt(LocalDateTime.now());current=assessments.saveAndFlush(current);
+  var pinned=service.getAssessmentStatus(module.getId(),student);
+  assertTrue(pinned.getAssessmentAvailable());assertTrue(pinned.getHasUnfinishedAttempt());
+  assertEquals(old.getId(),service.getAssessment(module.getId(),student).getId());
+  assertEquals(1,service.getAssessment(module.getId(),student).getQuizVersion());assertEquals(4,service.getAssessment(module.getId(),student).getCurrentQuizVersion());
+  service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"A"),item(q2.getId(),"B")));
+  var completedAt=progress.findAll().get(0).getCompletedAt();
+  assertFalse(service.getAssessmentStatus(module.getId(),student).getAssessmentAvailable());
+  current.setStatus(AssessmentStatus.AVAILABLE);assessments.saveAndFlush(current);
+  var latest=service.getAssessmentStatus(module.getId(),student);
+  assertTrue(latest.getAssessmentAvailable());assertFalse(latest.getHasUnfinishedAttempt());assertFalse(latest.getAlreadyPassed());assertTrue(latest.getCanTakeAssessment());
+  assertEquals(current.getId(),service.getAssessment(module.getId(),student).getId());
+  assertEquals(4,service.getAssessment(module.getId(),student).getQuizVersion());
+  assertEquals(1,attempts.count());assertEquals(2,answers.count());assertEquals(100,attempts.findById(attempt.getId()).orElseThrow().getScore());
+  assertEquals(old.getId(),attempts.findById(attempt.getId()).orElseThrow().getAssessment().getId());assertEquals(completedAt,progress.findAll().get(0).getCompletedAt());
+  assertEquals(current.getId(),service.startAttempt(module.getId(),student).getAssessment().getId());
+ }
 }

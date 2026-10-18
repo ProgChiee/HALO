@@ -26,10 +26,10 @@ for(const statsOK of [true,false])for(const activityOK of [true,false])test(`ind
   const statsCall=calls.find(c=>!c.config.url.endsWith('recent-activity'));const activityCall=calls.find(c=>c.config.url.endsWith('recent-activity'));
   const settle=(call,ok,data)=>ok?call.resolve(data):call.reject({response:{status:500,data:{code:'ADMIN_REQUEST_FAILED'}}});
   await act(async()=>settle(statsCall,statsOK,stats));
-  assert.equal(host.textContent.includes('Total Students'),statsOK);
+  assert.equal(host.textContent.includes('Active Students'),statsOK);
   assert.match(host.textContent,/Loading recent activity/);
   await act(async()=>settle(activityCall,activityOK,activity));
-  assert.equal(host.textContent.includes('Total Students'),statsOK);
+  assert.equal(host.textContent.includes('Active Students'),statsOK);
   assert.equal(host.textContent.includes('Saved a subject'),activityOK);
   for(const [ok,label,url,data] of [[statsOK,'Retry statistics',statsCall.config.url,stats],[activityOK,'Retry activity',activityCall.config.url,activity]]){
    if(ok)continue;
@@ -38,7 +38,7 @@ for(const statsOK of [true,false])for(const activityOK of [true,false])test(`ind
    assert.equal(calls.length,previous+1);assert.equal(calls.at(-1).config.url,url);
    await act(async()=>calls.at(-1).resolve(data));
   }
-  assert.match(host.textContent,/Total Students/);assert.match(host.textContent,/Saved a subject/);
+  assert.match(host.textContent,/Active Students/);assert.match(host.textContent,/Saved a subject/);
  }finally{await act(async()=>root.unmount());host.remove();}
  assert.ok(calls.every(c=>c.config.signal.aborted));
 });
@@ -49,4 +49,12 @@ test('unmount aborts both pending requests and ignores late responses',async()=>
  await act(async()=>root.unmount());assert.equal(calls.length,2);assert.ok(calls.every(c=>c.config.signal.aborted));
  await act(async()=>calls.forEach(c=>c.resolve({config:c.config,data:c.config.url.endsWith('recent-activity')?activity:stats,status:200,headers:{}})));
  assert.equal(host.textContent,'');host.remove();
+});
+
+test('recent activity prefers readable text without duplicating actor or exposing raw audit IDs',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ api.defaults.adapter=async config=>({config,status:200,headers:{},data:config.url.endsWith('recent-activity')?[{id:2,userName:'Talidong',action:'Revoked acting session by Admin 20 acting as PROFESSOR 10',displayAction:'Talidong exited Professor Mode for Maria Santos',createdAt:'2026-01-01'}]:stats});
+ try{await act(async()=>root.render(React.createElement(MemoryRouter,{},React.createElement(AuthContext.Provider,{value:{role:'admin',user:{name:'Admin'},logout(){}}},React.createElement(Dashboard)))));
+ assert.match(host.textContent,/Talidong exited Professor Mode for Maria Santos/);assert.doesNotMatch(host.textContent,/Admin 20|PROFESSOR 10|TalidongTalidong/);
+ }finally{await act(async()=>root.unmount());host.remove();}
 });

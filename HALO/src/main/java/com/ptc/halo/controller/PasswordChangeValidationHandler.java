@@ -6,6 +6,11 @@ import java.util.Map;
 // Safe authentication input and password errors; protected-route rules are unchanged.
 @RestControllerAdvice(assignableTypes = AuthController.class)
 public class PasswordChangeValidationHandler {
+    @ExceptionHandler(com.ptc.halo.service.RegistrationValidationException.class)
+    public ResponseEntity<?> registration(com.ptc.halo.service.RegistrationValidationException error) {
+        return ResponseEntity.status(error.status).body(Map.of("status",error.status,"code","REGISTRATION_VALIDATION_FAILED","message","Please correct the indicated fields.","errors",error.errors));
+    }
+
 
     @ExceptionHandler(com.ptc.halo.service.PasswordResetException.class)
     public ResponseEntity<?> resetError(com.ptc.halo.service.PasswordResetException error) {
@@ -14,7 +19,10 @@ public class PasswordChangeValidationHandler {
             "message",status==400?"Check your email and reset code, or request a new code.":"Password reset is unavailable. Please try again later."));
     }
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
-    public ResponseEntity<?> malformed() {
+    public ResponseEntity<?> malformed(org.springframework.http.converter.HttpMessageNotReadableException error) {
+        if (error.getMostSpecificCause() instanceof com.fasterxml.jackson.databind.exc.InvalidFormatException invalid
+                && invalid.getTargetType() == com.ptc.halo.enums.YearLevel.class)
+            return ResponseEntity.badRequest().body(Map.of("status",400,"code","REGISTRATION_VALIDATION_FAILED","message","Select a valid year level.","errors",Map.of("yearLevel","Select your year level.")));
         return ResponseEntity.badRequest().body(Map.of("status",400,"code","INVALID_REQUEST","message","Check the request format and try again."));
     }
     @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)

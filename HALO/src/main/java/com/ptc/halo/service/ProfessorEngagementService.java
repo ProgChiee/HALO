@@ -2,6 +2,7 @@ package com.ptc.halo.service;
 
 import com.ptc.halo.entity.UserEntity;
 import com.ptc.halo.enums.Role;
+import com.ptc.halo.enums.ProfessorStudentView;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,13 +37,14 @@ public class ProfessorEngagementService {
     }
     public static String consistency(long days,long consistent,long moderate){return days>=consistent?"Consistent":days>=moderate?"Moderate":"Low Activity";}
     public record ModuleEngagement(Long moduleId,String subjectName,Integer weekNumber,String title,long reviewCount,long reviewsMonth,long assessmentAttempts) {}
-    public Map<String,Object> modules(UserEntity professor,Long studentId,int page,int size){
+    public Map<String,Object> modules(UserEntity professor,Long studentId,int page,int size){return modules(professor,studentId,page,size,ProfessorStudentView.CURRENT);}
+    public Map<String,Object> modules(UserEntity professor,Long studentId,int page,int size,ProfessorStudentView view){
         if(professor==null || professor.getId()==null || professor.getRole()!=Role.PROFESSOR)throw new AccessDeniedException("Professor required");
         if(page<0 || size<1)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"INVALID_PAGINATION");
         size=Math.min(size,100);
-        var args=new HashMap<String,Object>();args.put("professor",professor.getId());args.put("student",studentId);args.put("limit",size);args.put("offset",(long)page*size);
+        var args=new HashMap<String,Object>();args.put("professor",professor.getId());args.put("student",studentId);args.put("statuses",view.statusNames());args.put("limit",size);args.put("offset",(long)page*size);
         args.put("month",LocalDate.now().withDayOfMonth(1));args.put("until",LocalDate.now().plusDays(1));
-        long eligible=jdbc.queryForObject(SCOPE+"select count(*) from scoped_students s join user_entity u on u.id=s.student_id where u.role='STUDENT' and u.id=:student",args,Long.class);
+        long eligible=jdbc.queryForObject(SCOPE+"select count(*) from scoped_students s join user_entity u on u.id=s.student_id where u.role='STUDENT' and u.status in (:statuses) and u.id=:student",args,Long.class);
         if(eligible==0)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"RESOURCE_NOT_FOUND");
         String from="""
           from ai_learning_modules m join weeks w on w.id=m.week_id join subjects s on s.id=w.subject_id
@@ -61,14 +63,16 @@ public class ProfessorEngagementService {
     public record Page(List<Engagement> content,int number,int size,long totalElements,int totalPages,boolean first,boolean last,String timezone,String weekStartsOn) {}
     public Page get(UserEntity professor,int page,int size) { return get(professor,page,size,LocalDate.now()); }
     // Same server-local calendar used by HALO's LocalDateTime activity timestamps; ISO Monday weeks.
-    public Page get(UserEntity professor,int page,int size,LocalDate today) {
+    public Page get(UserEntity professor,int page,int size,ProfessorStudentView view) { return get(professor,page,size,LocalDate.now(),view); }
+    public Page get(UserEntity professor,int page,int size,LocalDate today) { return get(professor,page,size,today,ProfessorStudentView.CURRENT); }
+    public Page get(UserEntity professor,int page,int size,LocalDate today,ProfessorStudentView view) {
         if(professor==null || professor.getId()==null || professor.getRole()!=Role.PROFESSOR) throw new AccessDeniedException("Professor required");
         if(page<0 || size<1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"INVALID_PAGINATION");
         size=Math.min(size,100);
         var week=today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));var month=today.withDayOfMonth(1);
         var args=new HashMap<String,Object>();args.put("professor",professor.getId());args.put("limit",size);args.put("offset",(long)page*size);
-        args.put("week",week.atStartOfDay());args.put("month",month.atStartOfDay());args.put("from",(week.isBefore(month)?week:month).atStartOfDay());args.put("until",today.plusDays(1).atStartOfDay());
-        String roster=" from user_entity u join scoped_students s on s.student_id=u.id where u.role='STUDENT'";
+        args.put("statuses",view.statusNames());args.put("week",week.atStartOfDay());args.put("month",month.atStartOfDay());args.put("from",(week.isBefore(month)?week:month).atStartOfDay());args.put("until",today.plusDays(1).atStartOfDay());
+        String roster=" from user_entity u join scoped_students s on s.student_id=u.id where u.role='STUDENT' and u.status in (:statuses)";
         long total=jdbc.queryForObject(SCOPE+"select count(*)"+roster,args,Long.class);
         var students=jdbc.query(SCOPE+"select u.id,u.name"+roster+" order by u.id limit :limit offset :offset",args,(rs,n)->new Engagement(rs.getLong(1),rs.getString(2),0,0,0,0));
         var metrics=new HashMap<Long,Engagement>();

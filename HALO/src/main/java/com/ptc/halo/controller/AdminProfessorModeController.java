@@ -97,8 +97,8 @@ public class AdminProfessorModeController {
         return mode.execute(authentication,sessionId.toString(),s -> students.getStudentBadges(id,s.getTarget()));
     }
     @GetMapping("/students/progress-summaries")
-    public Object summaries(@RequestParam(defaultValue="0") @Min(0) int page, @RequestParam(defaultValue="20") @Min(1) int size, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
-        return mode.execute(authentication,sessionId.toString(),s -> { var result=students.getProgressSummaries(s.getTarget(),page,size); return Map.of("content",result.getContent(),"number",result.getNumber(),"size",result.getSize(),"totalElements",result.getTotalElements(),"totalPages",result.getTotalPages(),"first",result.isFirst(),"last",result.isLast(),"badgeScope","INSTITUTION_WIDE"); });
+    public Object summaries(@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="0") @Min(0) int page, @RequestParam(defaultValue="20") @Min(1) int size, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
+        return mode.execute(authentication,sessionId.toString(),s -> { var result=students.getProgressSummaries(s.getTarget(),page,size,view); return Map.of("content",result.getContent(),"number",result.getNumber(),"size",result.getSize(),"totalElements",result.getTotalElements(),"totalPages",result.getTotalPages(),"first",result.isFirst(),"last",result.isLast(),"badgeScope","INSTITUTION_WIDE"); });
     }
     @GetMapping("/ai-learning-modules/week/{id}")
     public Object moduleByWeek(@PathVariable @Positive Long id, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {

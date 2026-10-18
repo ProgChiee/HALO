@@ -59,7 +59,7 @@ class ProfessorDashboardScopeTest {
   assertEquals(1, result.getApprovedModules());
   assertEquals(1, result.getTotalAssessments());
   assertEquals(1, result.getTotalPassedAttempts());
-  assertEquals(2, result.getTotalStudents()); // Explicitly institution-wide accounts.
+  assertEquals(1, result.getTotalStudents()); // Only eligible ACTIVE Students.
   assertEquals(0, dashboard.getDashboard(b).getApprovedModules());
   assertEquals(1, dashboard.getDashboard(b).getTotalPassedAttempts());
  }
@@ -67,7 +67,61 @@ class ProfessorDashboardScopeTest {
   var result = dashboard.getDashboard(user("no-subjects",Role.PROFESSOR));
   assertEquals(0,result.getTotalSubjects());assertEquals(0,result.getTotalModules());
   assertEquals(0,result.getApprovedModules());assertEquals(0,result.getTotalAssessments());assertEquals(0,result.getTotalPassedAttempts());
-  assertEquals(2,result.getTotalStudents());
+  assertEquals(0,result.getTotalStudents());
   assertThrows(org.springframework.security.access.AccessDeniedException.class,()->dashboard.getDashboard(student));
+ }
+
+ @Autowired LessonRevisionRepository revisions;
+ @Autowired ActivityLogRepository logs;
+ private AiLearningModuleEntity owned(){return modules.findAll().stream().filter(m->m.getWeek().getSubject().getId().equals(ownedSubject)).findFirst().orElseThrow();}
+ @Test void lifecycleAndEligibilityFilterCurrentMetricsWithoutDeletingHistory(){
+  var originalCount=attempts.count();
+  for(var status:java.util.List.of(Status.INACTIVE,Status.ARCHIVED,Status.BLOCKED)){
+   student.setStatus(status);users.saveAndFlush(student);var d=dashboard.getDashboard(a);
+   assertEquals(0,d.getTotalStudents());assertEquals(0,d.getTotalPassedAttempts());assertTrue(d.getPerformance().isEmpty());assertEquals(originalCount,attempts.count());
+  }
+  student.setStatus(Status.ACTIVE);users.saveAndFlush(student);assertEquals(1,dashboard.getDashboard(a).getTotalStudents());
+  var profile=profiles.findByUserId(student.getId()).orElseThrow();profile.setYearLevel(YearLevel.SECOND_YEAR);profiles.saveAndFlush(profile);
+  assertEquals(0,dashboard.getDashboard(a).getTotalStudents());assertTrue(dashboard.getDashboard(a).getPerformance().isEmpty());assertEquals(originalCount,attempts.count());
+ }
+ @Test void performanceUsesOnlySubmittedScopedAttemptsWithinTwentyEightDays(){
+  var ownAttempt=attempts.findAll().stream().filter(x->x.getAssessment().getModule().getId().equals(owned().getId())).findFirst().orElseThrow();
+  var yesterday=new AssessmentAttemptEntity();yesterday.setAssessment(ownAttempt.getAssessment());yesterday.setStudent(student);yesterday.setScore(50);yesterday.setPassed(false);yesterday.setStartedAt(java.time.LocalDate.now().minusDays(1).atTime(10,0));yesterday.setSubmittedAt(yesterday.getStartedAt());attempts.saveAndFlush(yesterday);
+  var old=new AssessmentAttemptEntity();old.setAssessment(ownAttempt.getAssessment());old.setStudent(student);old.setScore(10);old.setPassed(false);old.setStartedAt(java.time.LocalDate.now().minusDays(28).atTime(10,0));old.setSubmittedAt(old.getStartedAt());attempts.saveAndFlush(old);
+  var unfinished=new AssessmentAttemptEntity();unfinished.setAssessment(ownAttempt.getAssessment());unfinished.setStudent(student);unfinished.setScore(0);unfinished.setPassed(false);unfinished.setStartedAt(LocalDateTime.now());attempts.saveAndFlush(unfinished);
+  var d=dashboard.getDashboard(a);assertEquals(2,d.getPerformance().size());assertEquals(50.0,d.getPerformance().get(0).averageScore());assertEquals(90.0,d.getPerformance().get(1).averageScore());assertEquals(1,d.getPerformance().get(1).attempts());
+  assertEquals(java.time.LocalDate.now().minusDays(27),d.getPerformanceFrom());
+ }
+ @Test void attentionUsesRealOwnedFlagsAndNeverChangesRevisionState(){
+  var m=owned();m.setAssessmentNeedsReview(true);m.setStatus(LessonStatus.PENDING);modules.saveAndFlush(m);
+  var revision=new LessonRevisionEntity();revision.moduleId=m.getId();revision.baseVersion=m.getVersion();revision.revisionNumber=1;revision.state="DRAFT";revision.payload="{}";revision.revisedBy=a.getId();revision.revisedAt=LocalDateTime.now();revisions.saveAndFlush(revision);
+  var d=dashboard.getDashboard(a);for(var item:d.getAttention()){assertEquals(1,item.count());assertEquals(m.getId(),item.lessons().get(0).moduleId());assertEquals(ownedSubject,item.lessons().get(0).subjectId());}
+  for(var item:dashboard.getDashboard(b).getAttention())assertEquals(0,item.count());
+  assertEquals("DRAFT",revisions.findById(m.getId()).orElseThrow().state);assertTrue(m.isAssessmentNeedsReview());
+ }
+ private void log(UserEntity actor,UserEntity target,ActivityType type,String text){var l=new ActivityLogEntity();l.setUser(actor);l.setActingTarget(target);if(target!=null)l.setActingTargetRole(target.getRole());l.setActivityType(type);l.setAction(text);l.setCreatedAt(LocalDateTime.now());logs.saveAndFlush(l);}
+ @Test void recentActivityIncludesOnlyOwnTeachingAndAdminActionsForThisProfessor(){
+  log(a,null,ActivityType.MODULE,"Published revised lesson");log(b,null,ActivityType.MODULE,"Other Professor private lesson");log(student,null,ActivityType.ASSESSMENT,"Student private result");log(a,null,ActivityType.AUTH,"Login");
+  var admin=user("admin",Role.ADMIN);log(admin,a,ActivityType.ASSESSMENT,"Approved quiz version 4 by Admin "+admin.getId()+" acting as PROFESSOR "+a.getId());
+  var d=dashboard.getDashboard(a);assertEquals(2,d.getRecentActivity().size());assertTrue(d.getRecentActivity().get(0).description().contains("on behalf of a"));assertFalse(d.getRecentActivity().toString().contains("private"));assertEquals(5,logs.count());
+ }
+
+ @Test void unpublishedQuizDraftAlsoNeedsReviewWithoutInflatingAssessmentCount(){
+  var q=new AssessmentEntity();q.setModule(owned());q.setQuizVersion(2);q.setTitle("Draft quiz");q.setPassingScore(70);q.setStatus(AssessmentStatus.DRAFT);q.setCreatedAt(LocalDateTime.now());assessments.saveAndFlush(q);
+  var d=dashboard.getDashboard(a);assertEquals(1,d.getAttention().get(0).count());assertEquals(1,d.getTotalAssessments());assertFalse(owned().isAssessmentNeedsReview());
+ }
+
+ @Test void rosterIsDistinctAndMatchesCurrentProgressAcrossLifecycleStates(){
+  var second=new SubjectEntity();second.setProfessor(subjects.findById(ownedSubject).orElseThrow().getProfessor());
+  second.setSubjectCode("A2");second.setSubjectName("Another eligible subject");second.setYearLevel(YearLevel.FIRST_YEAR);subjects.saveAndFlush(second);
+  var unrelated=user("unrelated",Role.STUDENT);var profile=new StudentProfileEntity();profile.setUser(unrelated);profile.setStudentId("S2");profile.setYearLevel(YearLevel.SECOND_YEAR);profiles.saveAndFlush(profile);
+  long history=attempts.count();
+  for(var status:java.util.List.of(Status.ACTIVE,Status.INACTIVE,Status.ARCHIVED,Status.BLOCKED,Status.ACTIVE)){
+   student.setStatus(status);users.saveAndFlush(student);
+   long expected=status==Status.ACTIVE?1:0;
+   assertEquals(expected,dashboard.getDashboard(a).getTotalStudents());
+   assertEquals(expected,service.getProgressSummaries(a,0,20).getTotalElements());
+   assertEquals(history,attempts.count());
+  }
  }
 }

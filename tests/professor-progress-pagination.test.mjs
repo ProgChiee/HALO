@@ -44,7 +44,7 @@ test('one request per page, clears previous rows while loading, renders zero cou
   await act(async()=>button(ui.host,'Next').click());
   assert.match(ui.host.textContent,/Loading student progress/);assert.ok(!ui.host.textContent.includes('Student A'));
   await act(async()=>resolveNext());assert.match(ui.host.textContent,/Student B/);assert.equal(button(ui.host,'Next').disabled,true);
-  assert.deepEqual(calls,[{url:'/professor/students/progress-summaries',params:{page:0,size:20}},{url:'/professor/students/progress-summaries',params:{page:1,size:20}}]);
+  assert.deepEqual(calls,[{url:'/professor/students/progress-summaries',params:{view:'CURRENT',page:0,size:20}},{url:'/professor/students/progress-summaries',params:{view:'CURRENT',page:1,size:20}}]);
   await act(async()=>button(ui.host,'Previous').click());assert.match(ui.host.textContent,/Student A/);assert.equal(calls.length,3);
  }finally{await ui.close();api.defaults.adapter=adapter;}
 });
@@ -59,7 +59,7 @@ test('summary failure has retry and empty page renders without detail requests',
  try {
   assert.match(ui.host.textContent,/Couldn't load student progress/);assert.ok(button(ui.host,'Retry'));
   fail=false;await act(async()=>button(ui.host,'Retry').click());
-  assert.match(ui.host.textContent,/No student accounts found/);assert.equal(button(ui.host,'Next').disabled,true);
+  assert.match(ui.host.textContent,/No current students in your subject scope/);assert.equal(button(ui.host,'Next').disabled,true);
   assert.deepEqual(calls,Array(2).fill('/professor/students/progress-summaries'));
  }finally{await ui.close();api.defaults.adapter=adapter;}
 });
@@ -80,4 +80,22 @@ test('module metrics load only for selected student and paginate with zero count
  api.defaults.adapter=async config=>{calls.push(config);return {status:200,headers:{},config,data:config.url.endsWith('/engagement')?{...page(0,[{userId:8,name:'Selected',activeDaysWeek:3,activeDaysMonth:8,weeklyConsistency:'Consistent',monthlyConsistency:'Consistent',mentorSessionsWeek:0,mentorSessionsMonth:0}]),last:true}:page(config.params.page,[{moduleId:config.params.page+1,subjectName:'Hospitality',weekNumber:1,title:'Module',reviewCount:0,reviewsMonth:0,assessmentAttempts:2}])};};
  const ui=await mount('LearningEngagement');const click=async label=>act(async()=>[...ui.host.querySelectorAll('button')].find(b=>b.textContent===label).click());
  try{assert.equal(calls.length,1);assert.match(ui.host.textContent,/Consistent/);await click('View module activity');assert.equal(calls[1].url,'/professor/students/8/engagement/modules');assert.match(ui.host.textContent,/Assessment Attempts/);await click('Next modules');assert.equal(calls[2].params.page,1);assert.ok(calls.every(c=>c.signal));await click('Close module activity');assert.ok(!ui.host.textContent.includes('Reviews This Month'));}finally{await ui.close();api.defaults.adapter=original;}
+});
+
+test('current and former filters reset pages and share population with read-only engagement and modules',async()=>{
+ const original=api.defaults.adapter,calls=[];
+ api.defaults.adapter=async config=>{
+  calls.push(config);const former=config.params.view==='FORMER';
+  const student={...row(8,former?'Former Student':'Current Student'),status:former?'ARCHIVED':'ACTIVE',activeDaysWeek:1,activeDaysMonth:1,mentorSessionsWeek:1,mentorSessionsMonth:1};
+  return {status:200,headers:{},config,data:{...page(0,config.url.endsWith('/modules')?[]:[student]),totalElements:1,totalPages:1,last:true}};
+ };
+ const ui=await mount();try{
+  assert.match(ui.host.textContent,/Current Student/);
+  await act(async()=>button(ui.host,'Former / Archived').click());
+  assert.match(ui.host.textContent,/Former Student/);assert.match(ui.host.textContent,/Archived/);assert.match(ui.host.textContent,/Read-only history/);
+  await act(async()=>[...ui.host.querySelectorAll('button')].find(b=>b.textContent==='View module activity').click());
+  const formerCalls=calls.filter(c=>c.params.view==='FORMER');assert.equal(formerCalls.length,3);assert.ok(formerCalls.every(c=>c.params.page===0&&c.method==='get'));
+  await act(async()=>button(ui.host,'Current Students').click());assert.doesNotMatch(ui.host.textContent,/Former Student|Close module activity/);
+  assert.equal(calls.at(-1).params.view,'CURRENT');
+ }finally{await ui.close();api.defaults.adapter=original;}
 });

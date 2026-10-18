@@ -72,6 +72,20 @@ class ProfessorStudentScopeTest {
   assertEquals(400,assertThrows(ResponseStatusException.class,()->service.getProgressSummaries(a,0,0)).getStatusCode().value());
   assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.getProgressSummaries(student,0,20));
  }
+ @Test void lifecycleFiltersCountsWithoutRemovingAcademicHistory() {
+  long attemptsBefore=attempts.count(), progressBefore=progress.count(), badgesBefore=badges.count();
+  for(Status status:java.util.List.of(Status.INACTIVE,Status.ARCHIVED,Status.BLOCKED)) {
+   student.setStatus(status);users.saveAndFlush(student);
+   assertEquals(0,service.getProgressSummaries(a,0,20).getTotalElements());
+   var former=service.getProgressSummaries(a,0,20,ProfessorStudentView.FORMER);
+   assertEquals(status==Status.BLOCKED?0:1,former.getTotalElements());
+   if(status!=Status.BLOCKED){assertEquals(status,former.getContent().get(0).status());assertEquals(1,former.getContent().get(0).completedModules());assertEquals(1,former.getContent().get(0).passedAssessments());}
+   assertEquals(attemptsBefore,attempts.count());assertEquals(progressBefore,progress.count());assertEquals(badgesBefore,badges.count());
+  }
+  student.setStatus(Status.ACTIVE);users.saveAndFlush(student);
+  assertEquals(1,service.getProgressSummaries(a,0,20).getTotalElements());assertTrue(service.getProgressSummaries(a,0,20,ProfessorStudentView.FORMER).isEmpty());
+  var unrelated=user("unrelated",Role.PROFESSOR);assertTrue(service.getProgressSummaries(unrelated,0,20).isEmpty());
+ }
  @Test void progressHistoryAndSubjectsAreOwnedOnly() {
   var result=service.getStudentProgress(student.getId(),a);
   assertEquals(1,result.getCompletedModules());assertEquals(1,result.getPassedAssessments());

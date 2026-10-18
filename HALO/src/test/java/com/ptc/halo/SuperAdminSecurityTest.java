@@ -36,7 +36,7 @@ class SuperAdminSecurityTest {
         when(users.findForPasswordChange(user.getEmail())).thenReturn(Optional.of(user));
         when(users.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         var jwt = new JwtService(key()); var old = jwt.generateToken(user);
-        var service = new PasswordResetService(mock(PasswordResetOtpRepository.class), users, mock(EmailService.class), encoder);
+        var service = new PasswordResetService(mock(PasswordResetOtpRepository.class), users, mock(EmailService.class), encoder, mock(com.ptc.halo.service.AuthAuditService.class));
         service.changePassword(user, "Temporary-test-123", "Replacement-test-123");
         assertFalse(jwt.isCurrent(old, new CustomUserDetails(user))); assertFalse(user.isMustChangePassword());
         assertTrue(encoder.matches("Replacement-test-123", user.getPassword()));
@@ -45,7 +45,7 @@ class SuperAdminSecurityTest {
         var provider = new org.springframework.security.authentication.dao.DaoAuthenticationProvider();
         provider.setUserDetailsService(details); provider.setPasswordEncoder(encoder);
         AuthenticationManager manager = new org.springframework.security.authentication.ProviderManager(provider);
-        var auth = new AuthService(users, mock(StudentProfileRepository.class), encoder, manager, jwt);
+        var auth = new AuthService(users, mock(StudentProfileRepository.class), encoder, manager, jwt, mock(com.ptc.halo.service.AuthAuditService.class));
         var request = new LoginRequest(); request.setEmail(user.getEmail()); request.setPassword("Replacement-test-123");
         var response = auth.login(request);
         assertTrue(jwt.isCurrent(response.getToken(), new CustomUserDetails(user)));
@@ -68,7 +68,7 @@ class SuperAdminSecurityTest {
         var otp = new PasswordResetOtpEntity(); otp.setOtp("123456"); otp.setExpiresAt(LocalDateTime.now().plusMinutes(5));
         when(otps.findByUserId(5L)).thenReturn(Optional.of(otp));
         var jwt = new JwtService(key()); var old = jwt.generateToken(user);
-        new PasswordResetService(otps, users, mock(EmailService.class), encoder).resetPassword(user.getEmail(), "123456", "New-test-123");
+        new PasswordResetService(otps, users, mock(EmailService.class), encoder, mock(com.ptc.halo.service.AuthAuditService.class)).resetPassword(user.getEmail(), "123456", "New-test-123");
         assertFalse(jwt.isCurrent(old, new CustomUserDetails(user))); verify(otps).deleteByUserId(5L);
     }
     @Test void bootstrapEncodesPasswordAndDoesNotOverwriteExistingAccount() throws Exception {

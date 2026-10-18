@@ -597,6 +597,30 @@
       "method": "PATCH",
       "path": "/api/admin/students/{id}/restore",
       "controller": "AdminController"
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/preview/professor/sessions",
+      "controller": "AdminProfessorPreviewController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/professor/sessions/{id}",
+      "controller": "AdminProfessorPreviewController.java"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/preview/professor/sessions/{id}",
+      "controller": "AdminProfessorPreviewController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "controller": "AuthController.java"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/profile"
     }
   ],
   "dtos": {

@@ -505,3 +505,31 @@ nav.toolbarRow .retryBtn { margin-top: 0; }
 .legendDot { flex-shrink: 0; }
 .usageBarTrack { background: var(--color-border); }
 @media (max-width: 768px) { .logRow, .usageHeader { flex-wrap: wrap; } .summaryCard { flex: 1 1 10rem; } }
+
+/* Shared, compact profile-completeness notice for the current monitoring page. */
+.incompleteCard { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); overflow: hidden; }
+.incompleteHeader { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); background: var(--color-info-soft); color: var(--color-info-text); }
+.incompleteHeader svg { flex-shrink: 0; margin-top: var(--space-1); }
+.incompleteHeader h2 { margin: 0; font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); }
+.incompleteHeader p { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); }
+.incompleteList { list-style: none; margin: 0; padding: 0; }
+.incompleteRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--space-2) var(--space-4); padding: var(--space-3) var(--space-4); }
+.incompleteRow + .incompleteRow { border-top: 1px solid var(--color-border); }
+.incompleteIdentity { display: flex; flex-direction: column; min-width: 0; gap: var(--space-1); overflow-wrap: anywhere; font-size: var(--font-size-sm); }
+.incompleteIdentity strong { color: var(--color-text-primary); font-weight: var(--font-weight-semibold); }
+.incompleteIdentity span { color: var(--color-text-secondary); }
+.incompleteBadge { padding: var(--space-1) var(--space-2); border-radius: var(--radius-pill); color: var(--color-info-text); background: var(--color-info-soft); font-size: var(--font-size-xs); }
+.incompleteDetails { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin: 0; font-size: var(--font-size-sm); }
+.incompleteDetails div { display: flex; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.incompleteDetails dt { color: var(--color-text-secondary); }
+.incompleteDetails dd { margin: 0; color: var(--color-text-primary); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .incompleteDetails { display: grid; grid-template-columns: minmax(0, 1fr); } }
+
+
+/* Consistent vertical rhythm across Student Performance sections. */
+.studentPerformance { display: flex; flex-direction: column; gap: var(--space-6); }
+.studentPerformance .statsGrid { margin-bottom: 0; }
+.studentPerformance nav.toolbarRow { margin-top: 0; }
+@media (max-width: 768px) {
+  .studentPerformance { gap: var(--space-4); }
+}

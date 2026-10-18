@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class,PasswordResetService.class})
 class PasswordResetPublicHttpTest {
+ @MockBean AuthAuditService audit;
  @Autowired MockMvc mvc;
  @MockBean AuthService auth;
  @MockBean UserRepository users;

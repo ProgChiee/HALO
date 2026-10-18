@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   const { data: activity, isLoading: activityLoading, error: activityError, reload: retryActivity } = useRemoteData(getAdminRecentActivity, []);
 
   const statCards = [
-    { id: 'totalStudents', icon: Users, value: data?.totalStudents, label: 'Total Students' },
+    { id: 'totalStudents', icon: Users, value: data?.totalStudents, label: 'Active Students' },
     { id: 'totalProfessors', icon: GraduationCap, value: data?.totalProfessors, label: 'Total Professors' },
     { id: 'activeUsers', icon: UserCheck, value: data?.activeUsers, label: 'Active Users' },
     { id: 'inactiveUsers', icon: UserX, value: data?.inactiveUsers, label: 'Inactive Users' },
@@ -76,7 +76,7 @@ export default function AdminDashboard() {
             {activity.slice(0, 10).map((item) => (
               <div key={item.id} className={styles.activityRow}>
                 <p className={styles.activityText}>
-                  <span className={styles.activityActor}>{item.userName}</span> {item.action}
+                  {item.displayAction || <><span className={styles.activityActor}>{item.userName}</span> {item.action}</>}
                 </p>
                 <span className={styles.activityTime}>{new Date(item.createdAt).toLocaleString()}</span>
               </div>

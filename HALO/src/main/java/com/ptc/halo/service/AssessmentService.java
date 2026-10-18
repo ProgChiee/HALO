@@ -116,6 +116,8 @@ public class AssessmentService {
         assessment.setPassingScore(70);
         assessment.setStatus(AssessmentStatus.AVAILABLE);
         assessment.setCreatedAt(LocalDateTime.now());
+        assessment.setSourceModuleVersion(module.getVersion());
+        assessment.setApprovedAt(LocalDateTime.now());
 
         AssessmentEntity savedAssessment =
                 assessmentRepository.save(assessment);
@@ -173,15 +175,26 @@ public class AssessmentService {
         );
 
         AssessmentEntity assessment =
-                assessmentRepository.findByModuleId(moduleId)
+                assessmentForStudent(moduleId, student)
                         .orElseThrow(() ->
                                 new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "ASSESSMENT_NOT_FOUND")
                         );
 
-        if (assessment.getStatus() != AssessmentStatus.AVAILABLE) {
+        if (assessment.getStatus() != AssessmentStatus.AVAILABLE && assessment.getStatus() != AssessmentStatus.RETIRED) {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_NOT_AVAILABLE");
         }
 
+        var response = studentResponse(assessment);
+        response.setCurrentQuizVersion(assessmentRepository.findByModuleId(moduleId).map(AssessmentEntity::getQuizVersion).orElse(null));
+        return response;
+    }
+    @Transactional(readOnly=true)
+    public AssessmentResponse getCurrentAssessment(Long moduleId,UserEntity student) {
+        progressionService.validateModuleAccess(moduleId,student);
+        var assessment=assessmentRepository.findByModuleId(moduleId).filter(a->a.getStatus()==AssessmentStatus.AVAILABLE).orElseThrow(()->new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"ASSESSMENT_NOT_FOUND"));
+        return studentResponse(assessment);
+    }
+    private AssessmentResponse studentResponse(AssessmentEntity assessment) {
         List<AssessmentQuestionResponse> questions =
                 assessment.getQuestions()
                         .stream()
@@ -218,6 +231,7 @@ public class AssessmentService {
                 new AssessmentResponse();
 
         response.setId(assessment.getId());
+        response.setQuizVersion(assessment.getQuizVersion());
         response.setTitle(assessment.getTitle());
         response.setPassingScore(
                 assessment.getPassingScore()
@@ -236,18 +250,19 @@ public class AssessmentService {
     public AssessmentAttemptEntity startAttempt(Long moduleId, UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         lockStudentLifecycle(student);
+        moduleRepository.findForMentorOpenById(moduleId).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"MODULE_NOT_FOUND"));
         progressionService.validateModuleAccess(
                 moduleId,
                 student
         );
 
         AssessmentEntity assessment =
-                assessmentRepository.findByModuleId(moduleId)
+                assessmentForStudent(moduleId, student)
                         .orElseThrow(() ->
                                 new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "ASSESSMENT_NOT_FOUND")
                         );
 
-        if (assessment.getStatus() != AssessmentStatus.AVAILABLE) {
+        if (assessment.getStatus() != AssessmentStatus.AVAILABLE && assessment.getStatus() != AssessmentStatus.RETIRED) {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_NOT_AVAILABLE");
         }
 
@@ -323,7 +338,7 @@ public class AssessmentService {
         // Eligibility can change after an attempt starts. Recheck before accepting answers.
         AssessmentEntity assessment = attempt.getAssessment();
         progressionService.validateModuleAccess(assessment.getModule().getId(), student);
-        if (assessment.getStatus() != AssessmentStatus.AVAILABLE) {
+        if (assessment.getStatus() != AssessmentStatus.AVAILABLE && assessment.getStatus() != AssessmentStatus.RETIRED) {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_NOT_AVAILABLE");
         }
@@ -392,6 +407,7 @@ public class AssessmentService {
                                 return newProgress;
                             });
 
+            if (!Boolean.TRUE.equals(progress.getCompleted())) {
             progress.setCompleted(true);
             progress.setCompletedAt(LocalDateTime.now());
 
@@ -402,6 +418,7 @@ public class AssessmentService {
                     ActivityType.PROGRESS,
                     "Completed learning module ID " + module.getId()
             );
+            }
         }
 
         AssessmentAttemptEntity savedAttempt =
@@ -450,19 +467,7 @@ public class AssessmentService {
                 student
         );
 
-        AssessmentEntity assessment =
-                assessmentRepository.findByModuleId(moduleId)
-                        .orElseThrow(() ->
-                                new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "ASSESSMENT_NOT_FOUND")
-                        );
-
-        List<AssessmentAttemptEntity> attempts =
-                assessmentAttemptRepository
-                        .findByStudentIdAndAssessmentIdOrderByStartedAtDesc(
-                                student.getId(),
-                                assessment.getId()
-                        );
-
+        List<AssessmentAttemptEntity> attempts = assessmentAttemptRepository.findByStudentIdAndAssessment_Module_IdOrderByStartedAtDesc(student.getId(), moduleId);
         return attempts.stream()
                 .map(attempt -> {
 
@@ -561,6 +566,7 @@ public class AssessmentService {
         response.setFeedback(feedback);
         return response;
     }
+    @Transactional(readOnly = true)
     public AssessmentStatusResponse getAssessmentStatus(
             Long moduleId,
             UserEntity student) {
@@ -576,7 +582,7 @@ public class AssessmentService {
         response.setModuleId(moduleId);
 
         Optional<AssessmentEntity> assessmentOptional =
-                assessmentRepository.findByModuleId(moduleId);
+                assessmentForStudent(moduleId, student);
 
         if (assessmentOptional.isEmpty()) {
 
@@ -596,7 +602,7 @@ public class AssessmentService {
 
         boolean available =
                 assessment.getStatus()
-                        == AssessmentStatus.AVAILABLE;
+                        == AssessmentStatus.AVAILABLE || assessment.getStatus() == AssessmentStatus.RETIRED;
 
         response.setAssessmentAvailable(available);
 
@@ -634,5 +640,11 @@ public class AssessmentService {
     private void writeStudentAudit(UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting, ActivityType type, String action) {
         if (acting == null) activityLogService.createLog(student,type,action);
         else activityLogService.createStudentLog(student,acting,type,action);
+    }
+
+    private Optional<AssessmentEntity> assessmentForStudent(Long moduleId,UserEntity student) {
+        var unfinished=assessmentAttemptRepository.findTopByStudentIdAndAssessment_Module_IdAndSubmittedAtIsNullOrderByStartedAtDesc(student.getId(),moduleId);
+        if(unfinished.isPresent()) return Optional.of(unfinished.get().getAssessment());
+        return assessmentRepository.findByModuleId(moduleId);
     }
 }

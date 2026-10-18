@@ -40,7 +40,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
                 if (details instanceof CustomUserDetails account && account.isMustChangePassword()
-                        && !("POST".equals(request.getMethod()) && "/api/auth/change-password".equals(request.getServletPath()))
+                        && !("POST".equals(request.getMethod()) && ("/api/auth/change-password".equals(request.getServletPath()) || "/api/auth/logout".equals(request.getServletPath())))
                         && !isPasswordChangeProfile(request, details)) {
                     ApiSecurityErrors.write(request, response, 403, "PASSWORD_CHANGE_REQUIRED");
                     return;

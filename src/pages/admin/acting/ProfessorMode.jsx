@@ -1,14 +1,17 @@
-import { Search } from 'lucide-react';
+import { Search, Eye, LogIn } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import Dialog from '../../../components/shared/Dialog';
+import Button from '../../../components/shared/Button';
 import PageShell from '../../../components/shared/PageShell';
 import ProfessorPageShell from '../../professor/components/ProfessorPageShell';
 import { ADMIN_NAV_ITEMS, PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { ProfessorWorkflowContext } from '../../../context/professor/useProfessorWorkflow';
 import { useRemoteData } from '../../../hooks/useRemoteData';
-import { getProfessorTargets, createProfessorSession, validateProfessorSession, revokeProfessorSession, createActingProfessorScope } from '../../../services/admin/professorModeService';
+import { getProfessorTargets, createProfessorSession, validateProfessorSession, revokeProfessorSession, createActingProfessorScope, createProfessorPreview, validateProfessorPreview, revokeProfessorPreview } from '../../../services/admin/professorModeService';
 import styles from './ProfessorMode.module.css';
 
+const previewPath = '/admin/professor-preview';
 const selectionPath = '/admin/professor-mode';
 function validSession(session, id) {
   return session?.id === id && session?.target?.role === 'PROFESSOR' && session.target.userId
@@ -17,6 +20,7 @@ function validSession(session, id) {
 export function ProfessorModeSelector() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [confirmation, setConfirmation] = useState(null);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [page, setPage] = useState(0);
@@ -27,14 +31,14 @@ export function ProfessorModeSelector() {
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const loader = useCallback(config => getProfessorTargets(page, search, config), [page, search]);
   const result = useRemoteData(loader);
-  async function select(target) {
+  async function select(target, preview = false) {
     if (lock.current) return;
     lock.current = true; setSelectedId(target.userId); setPending(target.userId); setError('');
     try {
-      const session = await createProfessorSession(target.userId);
-      if (!alive.current) { revokeProfessorSession(session.id).catch(() => {}); return; }
+      const session = await (preview ? createProfessorPreview : createProfessorSession)(target.userId);
+      if (!alive.current) { (preview ? revokeProfessorPreview : revokeProfessorSession)(session.id).catch(() => {}); return; }
       if (!validSession(session, session.id) || session.target.userId !== target.userId) throw new Error('Invalid acting session');
-      navigate(selectionPath + '/' + encodeURIComponent(session.id));
+      navigate((preview ? previewPath : selectionPath) + '/' + encodeURIComponent(session.id));
     } catch {
       if (alive.current) setError('Could not start Professor Mode. Check that the account is active and try again.');
     } finally {
@@ -44,7 +48,7 @@ export function ProfessorModeSelector() {
   }
   return <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
     <main className={styles.selector}>
-      <h1 className={styles.pageTitle}>Professor Mode</h1><p className={styles.subtitle}>Select an active Professor. Changes will affect that Professor’s real teaching data and record you as the Admin actor.</p>
+      <h1 className={styles.pageTitle}>Professor Mode</h1><p className={styles.subtitle}>Select an active Professor to preview safely or act on their account with audited changes.</p>
       {location.state?.actingNotice && <p role="status">Professor Mode ended. Select an active account to start a new session.</p>}
       <div className={styles.searchArea}><label htmlFor="professor-mode-search">Search Professors</label>
       <div className={styles.searchField}><Search size={18} aria-hidden="true" />
@@ -54,9 +58,10 @@ export function ProfessorModeSelector() {
         : !result.data?.content?.length ? <p>No active Professors found.</p> : <ul className={styles.targets}>
           {result.data.content.map(target => <li key={target.userId} className={selectedId === target.userId ? styles.selectedTarget : undefined}>
             <div>{selectedId === target.userId && <span className={styles.selectedBadge}><span aria-hidden="true">&#10003;</span> Selected</span>}<strong>{target.name || 'Professor'}</strong><p>{target.email || 'Email not specified'}</p></div>
-            <button disabled={pending !== null} onClick={() => select(target)} aria-pressed={selectedId === target.userId} aria-label={'Act as ' + (target.name || 'Professor')}>
-              {pending === target.userId ? 'Starting...' : 'Enter Professor Mode'}
-            </button>
+            <div className={styles.actions}>
+              <Button disabled={pending !== null} onClick={() => select(target, true)}><Eye size={16} /> Preview</Button>
+              <Button variant="secondary" disabled={pending !== null} onClick={() => { setSelectedId(target.userId); setConfirmation(target); }}><LogIn size={16} /> Act as Professor</Button>
+            </div>
           </li>)}
         </ul>}
       <nav aria-label="Professor selection pages" className={styles.pagination}>
@@ -65,14 +70,21 @@ export function ProfessorModeSelector() {
         <button disabled={result.isLoading || pending !== null || page + 1 >= (result.data?.totalPages ?? 0)} onClick={() => setPage(p => p + 1)}>Next</button>
       </nav>
     </main>
+    {confirmation && <Dialog className={styles.confirmDialog} labelledBy="professor-support-title" describedBy="professor-support-description" busy={pending !== null} onClose={() => setConfirmation(null)} initialFocus="button">
+      <h2 id="professor-support-title">Act as Professor?</h2>
+      <p><strong>{confirmation.name}</strong><br />{confirmation.email}</p>
+      <p id="professor-support-description">You are about to perform actions in this Professor's account context. Changes may affect real academic data and will be recorded in the audit log.</p>
+      {error && <p role="alert">{error}</p>}
+      <div className={styles.actions}><Button variant="secondary" disabled={pending !== null} onClick={() => setConfirmation(null)}>Cancel</Button><Button disabled={pending !== null} onClick={() => select(confirmation)}>Continue as Professor</Button></div>
+    </Dialog>}
   </PageShell>;
 }
-export default function ProfessorModeRoute() {
+export default function ProfessorModeRoute({ preview = false }) {
   const { actingSessionId } = useParams();
-  return <RestoreProfessorMode key={actingSessionId} id={actingSessionId} />;
+  return <RestoreProfessorMode key={`${preview}-${actingSessionId}`} id={actingSessionId} preview={preview} />;
 }
-function RestoreProfessorMode({ id }) {
-  const loader = useCallback(config => validateProfessorSession(id, config), [id]);
+function RestoreProfessorMode({ id, preview }) {
+  const loader = useCallback(config => (preview ? validateProfessorPreview : validateProfessorSession)(id, config), [id, preview]);
   const result = useRemoteData(loader);
   if (result.isLoading) return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin"><p role="status">Restoring Professor Mode...</p></PageShell>;
   if (result.error) {
@@ -82,16 +94,16 @@ function RestoreProfessorMode({ id }) {
     </div></PageShell>;
   }
   if (!validSession(result.data, id)) return <Navigate to={selectionPath} replace state={{ actingNotice: true }} />;
-  return <ActiveProfessorMode session={result.data} />;
+  return <ActiveProfessorMode session={result.data} preview={preview} />;
 }
-function ActiveProfessorMode({ session }) {
+function ActiveProfessorMode({ session, preview }) {
   const navigate = useNavigate();
   const [leaving, setLeaving] = useState(false);
   const [exitError, setExitError] = useState('');
   const lock = useRef(false);
   const alive = useRef(false);
   const invalid = useCallback(() => navigate(selectionPath, { replace: true, state: { actingNotice: true } }), [navigate]);
-  const scope = useMemo(() => createActingProfessorScope(session.id, invalid), [session.id, invalid]);
+  const scope = useMemo(() => createActingProfessorScope(session.id, invalid, preview), [session.id, invalid, preview]);
   useLayoutEffect(() => {
     alive.current = true; scope.resume();
     const timer = setTimeout(invalid, Math.max(0, Date.parse(session.expiresAt) - Date.now()));
@@ -101,7 +113,7 @@ function ActiveProfessorMode({ session }) {
     if (lock.current) return;
     lock.current = true; setLeaving(true); setExitError(''); scope.dispose();
     try {
-      await revokeProfessorSession(session.id);
+      await (preview ? revokeProfessorPreview : revokeProfessorSession)(session.id);
       if (alive.current) navigate(changeAccount ? selectionPath : '/admin', { replace: true });
     } catch (error) {
       if (!alive.current) return;
@@ -109,8 +121,8 @@ function ActiveProfessorMode({ session }) {
       else { scope.resume(); setExitError('Could not end the session. Please try Exit Mode again.'); setLeaving(false); }
     } finally { lock.current = false; }
   }
-  const value = { acting: true, api: scope.api, target: session.target,
-    basePath: selectionPath + '/' + session.id, leave, leaving, exitError };
+  const value = { acting: true, preview, api: scope.api, target: session.target,
+    basePath: (preview ? previewPath : selectionPath) + '/' + session.id, leave, leaving, exitError };
   return <ProfessorWorkflowContext.Provider value={value}>
     {leaving ? <ProfessorPageShell responsive navItems={PROFESSOR_NAV_ITEMS} roleBadge="Professor"><p role="status">Ending Professor Mode...</p></ProfessorPageShell> : <Outlet />}
   </ProfessorWorkflowContext.Provider>;

@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<UserEntity, Long> {
+    java.util.List<UserEntity> findByEmailIn(java.util.Collection<String> emails);
+
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select u from UserEntity u where u.id = :id")
     Optional<UserEntity> findForAssessmentLifecycle(@org.springframework.data.repository.query.Param("id") Long id);
@@ -28,7 +30,7 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
     // No lazy entities or per-student repository calls are used by the summary page.
     @org.springframework.data.jpa.repository.Query(value = """
         select new com.ptc.halo.dtoResponse.ProfessorStudentSummary(
-            u.id, u.name, profile.section,
+            u.id, u.name, profile.section, u.status,
             (select count(p.id) from StudentModuleProgressEntity p
              where p.student.id = u.id and p.completed = true
              and p.module.week.subject.professor.user.id = :professorId),
@@ -37,12 +39,13 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
              and a.assessment.module.week.subject.professor.user.id = :professorId),
             (select count(b.id) from StudentBadgeEntity b where b.student.id = u.id))
         from UserEntity u left join StudentProfileEntity profile on profile.user.id = u.id
-        where u.role = com.ptc.halo.enums.Role.STUDENT
+        where u.role = com.ptc.halo.enums.Role.STUDENT and u.status in :statuses
         and exists (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel)
         order by u.id asc
-        """, countQuery = "select count(u.id) from UserEntity u join StudentProfileEntity profile on profile.user.id=u.id where u.role = com.ptc.halo.enums.Role.STUDENT and exists (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel)")
+        """, countQuery = "select count(u.id) from UserEntity u join StudentProfileEntity profile on profile.user.id=u.id where u.role = com.ptc.halo.enums.Role.STUDENT and u.status in :statuses and exists (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel)")
     org.springframework.data.domain.Page<com.ptc.halo.dtoResponse.ProfessorStudentSummary> findProfessorProgressSummaries(
             @org.springframework.data.repository.query.Param("professorId") Long professorId,
+            @org.springframework.data.repository.query.Param("statuses") java.util.List<Status> statuses,
             org.springframework.data.domain.Pageable pageable);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
@@ -61,7 +64,13 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
 
     boolean existsByRole(Role role);
 
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("update UserEntity u set u.name=:name where u.id=:id and u.status=com.ptc.halo.enums.Status.ACTIVE")
+    int updateOwnName(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("name") String name);
+
     long countByRole(Role role);
+
+    long countByRoleAndStatus(Role role, Status status);
 
     long countByStatus(Status status);
 }

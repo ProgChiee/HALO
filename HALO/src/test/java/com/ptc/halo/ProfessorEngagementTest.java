@@ -27,6 +27,7 @@ class ProfessorEngagementTest {
    "create table mentor_sessions(id bigint primary key,student_id bigint,ai_learning_module_id bigint)",
    "create table mentor_messages(session_id bigint,sender varchar(30),message varchar(200),created_at timestamp)"})db.execute(sql);
   db.update("insert into user_entity values(1,'Professor','PROFESSOR'),(2,'Other','PROFESSOR'),(10,'Student','STUDENT'),(11,'Unrelated','STUDENT'),(12,'Admin','ADMIN')");
+  db.execute("alter table user_entity add status varchar(30) default 'ACTIVE'");
   db.update("insert into professor_entity values(1,1),(2,2)");db.update("insert into subjects values(1,1,'FIRST_YEAR'),(2,2,'SECOND_YEAR')");db.update("insert into weeks values(1,1),(2,2)");db.update("insert into ai_learning_modules values(1,1),(2,2)");db.update("insert into assessments values(1,1),(2,2)");
   db.update("insert into student_profile_entity values(10,'FIRST_YEAR'),(11,'SECOND_YEAR'),(12,'FIRST_YEAR')");
   db.execute("alter table subjects add subject_name varchar(100) default 'Subject'");db.execute("alter table weeks add week_number integer default 1");db.execute("alter table weeks add title varchar(100) default 'Module'");
@@ -83,6 +84,24 @@ class ProfessorEngagementTest {
   attempt(10,2,"2026-10-06 00:00:00",null);
   assertEquals(0,page().content().stream().filter(v->v.userId()==10L).findFirst().orElseThrow().activeDaysWeek());
   assertEquals(1L,service.modules(professor,10L,0,20).get("totalElements"));
+ }
+ @Test void lifecyclePopulationsPreserveHistoryAndRestore() {
+  attempt(10,1,"2026-10-06 08:00:00",null);
+  db.update("insert into lesson_study_days values(10,1,CURRENT_DATE,3)");
+  for(String status:java.util.List.of("INACTIVE","ARCHIVED","BLOCKED")) {
+   db.update("update user_entity set status=? where id=10",status);
+   assertEquals(0,page().totalElements());
+   var former=service.get(professor,0,20,LocalDate.of(2026,10,11),com.ptc.halo.enums.ProfessorStudentView.FORMER);
+   assertEquals(status.equals("BLOCKED")?0:1,former.totalElements());
+   if(!status.equals("BLOCKED")) {
+    assertEquals(1,former.content().get(0).activeDaysWeek());
+    var rows=(java.util.List<ProfessorEngagementService.ModuleEngagement>)service.modules(professor,10L,0,20,com.ptc.halo.enums.ProfessorStudentView.FORMER).get("content");
+    assertEquals(3,rows.get(0).reviewCount());assertEquals(1,rows.get(0).assessmentAttempts());
+   }
+   assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.modules(professor,10L,0,20));
+   assertEquals(1,db.queryForObject("select count(*) from assessment_attempts",Integer.class));
+  }
+  db.update("update user_entity set status='ACTIVE' where id=10");assertEquals(1,page().totalElements());assertEquals(1,page().content().get(0).activeDaysWeek());
  }
  @Test void consistencyThresholdsAreDeterministic(){
   for(int days=0;days<=10;days++){

@@ -1,14 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, User, Mail, KeyRound, Eye, EyeOff, Hash, Users2 } from 'lucide-react';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { register as registerService } from '../../../services/authService';
 import bgImage from '../../../assets/login/Background.png';
+import { validateRegistration, registrationHints, registrationFailure } from '../../../utils/registration';
 import styles from '../styles/Register.module.css';
 
-// Change this if your institutional domain is different
-const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
 
 // Matches the backend's YearLevel enum exactly.
 const YEAR_LEVELS = [
@@ -23,49 +22,41 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [studentId, setStudentId] = useState('');
   const [section, setSection] = useState('');
-  const [yearLevel, setYearLevel] = useState('FIRST_YEAR');
+  const [yearLevel, setYearLevel] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [errors, setErrors] = useState({});
+  const submitting = useRef(false);
   const { showToast } = useToast();
   const navigate = useNavigate();
 
+  function clearField(field) { setErrors(current => { const next = { ...current }; delete next[field]; return next; }); }
+
   async function handleSubmit(e) {
     e.preventDefault();
-    if (isLoading) return;
+    if (submitting.current) return;
     setError('');
-
-    if (!fullName || !email || !password || !confirmPassword || !studentId || !section) {
-      setError('Please fill in all fields.');
+    const result = validateRegistration({ name: fullName, email, password, confirmPassword, studentId, section, yearLevel });
+    setErrors(result.errors);
+    if (Object.keys(result.errors).length) {
+      requestAnimationFrame(() => document.getElementById('register-' + Object.keys(result.errors)[0])?.focus());
       return;
     }
-
-    if (!email.toLowerCase().endsWith(INSTITUTIONAL_DOMAIN)) {
-      setShowEmailModal(true);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-
+    submitting.current = true;
     setIsLoading(true);
 
     try {
-      await registerService(fullName, email, password, studentId, section, yearLevel);
+      await registerService(result.value.name, result.value.email, password, result.value.studentId, result.value.section, yearLevel);
       showToast('Account created! Please sign in.', 'success');
       navigate('/login');
-    } catch {
-      setError('Something went wrong. Please try again.');
+    } catch (failure) {
+      const result = registrationFailure(failure);
+      setError(result.message); setErrors(result.errors);
+      showToast(result.message, 'error');
     } finally {
+      submitting.current = false;
       setIsLoading(false);
     }
   }
@@ -86,86 +77,98 @@ export default function Register() {
         </p>
 
         </div>
-          <form onSubmit={handleSubmit} className={styles.form}>
+          <form noValidate onSubmit={handleSubmit} className={styles.form}>
 <fieldset className={styles.group}><legend className={styles.groupTitle}>Personal information</legend>
             <div className={styles.field}>
-              <label className={styles.label}>Fullname</label>
+              <label className={styles.label} htmlFor="register-name">Full name</label>
               <div className={styles.inputWrapper}>
                 <User size={18} className={styles.inputIcon} />
                 <input
                   type="text"
                   className={styles.input}
+                  id="register-name" aria-invalid={!!errors.name} aria-describedby="register-name-hint" disabled={isLoading}
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) => { setFullName(e.target.value); clearField('name'); }}
                   placeholder="Your full name"
                 />
               </div>
+              <p id="register-name-hint" className={errors.name ? styles.fieldError : styles.hint}>{errors.name || registrationHints.name}</p>
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Email</label>
+              <label className={styles.label} htmlFor="register-email">Email</label>
               <div className={styles.inputWrapper}>
                 <Mail size={18} className={styles.inputIcon} />
                 <input
                   type="email"
                   className={styles.input}
+                  id="register-email" aria-invalid={!!errors.email} aria-describedby="register-email-hint" disabled={isLoading}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
                   placeholder="Your@Paterostechnologicalcollege.edu.ph"
                 />
               </div>
+              <p id="register-email-hint" className={errors.email ? styles.fieldError : styles.hint}>{errors.email || registrationHints.email}</p>
             </div>
 
             </fieldset>
 <fieldset className={styles.group}><legend className={styles.groupTitle}>School information</legend>
 <div className={styles.field}>
-              <label className={styles.label}>Student ID</label>
+              <label className={styles.label} htmlFor="register-studentId">Student ID</label>
               <div className={styles.inputWrapper}>
                 <Hash size={18} className={styles.inputIcon} />
                 <input
                   type="text"
                   className={styles.input}
+                  id="register-studentId" aria-invalid={!!errors.studentId} aria-describedby="register-studentId-hint" disabled={isLoading}
                   value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                  placeholder="e.g. 2023-00123"
+                  onChange={(e) => { setStudentId(e.target.value); clearField('studentId'); }}
+                  placeholder="e.g. 29AHRT-0168"
                 />
               </div>
+              <p id="register-studentId-hint" className={errors.studentId ? styles.fieldError : styles.hint}>{errors.studentId || registrationHints.studentId}</p>
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Section</label>
+              <label className={styles.label} htmlFor="register-section">Section</label>
               <div className={styles.inputWrapper}>
                 <Users2 size={18} className={styles.inputIcon} />
                 <input
                   type="text"
                   className={styles.input}
+                  id="register-section" aria-invalid={!!errors.section} aria-describedby="register-section-hint" disabled={isLoading}
                   value={section}
-                  onChange={(e) => setSection(e.target.value)}
+                  onChange={(e) => { setSection(e.target.value); clearField('section'); }}
                   placeholder="e.g. BSHM 1A"
                 />
               </div>
+              <p id="register-section-hint" className={errors.section ? styles.fieldError : styles.hint}>{errors.section || registrationHints.section}</p>
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Year level</label>
-              <select className={styles.input} value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}>
+              <label className={styles.label} htmlFor="register-yearLevel">Year level</label>
+              <select className={styles.input} id="register-yearLevel" aria-invalid={!!errors.yearLevel} aria-describedby="register-yearLevel-hint" disabled={isLoading}
+                  value={yearLevel} onChange={(e) => { setYearLevel(e.target.value); clearField('yearLevel'); }}>
+                <option value="">Select year level</option>
                 {YEAR_LEVELS.map((yl) => (
                   <option key={yl.value} value={yl.value}>{yl.label}</option>
                 ))}
               </select>
+              <p id="register-yearLevel-hint" className={errors.yearLevel ? styles.fieldError : styles.hint}>{errors.yearLevel || registrationHints.yearLevel}</p>
             </div>
 
             </fieldset>
 <fieldset className={styles.group}><legend className={styles.groupTitle}>Account information</legend>
 <div className={styles.field}>
-              <label className={styles.label}>Password</label>
+              <label className={styles.label} htmlFor="register-password">Password</label>
               <div className={styles.inputWrapper}>
                 <KeyRound size={18} className={styles.inputIcon} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   className={styles.input}
+                  id="register-password" aria-invalid={!!errors.password} aria-describedby="register-password-hint" disabled={isLoading}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
                   placeholder="Password"
                 />
                 <button
@@ -177,17 +180,19 @@ export default function Register() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              <p id="register-password-hint" className={errors.password ? styles.fieldError : styles.hint}>{errors.password || registrationHints.password}</p>
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Confirm password</label>
+              <label className={styles.label} htmlFor="register-confirmPassword">Confirm password</label>
               <div className={styles.inputWrapper}>
                 <KeyRound size={18} className={styles.inputIcon} />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   className={styles.input}
+                  id="register-confirmPassword" aria-invalid={!!errors.confirmPassword} aria-describedby="register-confirmPassword-hint" disabled={isLoading}
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => { setConfirmPassword(e.target.value); clearField('confirmPassword'); }}
                   placeholder="Repeat your password"
                 />
                 <button
@@ -199,12 +204,13 @@ export default function Register() {
                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              <p id="register-confirmPassword-hint" className={errors.confirmPassword ? styles.fieldError : styles.hint}>{errors.confirmPassword || registrationHints.confirmPassword}</p>
             </div>
 
             </fieldset>
-            {error && <p className={styles.error}>{error}</p>}
+            {error && <p role="alert" className={styles.error}>{error}</p>}
 
-            <Button type="submit" isLoading={isLoading}>Create account</Button>
+            <Button type="submit" disabled={isLoading} isLoading={isLoading}>Create account</Button>
 
             <p className={styles.signinText}>
               Already have an account?{' '}
@@ -214,18 +220,6 @@ export default function Register() {
         </div>
       </div>
 
-      {/* Institutional email popup */}
-      {showEmailModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowEmailModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Institutional email required</h3>
-            <p className={styles.modalText}>
-              Please use your school email address (ending in {INSTITUTIONAL_DOMAIN}) to create your account.
-            </p>
-            <Button onClick={() => setShowEmailModal(false)}>Okay</Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

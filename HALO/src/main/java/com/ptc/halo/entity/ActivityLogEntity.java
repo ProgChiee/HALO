@@ -13,7 +13,7 @@ public class ActivityLogEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private UserEntity user;
 
     @Enumerated(EnumType.STRING)
@@ -41,6 +41,16 @@ public class ActivityLogEntity {
     public void setActingTargetRole(com.ptc.halo.enums.Role value) { actingTargetRole = value; }
     public AdminActingSessionEntity getActingSession() { return actingSession; }
     public void setActingSession(AdminActingSessionEntity value) { actingSession = value; }
+
+    @Enumerated(EnumType.STRING) @Column(length=64) private com.ptc.halo.enums.AuthEvent authEvent;
+    @Column(length=512) private String authDisplay;
+    @Column(length=64, unique=true) private String authEventKey;
+    public com.ptc.halo.enums.AuthEvent getAuthEvent(){return authEvent;}
+    public void setAuthEvent(com.ptc.halo.enums.AuthEvent value){authEvent=value;}
+    public String getAuthDisplay(){return authDisplay;}
+    public void setAuthDisplay(String value){authDisplay=value;}
+    public String getAuthEventKey(){return authEventKey;}
+    public void setAuthEventKey(String value){authEventKey=value;}
 
     public ActivityLogEntity() {
     }

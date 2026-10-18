@@ -10,12 +10,17 @@ export const validateProfessorSession = async (id, config = {}) =>
   (await apiClient.get(`/admin/acting/sessions/${encodeURIComponent(id)}`, config)).data;
 export const revokeProfessorSession = async (id) => apiClient.delete(`/admin/acting/sessions/${encodeURIComponent(id)}`);
 
+export const createProfessorPreview = async targetUserId => (await apiClient.post('/admin/preview/professor/sessions', { targetUserId })).data;
+export const validateProfessorPreview = async (id, config = {}) => (await apiClient.get(`/admin/preview/professor/sessions/${encodeURIComponent(id)}`, config)).data;
+export const revokeProfessorPreview = async id => apiClient.delete(`/admin/preview/professor/sessions/${encodeURIComponent(id)}`);
+
 // This adapter is instance-scoped: never rewrite the shared Axios client's defaults.
-export function createActingProfessorScope(sessionId, onInvalid) {
+export function createActingProfessorScope(sessionId, onInvalid, preview = false) {
   let active = true;
   const pending = new Set();
   async function request(method, path, data, config = {}) {
     if (!active) throw new axios.CanceledError();
+    if (preview && method !== 'get') throw new Error('Professor Preview is read-only.');
     if (!path.startsWith('/professor/')) throw new Error('Unsupported Professor operation');
     const controller = new AbortController();
     pending.add(controller);
@@ -24,7 +29,7 @@ export function createActingProfessorScope(sessionId, onInvalid) {
     if (config.signal?.aborted) controller.abort();
     try {
       const response = await apiClient.request({ ...config, method, data,
-        url: '/admin/acting/professor/' + path.slice('/professor/'.length),
+        url: (preview ? '/admin/preview/professor/' : '/admin/acting/professor/') + path.slice('/professor/'.length),
         signal: controller.signal, headers: { ...config.headers, 'X-Acting-Session': sessionId } });
       if (!active || controller.signal.aborted) throw new axios.CanceledError();
       return response;

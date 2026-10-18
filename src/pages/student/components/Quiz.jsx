@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ClipboardCheck, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
+import QuizVersion from './QuizVersion';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { buildAssessmentAnswers } from '../../../utils/backendContract';
@@ -135,6 +136,10 @@ function WeekQuiz({ subjectId, weekId }) {
       if (!latestStatus.canTakeAssessment) return;
       const attempt = await startAttempt(moduleId);
       if (!mounted.current) return;
+      const pinnedAssessment = await getAssessment(moduleId);
+      if (!mounted.current) return;
+      if (attempt.assessmentId && pinnedAssessment.id !== attempt.assessmentId) throw new Error('Assessment changed. Please resume the attempt.');
+      setAssessment(pinnedAssessment);
       setAttemptId(attempt.attemptId);
       setStage('active');
       setCurrentIndex(0);
@@ -228,6 +233,7 @@ function WeekQuiz({ subjectId, weekId }) {
         </header>
 
         <main className={styles.main}>
+          <QuizVersion version={assessment.quizVersion} currentVersion={assessment.currentQuizVersion} continuing={!workflow.preview && stage !== 'results' && status?.hasUnfinishedAttempt} />
           {stage === 'intro' && (
             <div className={styles.introCard}>
               <span className={styles.introIcon}>

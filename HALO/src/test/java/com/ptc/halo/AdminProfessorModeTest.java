@@ -21,10 +21,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect","spring.jpa.open-in-view=false"},showSql=false)
-@Import({AdminProfessorModeService.class,AdminActingSessionService.class,ProfessorAcademicService.class,
+@Import({AdminProfessorPreviewService.class,AdminProfessorModeService.class,AdminActingSessionService.class,ProfessorAcademicService.class,
     ProfessorModuleService.class,ModuleGenerationState.class,ActivityLogService.class,AssessmentService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AdminProfessorModeTest {
+ @Autowired AdminProfessorPreviewService preview;
  @Autowired AdminProfessorModeService mode;
  @Autowired AdminActingSessionService acting;
  @Autowired ProfessorAcademicService academic;
@@ -66,6 +67,35 @@ class AdminProfessorModeTest {
  void tx(java.util.function.Consumer<org.springframework.transaction.TransactionStatus> f){new TransactionTemplate(manager).executeWithoutResult(f);}
  void ready(Long id){tx(t->{var m=moduleRepo.findById(id).orElseThrow();m.setAiGenerationStatus(AiGenerationStatus.COMPLETED);m.setGeneratedKnowledge("Knowledge");var file=new AiLearningFileEntity();file.setOriginalFileName("lesson.pdf");file.setStoredFileName("opaque.pdf");file.setFilePath("opaque.pdf");file.setFileType("application/pdf");m.addFile(file);moduleRepo.saveAndFlush(m);});}
  GeneratedAssessment generated(){var result=new GeneratedAssessment();var q=new GeneratedAssessmentQuestion();q.setQuestionNumber(1);q.setQuestion("Question?");q.setOptionA("A");q.setOptionB("B");q.setOptionC("C");q.setOptionD("D");q.setCorrectAnswer("A");result.setQuestions(List.of(q));return result;}
+ @Test void previewRechecksTokenVersionsExpiryAndUsesReadOnlyTransactions() {
+  var p=preview.create(auth,professor.getId());
+  assertEquals(Boolean.TRUE,preview.read(auth,p.id(),s->org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()));
+  professor.setTokenVersion(professor.getTokenVersion()+1);users.saveAndFlush(professor);
+  assertThrows(AdminApiException.class,()->preview.validate(auth,p.id()));
+  var expired=new AdminActingSessionEntity(java.util.UUID.randomUUID().toString(),admin,professor,java.time.Instant.now().minusSeconds(100),java.time.Instant.now().minusSeconds(1));
+  assertThrows(AdminApiException.class,()->acting.validateProfessorPreview(auth,expired));
+  var student=user("preview-student",Role.STUDENT);
+  var wrong=new AdminActingSessionEntity(java.util.UUID.randomUUID().toString(),admin,student,java.time.Instant.now(),java.time.Instant.now().plusSeconds(100));
+  assertThrows(AdminApiException.class,()->acting.validateProfessorPreview(auth,wrong));
+ }
+ @Test void previewIsSeparateReadOnlyScopedAndRevocable() {
+  Long moduleId=module();long stored=sessions.count(),academicCount=moduleRepo.count();
+  var p=preview.create(auth,professor.getId());assertEquals(stored,sessions.count());
+  assertEquals(professor.getId(),preview.validate(auth,p.id()).target().userId());
+  assertNotNull(preview.read(auth,p.id(),s->modules.getModuleById(moduleId,s.getTarget(),null)));
+  assertThrows(AdminApiException.class,()->mode.execute(auth,p.id(),s->academic.createSubject(subjectRequest("NO"),s.getTarget(),s)));
+  var otherPreview=preview.create(auth,other.getId());
+  assertThrows(ResponseStatusException.class,()->preview.read(auth,otherPreview.id(),s->modules.getModuleById(moduleId,s.getTarget(),null)));
+  var another=user("another",Role.ADMIN);assertThrows(AdminApiException.class,()->preview.validate(auth(another),p.id()));
+  assertThrows(org.springframework.security.access.AccessDeniedException.class,()->preview.create(auth(professor),professor.getId()));
+  assertThrows(AdminApiException.class,()->preview.create(auth,admin.getId()));
+  professor.setStatus(Status.ARCHIVED);users.saveAndFlush(professor);
+  assertThrows(AdminApiException.class,()->preview.validate(auth,p.id()));assertThrows(AdminApiException.class,()->preview.create(auth,professor.getId()));
+  professor.setStatus(Status.ACTIVE);users.saveAndFlush(professor);
+  preview.revoke(auth,p.id());assertThrows(AdminApiException.class,()->preview.validate(auth,p.id()));
+  assertEquals(academicCount,moduleRepo.count());
+  tx(t->{var logsForPreview=logs.findAll().stream().filter(l->l.getAction().contains("preview")).toList();assertFalse(logsForPreview.isEmpty());for(var l:logsForPreview){assertEquals(admin.getId(),l.getUser().getId());assertEquals(Role.PROFESSOR,l.getActingTargetRole());assertNull(l.getActingSession());}});
+ }
  @Test void createsTargetOwnedAcademicDataAndAdminAudits() {
   Long id=module();
   tx(t->{var m=moduleRepo.findById(id).orElseThrow();assertEquals(professor.getId(),m.getWeek().getSubject().getProfessor().getUser().getId());

@@ -1,0 +1,15 @@
+.container { width: 100%; min-width: 0; }
+.label { composes: label from './UIPrimitives.module.css'; display: block; margin-bottom: var(--space-2); }
+.value { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); overflow-wrap: anywhere; }
+.edit { composes: iconButton from './UIPrimitives.module.css'; padding: var(--space-2); }
+.edit:focus-visible, .actions button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.form { display: grid; gap: var(--space-3); }
+.input { composes: control from './UIPrimitives.module.css'; width: 100%; min-width: 0; padding: var(--space-3); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.actions button { padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm); font: inherit; }
+.cancel { background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-primary); }
+.save { background: var(--color-primary); border: 1px solid var(--color-primary); color: var(--color-text-on-button); }
+.save:hover:not(:disabled) { background: var(--color-primary-hover); }
+.actions button:disabled { opacity: .6; cursor: not-allowed; }
+.error { composes: error from './UIPrimitives.module.css'; margin: 0; }
+.success { display: block; margin-top: var(--space-2); color: var(--color-success-text); font-size: var(--font-size-sm); }

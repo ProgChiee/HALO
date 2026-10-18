@@ -8,18 +8,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "assessments")
+@Table(name = "assessments", uniqueConstraints=@UniqueConstraint(name="uk_assessment_module_version", columnNames={"module_id","quiz_version"}))
 public class AssessmentEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "module_id",
-            nullable = false,
-            unique = true
+            nullable = false
     )
     private AiLearningModuleEntity module;
 
@@ -44,6 +43,15 @@ public class AssessmentEntity {
     @OrderBy("questionNumber ASC")
     private List<AssessmentQuestionEntity> questions = new ArrayList<>();
 
+    @Column(name="quiz_version",nullable=false) private int quizVersion = 1;
+    private Long sourceModuleVersion;
+    private LocalDateTime approvedAt;
+    public int getQuizVersion(){return quizVersion;}
+    public void setQuizVersion(int value){quizVersion=value;}
+    public Long getSourceModuleVersion(){return sourceModuleVersion;}
+    public void setSourceModuleVersion(Long value){sourceModuleVersion=value;}
+    public LocalDateTime getApprovedAt(){return approvedAt;}
+    public void setApprovedAt(LocalDateTime value){approvedAt=value;}
     public AssessmentEntity() {
     }
 

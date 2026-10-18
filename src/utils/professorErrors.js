@@ -1,5 +1,9 @@
 // Fixed messages only: never display arbitrary server messages or payloads.
 const MESSAGES = {
+  QUIZ_GENERATION_FAILED: "The quiz could not be generated. Please try again.",
+  REVISION_REQUIRES_PUBLISHED: "Only published lessons can be revised.",
+  REVISION_NOT_FOUND: "This revision is no longer available. Reload the lesson.",
+  REVISION_REVIEW_REQUIRED: "Save and review the latest revision before publishing.",
   INVALID_YOUTUBE_URL: "Please provide a valid YouTube video URL.",
   "AUTHENTICATION_REQUIRED": "Please sign in to continue.",
   "ACCESS_DENIED": "You do not have permission to access this resource.",

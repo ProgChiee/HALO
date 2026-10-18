@@ -21,7 +21,7 @@ class ActivityLogTransactionTest {
    if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new LazyInitializationException("no persistence context");
    return user;
   });
-  var service = new ActivityLogService(repository);
+  var service = new ActivityLogService(repository, mock(com.ptc.halo.repository.UserRepository.class));
   assertThrows(LazyInitializationException.class, () -> service.getLogs(Role.ADMIN, null, 0, 20, ""));
   var factory = new ProxyFactory(service); factory.setProxyTargetClass(true);
   factory.addAdvice(new TransactionInterceptor(new StudentLessonTransactionTest.TestTransactions(), new AnnotationTransactionAttributeSource()));

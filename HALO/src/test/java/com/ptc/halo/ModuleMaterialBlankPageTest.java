@@ -83,4 +83,16 @@ class ModuleMaterialBlankPageTest {
         assertEquals("MODULE_INDEX_UNAVAILABLE",assertThrows(ResponseStatusException.class,()->index(chat).getOrBuild(m)).getReason());
         assertFalse(Files.exists(directory.resolve(".module-index/41.json")));
     }
+
+    @Test void revisionBuildCannotReplaceLiveCache() throws Exception {
+        var live=module();var draft=module();var chat=mock(ChatClient.class,RETURNS_DEEP_STUBS);
+        var originalFile=pdf(1,live,"Original hospitality lesson.");var revisionFile=pdf(2,draft,"Revised hospitality lesson.");
+        when(live.getFiles()).thenReturn(List.of(originalFile));
+        when(draft.getFiles()).thenReturn(List.of(revisionFile));
+        var index=index(chat);var original=index.getOrBuild(live);
+        var cache=directory.resolve(".module-index/41.json");var bytes=Files.readAllBytes(cache);
+        assertEquals(2L,index.buildRevision(draft).chunks().get(0).fileId());assertArrayEquals(bytes,Files.readAllBytes(cache));
+        assertEquals(original,index.getOrBuild(live));index.invalidate(41L);assertFalse(Files.exists(cache));
+        assertEquals(2L,index.getOrBuild(draft).chunks().get(0).fileId());
+    }
 }

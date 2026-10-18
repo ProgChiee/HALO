@@ -1,3 +1,5 @@
+import { useAuth } from '../../../context/login/useAuth';
+import ProfileName from '../../../components/shared/ProfileName';
 import ProfilePhoto from '../../../components/shared/ProfilePhoto';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
@@ -19,6 +21,7 @@ import styles from '../styles/ProfessorProfile.module.css';
 // in professorService.js is still flagged as unavailable).
 
 export default function ProfessorProfile() {
+  const { user } = useAuth();
   const workflow = useProfessorWorkflow();
   const { getProfessorProfile } = workflow.api;
   const [isLoading, setIsLoading] = useState(true);
@@ -65,7 +68,8 @@ export default function ProfessorProfile() {
     );
   }
 
-  const avatarInitial = profile.name?.trim().charAt(0).toUpperCase() || '?';
+  const displayName = workflow.acting ? profile.name : (user?.name ?? profile.name);
+  const avatarInitial = displayName?.trim().charAt(0).toUpperCase() || '?';
 
   return (
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
@@ -80,12 +84,11 @@ export default function ProfessorProfile() {
 
         <main className={styles.main}>
           <div className={styles.profileHeader}>
-            <ProfilePhoto identity={`${workflow.basePath}:${profile.userId}`} initial={avatarInitial} readOnly={workflow.acting} getProfilePhoto={workflow.acting ? workflow.api.getProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{profile.name}</p><p className={styles.subMeta}>Professor</p></div>} />
+            <ProfilePhoto identity={`${workflow.basePath}:${profile.userId}`} initial={avatarInitial} readOnly={workflow.acting} getProfilePhoto={workflow.acting ? workflow.api.getProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{displayName}</p><p className={styles.subMeta}>Professor</p></div>} />
           </div>
 
           <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Full name</span>
-            <span className={styles.infoValue}>{profile.name}</span>
+            <ProfileName key={workflow.identity ?? workflow.basePath} name={displayName} readOnly={workflow.acting} />
           </div>
 
           <div className={styles.infoCard}>

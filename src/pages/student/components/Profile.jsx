@@ -1,3 +1,5 @@
+import { useAuth } from '../../../context/login/useAuth';
+import ProfileName from '../../../components/shared/ProfileName';
 import ProfilePhoto from './ProfilePhoto';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
@@ -13,6 +15,7 @@ const YEAR_LEVEL_LABELS = {
 };
 
 export default function Profile() {
+  const { user } = useAuth();
   const workflow = useStudentWorkflow();
   const { getProfileData } = workflow.api;
   const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +60,8 @@ export default function Profile() {
     );
   }
 
-  const avatarInitial = profile.name?.trim().charAt(0).toUpperCase() || '?';
+  const displayName = workflow.acting ? profile.name : (user?.name ?? profile.name);
+  const avatarInitial = displayName?.trim().charAt(0).toUpperCase() || '?';
   const yearLevelLabel = YEAR_LEVEL_LABELS[profile.yearLevel] ?? profile.yearLevel;
 
   return (
@@ -74,15 +78,14 @@ export default function Profile() {
         <main className={styles.main}>
           <div className={styles.profileHeader}>
             <ProfilePhoto key={workflow.identity} initial={avatarInitial} readOnly={workflow.acting} identityContent={<div>
-              <p className={styles.fullName}>{profile.name}</p>
+              <p className={styles.fullName}>{displayName}</p>
               <p className={styles.subMeta}>{profile.section} · {yearLevelLabel}</p>
             </div>} />
           </div>
 
           <div className={styles.detailsGrid}>
           <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Full name</span>
-            <span className={styles.infoValue}>{profile.name}</span>
+            <ProfileName key={workflow.identity ?? workflow.basePath} name={displayName} readOnly={workflow.acting} />
           </div>
 
           <div className={styles.infoCard}>
