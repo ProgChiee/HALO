@@ -18,17 +18,17 @@ before(async()=>{
 after(async()=>{await server?.close();dom?.window.close();});
 test('registration shows field errors, retains values and blocks duplicate submission',async()=>{
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);let calls=0,reject;
- api.defaults.adapter=config=>{calls++;const payload=JSON.parse(config.data);assert.equal(payload.studentId,'2023-00123');assert.equal(payload.name,'Talidong, Archie V.');return new Promise((_,fail)=>{reject=fail;});};
+ api.defaults.adapter=config=>{calls++;const payload=JSON.parse(config.data);assert.equal(payload.studentId,'29AHRT-0168');assert.equal(payload.name,'Talidong, Archie V.');return new Promise((_,fail)=>{reject=fail;});};
  try{
   await act(async()=>root.render(React.createElement(Router.MemoryRouter,null,React.createElement(ToastContext.Provider,{value:{showToast:()=>{}}},React.createElement(Register)))));
   const submit=()=>host.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
   await act(async()=>{submit();await new Promise(r=>setTimeout(r,1));});
   assert.equal(calls,0);assert.equal(host.querySelectorAll('[aria-invalid="true"]').length,7);
-  for(const [key,value] of Object.entries({name:'Talidong, Archie V.',email:'archie@paterostechnologicalcollege.edu.ph',studentId:'2023-00123',section:'BSHM 1A',yearLevel:'FIRST_YEAR',password:'password-123',confirmPassword:'password-123'})){
+  for(const [key,value] of Object.entries({name:'Talidong, Archie V.',email:'archie@paterostechnologicalcollege.edu.ph',studentId:'29AHRT-0168',section:'BSHM 1A',yearLevel:'FIRST_YEAR',password:'password-123',confirmPassword:'password-123'})){
    await act(async()=>{const input=host.querySelector('#register-'+key);Object.getOwnPropertyDescriptor(key==='yearLevel'?window.HTMLSelectElement.prototype:window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event(key==='yearLevel'?'change':'input',{bubbles:true}));});
   }
   await act(async()=>{submit();submit();});assert.equal(calls,1);assert.equal(host.querySelector('[type="submit"]').disabled,true);
   await act(async()=>reject({response:{status:409,data:{code:'REGISTRATION_VALIDATION_FAILED',errors:{studentId:'This Student ID is already registered.'}}}}));
-  assert.equal(host.querySelector('#register-studentId').value,'2023-00123');assert.equal(host.querySelector('#register-studentId').getAttribute('aria-invalid'),'true');assert.match(host.textContent,/already registered/);assert.equal(host.querySelector('[type="submit"]').disabled,false);
+  assert.equal(host.querySelector('#register-studentId').value,'29AHRT-0168');assert.equal(host.querySelector('#register-studentId').getAttribute('aria-invalid'),'true');assert.match(host.textContent,/already registered/);assert.equal(host.querySelector('[type="submit"]').disabled,false);
  }finally{await act(async()=>root.unmount());host.remove();}
 });

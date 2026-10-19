@@ -1,4 +1,5 @@
 const MESSAGES = {
+  PROFILE_INCOMPLETE: 'This Student profile is incomplete. Academic details are required before entering Preview or Support Mode.',
   ACCOUNT_STATE_CONFLICT: 'Restore this archived account before changing its status.',
   RESOURCE_NOT_FOUND: 'This account or resource no longer exists. Reload the list.',
   INVALID_TARGET_ROLE: 'This account does not have the required role for this action. Reload the list.',

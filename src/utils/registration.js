@@ -2,7 +2,7 @@ import { validateFullName } from './fullName.js';
 export const registrationHints = {
  name: "Letters, spaces, hyphens, apostrophes, periods and commas are welcome.",
  email: 'Use your @paterostechnologicalcollege.edu.ph school email.',
- studentId: 'Required format: YYYY-NNNNN, for example 2023-00123. Include the hyphen.',
+ studentId: 'Required format: 2 digits + AHRT + hyphen + 4 digits, for example 29AHRT-0168. Include the hyphen.',
  section: 'For example, BSHM 1A (up to 50 characters).',
  yearLevel: 'Select your current year level.',
  password: 'At least 8 characters; maximum 72 UTF-8 bytes. Spaces count as characters.',
@@ -14,7 +14,7 @@ export function validateRegistration(input) {
  const errors={};
  if(name.error)errors.name=name.error;
  if(value.email.length>254 || !/^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@paterostechnologicalcollege\.edu\.ph$/.test(value.email))errors.email=registrationHints.email;
- if(!/^[0-9]{4}-[0-9]{5}$/.test(value.studentId))errors.studentId=registrationHints.studentId;
+ if(!/^[0-9]{2}AHRT-[0-9]{4}$/.test(value.studentId))errors.studentId=registrationHints.studentId;
  if(!value.section || value.section.length>50 || !/^[\p{L}\p{M}\p{N} .'-]+$/u.test(value.section))errors.section=registrationHints.section;
  if(!['FIRST_YEAR','SECOND_YEAR'].includes(value.yearLevel))errors.yearLevel=registrationHints.yearLevel;
  if(!value.password.trim() || value.password.length<8 || new TextEncoder().encode(value.password).length>72)errors.password=registrationHints.password;

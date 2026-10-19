@@ -16,7 +16,7 @@ import styles from '../styles/StudentManagement.module.css';
 function yearLevelLabel(value) {
   if (value === 'FIRST_YEAR') return '1st Year';
   if (value === 'SECOND_YEAR') return '2nd Year';
-  return 'Not specified';
+  return 'Not set';
 }
 
 export default function StudentManagement() {
@@ -50,6 +50,7 @@ export default function StudentManagement() {
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
     } catch (error) {
       showToast(adminErrorMessage(error), 'error');
+      throw error;
     } finally {
       toggleLock.current = false;
       setTogglingId(null);
@@ -114,7 +115,7 @@ export default function StudentManagement() {
                 className={`${styles.tableRow} ${styles.tableRowClickable}`}
                 onClick={() => setViewingStudent(student)}
               >
-                <span role="cell" aria-describedby="student-column-1" className={styles.studentName}>{accountDisplay(student.name)}</span>
+                <span role="cell" aria-describedby="student-column-1" className={styles.studentName}>{accountDisplay(student.name)}{student.profileIncomplete && <small className={styles.incomplete}>Profile incomplete</small>}</span>
                 <span role="cell" aria-describedby="student-column-2" className={styles.studentEmail}>{accountDisplay(student.email, 'Email not provided')}</span>
                 <span role="cell" aria-describedby="student-column-3" className={styles.studentYear}>{yearLevelLabel(student.yearLevel)}</span>
                 <span role="cell" aria-describedby="student-column-4" className={styles.studentProgress}>—</span>
@@ -158,6 +159,9 @@ export default function StudentManagement() {
             </div>
 
             <div className={styles.detailList}>
+              {viewingStudent.profileIncomplete && <p className={styles.incomplete}>Profile incomplete</p>}
+              <div className={styles.detailRow}><span className={styles.detailLabel}>Student ID</span><span className={styles.detailValue}>{accountDisplay(viewingStudent.studentId, 'Not set')}</span></div>
+              <div className={styles.detailRow}><span className={styles.detailLabel}>Section</span><span className={styles.detailValue}>{accountDisplay(viewingStudent.section, 'Not set')}</span></div>
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Year Level</span>
                 <span className={styles.detailValue}>{yearLevelLabel(viewingStudent.yearLevel)}</span>

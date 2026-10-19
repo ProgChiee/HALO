@@ -185,7 +185,7 @@ test('AD-18 Admin modal styles bound the scroll area without clipping bottom act
 
 test('AD-19 student list and details consistently label known and missing year levels',async()=>{
  const Component=(await server.ssrLoadModule('/src/pages/admin/components/StudentManagement.jsx')).default;
- for(const [yearLevel,label] of [['FIRST_YEAR','1st Year'],['SECOND_YEAR','2nd Year'],[null,'Not specified'],[undefined,'Not specified'],['','Not specified'],['   ','Not specified'],['THIRD_YEAR','Not specified']]){
+ for(const [yearLevel,label] of [['FIRST_YEAR','1st Year'],['SECOND_YEAR','2nd Year'],[null,'Not set'],[undefined,'Not set'],['','Not set'],['   ','Not set'],['THIRD_YEAR','Not set']]){
   api.defaults.adapter=async config=>({config,data:[{...row,yearLevel}],status:200,headers:{}});
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
   try{

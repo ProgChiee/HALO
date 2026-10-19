@@ -1,3 +1,4 @@
+import { adminErrorMessage } from '../../../utils/adminErrors';
 import { Search } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -38,8 +39,8 @@ export function StudentModeSelector() {
       if (!alive.current) { (preview ? revokeStudentPreview : revokeStudentSession)(session.id).catch(() => {}); return; }
       if (!validSession(session, session.id) || session.target.userId !== target.userId) throw new Error('Invalid acting session');
       navigate((preview ? '/admin/student-preview' : selectionPath) + '/' + encodeURIComponent(session.id));
-    } catch {
-      if (alive.current) setError('Could not start Student Mode. Check that the account is active and try again.');
+    } catch (failure) {
+      if (alive.current) setError(adminErrorMessage(failure, 'Could not start Student Mode. Check that the account is active and try again.'));
     } finally {
       lock.current = false;
       if (alive.current) setPending(null);

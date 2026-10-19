@@ -20,6 +20,11 @@ public class StudentListResponse {
     private Status status;
 
 
+    public StudentListResponse(com.ptc.halo.entity.UserEntity user, com.ptc.halo.entity.StudentProfileEntity profile) {
+        id=user.getId(); name=user.getName(); email=user.getEmail(); status=user.getStatus();
+        if(profile!=null){studentId=profile.getStudentId();section=profile.getSection();yearLevel=profile.getYearLevel();}
+    }
+    public boolean isProfileIncomplete(){return studentId==null || studentId.isBlank() || section==null || section.isBlank() || yearLevel==null;}
     public StudentListResponse() {
     }
 

@@ -297,3 +297,5 @@
 .actionBtnOff:hover { background: var(--color-danger-soft); }
 .actionBtn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .actionBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.incomplete { display: block; font-size: var(--text-xs, 0.75rem); font-weight: 500; color: var(--color-text-secondary); margin-top: var(--space-1); }

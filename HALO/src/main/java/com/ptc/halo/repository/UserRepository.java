@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<UserEntity, Long> {
+    @org.springframework.data.jpa.repository.Query("select count(p) from StudentProfileEntity p where p.user.id=:id and p.yearLevel is not null and p.studentId is not null and trim(p.studentId)<>'' and p.section is not null and trim(p.section)<>''")
+    long countCompleteStudentProfile(@org.springframework.data.repository.query.Param("id") Long id);
     java.util.List<UserEntity> findByEmailIn(java.util.Collection<String> emails);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
@@ -19,7 +21,9 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
         select new com.ptc.halo.dtoResponse.AdminActingTargetResponse(u.id, u.name, u.email, u.role)
         from UserEntity u where u.role = :role and u.status = com.ptc.halo.enums.Status.ACTIVE
         and (:search = '' or locate(:search, lower(coalesce(u.name, ''))) > 0
-             or locate(:search, lower(coalesce(u.email, ''))) > 0)
+             or locate(:search, lower(coalesce(u.email, ''))) > 0
+             or exists (select p.id from StudentProfileEntity p where p.user.id=u.id and locate(:search,lower(p.studentId))>0)
+             or exists (select p.id from ProfessorEntity p where p.user.id=u.id and locate(:search,lower(p.professorId))>0))
         """)
     org.springframework.data.domain.Page<com.ptc.halo.dtoResponse.AdminActingTargetResponse> findActingTargets(
         @org.springframework.data.repository.query.Param("role") Role role,

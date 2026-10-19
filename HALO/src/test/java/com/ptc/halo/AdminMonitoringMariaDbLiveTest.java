@@ -60,6 +60,17 @@ class AdminMonitoringMariaDbLiveTest {
         org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration.class})
     static class Config {}
 
+    @Autowired com.ptc.halo.repository.StudentProfileRepository managementProfiles;
+    @Autowired com.ptc.halo.repository.ActivityLogRepository activityLogs;
+    @Test void managementPopulationAndTargetSearchUseLiveReadOnlyData() {
+        var rows=managementProfiles.findManagementAccounts();
+        assertEquals(jdbc.queryForObject("select count(*) from user_entity where role='STUDENT'",Long.class),rows.size());
+        long active=rows.stream().filter(r->r.getStatus()==com.ptc.halo.enums.Status.ACTIVE).count();
+        assertEquals(jdbc.queryForObject("select count(*) from user_entity where role='STUDENT' and status='ACTIVE'",Long.class),active);
+        for(var row:rows) if(row.getStudentId()==null) assertTrue(row.isProfileIncomplete());
+        // Exercise the MariaDB dialect for target-name search, without mutating audit history.
+        activityLogs.findAdminLogs(null,null,"dichoso",org.springframework.data.domain.PageRequest.of(0,10));
+    }
     @DynamicPropertySource static void isolatedSigningKey(DynamicPropertyRegistry registry) {
         byte[] key=new byte[32]; new SecureRandom().nextBytes(key);
         registry.add("jwt.secret", () -> Base64.getEncoder().encodeToString(key));

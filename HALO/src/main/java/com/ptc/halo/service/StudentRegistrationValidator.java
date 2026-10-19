@@ -12,7 +12,7 @@ public final class StudentRegistrationValidator {
   r.setEmail(email);
   if(email.length()>254 || !email.matches("[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@paterostechnologicalcollege\\.edu\\.ph")) errors.put("email","Use your @paterostechnologicalcollege.edu.ph school email.");
   r.setStudentId(r.getStudentId()==null?"":r.getStudentId().strip());
-  if(!r.getStudentId().matches("[0-9]{4}-[0-9]{5}")) errors.put("studentId","Use YYYY-NNNNN, for example 2023-00123. Include the hyphen.");
+  if(!r.getStudentId().matches("[0-9]{2}AHRT-[0-9]{4}")) errors.put("studentId","Use 2 digits + AHRT + hyphen + 4 digits, for example 29AHRT-0168. Include the hyphen.");
   String section=r.getSection()==null?"":r.getSection().strip().replaceAll("\\s+"," ");r.setSection(section);
   if(section.isEmpty() || section.length()>50 || !section.matches("[\\p{L}\\p{M}\\p{N} .'-]+")) errors.put("section","Enter a section of up to 50 characters, for example BSHM 1A.");
   if(r.getYearLevel()==null)errors.put("yearLevel","Select your year level.");

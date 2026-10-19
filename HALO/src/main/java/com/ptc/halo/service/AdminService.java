@@ -255,49 +255,13 @@ public class AdminService {
         }
         return role == Role.PROFESSOR ? viewProfessorById(id) : viewStudentById(id);
     }
-    public List<StudentListResponse> viewAllStudents(){
-
-        return studentProfileRepository.findAll()
-                .stream()
-                .map(student -> {
-
-                    StudentListResponse response =
-                            new StudentListResponse();
-
-                    response.setId(student.getUser().getId());
-                    response.setName(student.getUser().getName());
-                    response.setEmail(student.getUser().getEmail());
-                    response.setStudentId(student.getStudentId());
-                    response.setSection(student.getSection());
-                    response.setYearLevel(student.getYearLevel());
-                    response.setStatus(student.getUser().getStatus());
-
-                    return response;
-
-                })
-                .collect(Collectors.toList());
-    }
+    @org.springframework.transaction.annotation.Transactional(readOnly=true)
+    public List<StudentListResponse> viewAllStudents(){return studentProfileRepository.findManagementAccounts();}
+    @org.springframework.transaction.annotation.Transactional(readOnly=true)
     public StudentListResponse viewStudentById(Long id){
-
-        StudentProfileEntity student =
-                studentProfileRepository.findByUserId(id)
-                        .orElseThrow(() ->
-                                new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
-                        );
-
-
-        StudentListResponse response =
-                new StudentListResponse();
-
-        response.setId(student.getUser().getId());
-        response.setName(student.getUser().getName());
-        response.setEmail(student.getUser().getEmail());
-        response.setStudentId(student.getStudentId());
-        response.setSection(student.getSection());
-        response.setYearLevel(student.getYearLevel());
-        response.setStatus(student.getUser().getStatus());
-
-        return response;
+        var user=userRepository.findById(id).orElseThrow(()->new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND));
+        if(user.getRole()!=Role.STUDENT)throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
+        return new StudentListResponse(user,studentProfileRepository.findByUserId(id).orElse(null));
     }
     @org.springframework.transaction.annotation.Transactional
     public StudentListResponse changeStudentStatus(Long id, Status desiredStatus, UserEntity admin){
@@ -327,23 +291,7 @@ public class AdminService {
                         + updatedStudent.getEmail()
         );
 
-        StudentProfileEntity studentProfile =
-                studentProfileRepository.findByUserId(id)
-                        .orElseThrow(() ->
-                                new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND)
-                        );
-
-        StudentListResponse response = new StudentListResponse();
-
-        response.setId(updatedStudent.getId());
-        response.setName(updatedStudent.getName());
-        response.setEmail(updatedStudent.getEmail());
-        response.setStudentId(studentProfile.getStudentId());
-        response.setSection(studentProfile.getSection());
-        response.setYearLevel(studentProfile.getYearLevel());
-        response.setStatus(updatedStudent.getStatus());
-
-        return response;
+        return new StudentListResponse(updatedStudent,studentProfileRepository.findByUserId(id).orElse(null));
     }
     @org.springframework.transaction.annotation.Transactional
     public StudentListResponse updateStudent(

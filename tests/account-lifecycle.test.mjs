@@ -48,3 +48,31 @@ for(const kind of ['Student','Professor']) test(kind+' lifecycle filters, archiv
   assert.equal(requests.filter(r=>r.method==='delete').length,0);
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+for (const kind of ['Student', 'Professor']) test(kind + ' failed lifecycle confirmation stays open and safely retries', async () => {
+ const Page=(await server.ssrLoadModule('/src/pages/admin/components/'+kind+'Management.jsx')).default;
+ const {ToastContext}=await server.ssrLoadModule('/src/context/notifications/useToast.js');
+ const api=(await server.ssrLoadModule('/src/services/apiClient.js')).default;
+ window.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}});
+ let calls=0, record={id:12,name:'Incomplete account',email:'incomplete@example.test',status:'ACTIVE',profileIncomplete:kind==='Student'};
+ api.defaults.adapter=async config=>{
+  if(config.method==='patch') { calls++; if(calls===1)throw {response:{status:500,data:{code:'ADMIN_REQUEST_FAILED'}}}; record={...record,status:'INACTIVE'}; }
+  return {data:config.method==='get'?[record]:record,status:200,headers:{},config};
+ };
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try {
+  await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{role:'admin',user:{name:'Admin'}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,null,React.createElement(Page))))));
+  if(kind==='Student') {
+   assert.match(host.textContent,/Profile incomplete/);
+   await act(async()=>host.querySelector('[aria-label="View"]').click());
+   assert.match(document.querySelector('[role="dialog"]').textContent,/Student IDNot setSectionNot set/);
+   await act(async()=>document.querySelector('[aria-label="Close"]').click());
+  }
+  await act(async()=>host.querySelector('[aria-label="Deactivate"]').click());
+  const confirm=()=>[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Deactivate');
+  await act(async()=>confirm().click());
+  assert.equal(calls,1);assert.ok(document.querySelector('[role="dialog"]'));
+  assert.match(document.querySelector('[role="dialog"] [role="alert"]').textContent,/server could not complete/i);
+  await act(async()=>confirm().click());
+  assert.equal(calls,2);assert.equal(document.querySelector('[role="dialog"]'),null);
+ } finally {await act(async()=>root.unmount());host.remove();}
+});

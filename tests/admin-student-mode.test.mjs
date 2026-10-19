@@ -342,3 +342,19 @@ test('Student selector highlights only the selected row and retains distinct but
   assert.equal(calls.filter(c=>c.method==='post').length,0);
  } finally {await cleanup();}
 });
+test('incomplete Student entry displays actionable error and keeps Support confirmation open',async()=>{
+ const calls=[];const normal=adapter(calls);
+ api.defaults.adapter=async config=>{if(config.method==='post')throw failure(config,409,'PROFILE_INCOMPLETE');return normal(config);};
+ const cleanup=await mount('/admin/student-mode');
+ try {
+  await click(button('Select Student'));
+  await click(button('Preview as Student'));
+  assert.match(document.querySelector('[role="alert"]').textContent,/profile is incomplete/i);
+  assert.equal(document.querySelector('output').textContent,'/admin/student-mode');
+  await click(button('Enter Support Mode'));
+  await click(button('Confirm Support Mode'));
+  const dialog=document.querySelector('[role="dialog"]');assert.ok(dialog);
+  assert.match(dialog.querySelector('[role="alert"]').textContent,/Academic details are required/);
+  await click(button('Cancel'));assert.equal(document.querySelector('[role="dialog"]'),null);
+ }finally{await cleanup();}
+});

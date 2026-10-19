@@ -31,10 +31,10 @@ class StudentRegistrationAtomicityTest {
   r.setPassword("test-password");r.setStudentId(studentId);r.setSection("A");r.setYearLevel(YearLevel.FIRST_YEAR);return r;
  }
  @Test void registrationCommitsBothRecordsOrNeither() {
-  var first=request("atomic-first","2023-00123");auth.registerStudent(first);
+  var first=request("atomic-first","29AHRT-0168");auth.registerStudent(first);
   var user=users.findByEmail(first.getEmail()).orElseThrow();
   assertTrue(profiles.findByUserId(user.getId()).isPresent());
-  var duplicate=request("atomic-duplicate","2023-00123");
+  var duplicate=request("atomic-duplicate","29AHRT-0168");
   assertThrows(RegistrationValidationException.class,()->auth.registerStudent(duplicate));
   assertFalse(users.existsByEmail(duplicate.getEmail()));
   var missing=request("atomic-missing",null);
@@ -44,15 +44,15 @@ class StudentRegistrationAtomicityTest {
  }
 
  @Test void profileFailureRollsBackUserInsert(){
-  var r=request("atomic-rollback","2023-00999");
+  var r=request("atomic-rollback","29AHRT-0999");
   org.mockito.Mockito.doThrow(new org.springframework.dao.DataIntegrityViolationException("simulated concurrent conflict")).when(profiles).save(org.mockito.ArgumentMatchers.any());
   assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->auth.registerStudent(r));
   assertFalse(users.existsByEmail(r.getEmail()));
  }
  @Test void duplicateEmailIsReportedWithoutCreatingAnotherProfile(){
-  var r=request("atomic-email","2023-00888");auth.registerStudent(r);
-  var duplicate=request("atomic-email","2023-00889");
+  var r=request("atomic-email","29AHRT-0888");auth.registerStudent(r);
+  var duplicate=request("atomic-email","29AHRT-0889");
   assertTrue(assertThrows(RegistrationValidationException.class,()->auth.registerStudent(duplicate)).errors.containsKey("email"));
-  assertFalse(profiles.existsByStudentId("2023-00889"));
+  assertFalse(profiles.existsByStudentId("29AHRT-0889"));
  }
 }

@@ -26,6 +26,8 @@ import static org.mockito.Mockito.*;
 class AdminActingSessionTest {
     @Autowired AdminActingSessionService service;
     @Autowired UserRepository users;
+    @Autowired StudentProfileRepository profiles;
+    @Autowired ProfessorRepository professors;
     @Autowired AdminActingSessionRepository sessions;
     @Autowired ActivityLogRepository logs;
     @Autowired org.springframework.transaction.PlatformTransactionManager manager;
@@ -33,9 +35,11 @@ class AdminActingSessionTest {
     UserEntity admin, other, professor, student;
     ActivityLogService auditTarget() { return org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit); }
     @BeforeEach void setup() {
-        reset(auditTarget()); logs.deleteAll(); sessions.deleteAll(); users.deleteAll();
+        reset(auditTarget()); logs.deleteAll(); sessions.deleteAll(); profiles.deleteAll(); professors.deleteAll(); users.deleteAll();
         admin=user("admin",Role.ADMIN); other=user("other",Role.ADMIN);
         professor=user("professor",Role.PROFESSOR); student=user("student",Role.STUDENT);
+        var p=new StudentProfileEntity();p.setUser(student);p.setStudentId("29AHRT-0168");p.setSection("BSHM 1A");p.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(p);
+        var prof=new ProfessorEntity();prof.setUser(professor);prof.setProfessorId("PROF-099");professors.saveAndFlush(prof);
     }
     UserEntity user(String name, Role role) {
         var u=new UserEntity(); u.setName(name); u.setEmail(name+"@example.test"); u.setRole(role); u.setStatus(Status.ACTIVE);
@@ -49,6 +53,21 @@ class AdminActingSessionTest {
     }
     void code(AdminApiException.Code expected, org.junit.jupiter.api.function.Executable action) {
         assertEquals(expected, assertThrows(AdminApiException.class, action).code);
+    }
+    @Test void incompleteStudentsCannotEnterEitherModeAndRemainSearchable() {
+        profiles.deleteAll();
+        assertEquals(1,service.targets(auth(admin),Role.STUDENT,0,20,"student").getTotalElements());
+        code(AdminApiException.Code.PROFILE_INCOMPLETE,()->create(student));
+        code(AdminApiException.Code.PROFILE_INCOMPLETE,()->service.createStudentPreview(auth(admin),student.getId()));
+        assertEquals(0,sessions.count());assertEquals(0,logs.count());
+    }
+    @Test void institutionalIdsAndTargetNamesAreSearchableWithoutChangingPagination() {
+        assertEquals(1,service.targets(auth(admin),Role.STUDENT,0,1,"29ahrt-0168").getTotalElements());
+        assertEquals(1,service.targets(auth(admin),Role.PROFESSOR,0,1,"prof-099").getTotalElements());
+        student.setName("Maya Unique");users.saveAndFlush(student);create(student);
+        assertEquals(1,logs.findAdminLogs(null,null,"maya unique",org.springframework.data.domain.PageRequest.of(0,1)).getTotalElements());
+        student.setStatus(Status.ARCHIVED);users.saveAndFlush(student);
+        assertEquals(0,service.targets(auth(admin),Role.STUDENT,0,1,"29ahrt-0168").getTotalElements());
     }
     @Test void createValidateRevokeAndAuditKeepActorSeparateFromTarget() {
         for(var target:List.of(professor,student)) {

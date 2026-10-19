@@ -27,9 +27,12 @@ public interface ActivityLogRepository
         org.springframework.data.domain.Pageable pageable);
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "actingTarget"})
     @org.springframework.data.jpa.repository.Query("""
-        select l from ActivityLogEntity l left join l.user u
+        select l from ActivityLogEntity l left join l.user u left join l.actingTarget target
         where (:role is null or u.role = :role) and (:type is null or l.activityType = :type)
-        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0 or locate(:search, lower(u.email)) > 0 or locate(:search, lower(l.authDisplay)) > 0)
+        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0 or locate(:search, lower(u.email)) > 0 or locate(:search, lower(l.authDisplay)) > 0 or locate(:search, lower(target.name)) > 0 or locate(:search, lower(target.email)) > 0
+            or exists (select named.id from UserEntity named where (locate(:search,lower(named.name))>0 or locate(:search,lower(named.email))>0)
+                and (((l.action like 'Archived %' or l.action like 'Restored %') and locate(concat(' account ID ',cast(named.id as string),': '),l.action)>0)
+                    or ((l.action like 'Changed % status to %' or l.action like 'Set % status to %') and l.action like concat('%: ',named.email)))))
         """)
     org.springframework.data.domain.Page<ActivityLogEntity> findAdminLogs(
         @org.springframework.data.repository.query.Param("role") Role role,

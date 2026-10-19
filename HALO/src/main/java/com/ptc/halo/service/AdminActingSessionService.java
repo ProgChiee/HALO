@@ -56,6 +56,7 @@ public class AdminActingSessionService {
         var target = users.findById(request.targetUserId()).orElseThrow(() -> new AdminApiException(RESOURCE_NOT_FOUND));
         if (target.getRole() != request.targetRole()) throw new AdminApiException(INVALID_TARGET_ROLE);
         if (target.getStatus() != Status.ACTIVE) throw new AdminApiException(ACTING_TARGET_INACTIVE);
+        if(target.getRole()==Role.STUDENT && users.countCompleteStudentProfile(target.getId())==0) throw new AdminApiException(PROFILE_INCOMPLETE);
         var now = Instant.now();
         var session = sessions.save(new AdminActingSessionEntity(UUID.randomUUID().toString(), actor, target, now, now.plus(LIFETIME)));
         audit.createActingLog(session, "Started acting session");
@@ -122,6 +123,7 @@ public class AdminActingSessionService {
         var target = users.findById(targetId).orElseThrow(() -> new AdminApiException(RESOURCE_NOT_FOUND));
         if (target.getRole() != role) throw new AdminApiException(INVALID_TARGET_ROLE);
         if (target.getStatus() != Status.ACTIVE) throw new AdminApiException(ACTING_TARGET_INACTIVE);
+        if (role == Role.STUDENT && users.countCompleteStudentProfile(target.getId()) == 0) throw new AdminApiException(PROFILE_INCOMPLETE);
         var now = Instant.now();
         var context = new AdminActingSessionEntity(UUID.randomUUID().toString(), actor, target, now, now.plus(LIFETIME));
         audit.createPreviewLog(actor, target, "Started " + (role == Role.STUDENT ? "Student" : "Professor") + " preview");

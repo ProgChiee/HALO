@@ -159,6 +159,7 @@ export default function ProfessorManagement() {
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
     } catch (error) {
       if (mounted.current) showToast(adminErrorMessage(error), 'error');
+      throw error;
     } finally {
       toggleLock.current = false;
       if (mounted.current) setTogglingId(null);

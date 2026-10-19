@@ -63,7 +63,7 @@ class AdminStudentModeTest {
   var module=new AiLearningModuleEntity();module.setWeek(week);module.setAiGenerationStatus(AiGenerationStatus.COMPLETED);module.setStatus(LessonStatus.APPROVED);module=modules.saveAndFlush(module);
   var assessment=new AssessmentEntity();assessment.setModule(module);assessment.setTitle("Quiz");assessment.setPassingScore(70);assessment.setStatus(AssessmentStatus.AVAILABLE);assessment.setCreatedAt(LocalDateTime.now());assessment=assessments.saveAndFlush(assessment);
   q1=question(assessment,1,"A");q2=question(assessment,2,"B");
-  var profile=new StudentProfileEntity();profile.setUser(student);profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  var profile=new StudentProfileEntity();profile.setUser(student);profile.setSection("BSHM 1A");profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
   attempt=service.startAttempt(module.getId(),student);
   admin=new UserEntity();admin.setEmail("admin@test.example");admin.setName("Admin");admin.setRole(Role.ADMIN);admin.setStatus(Status.ACTIVE);admin=users.saveAndFlush(admin);
   auth=authentication(admin);
@@ -130,7 +130,7 @@ class AdminStudentModeTest {
  @Test void differentStudentCannotUseAttemptOrMentorSession(){
   prepareIndex();var opened=mode.openMentor(auth,actingId,moduleId());
   var other=new UserEntity();other.setEmail("other-student@test.example");other.setName("Other");other.setRole(Role.STUDENT);other.setStatus(Status.ACTIVE);other=users.saveAndFlush(other);
-  var profile=new StudentProfileEntity();profile.setUser(other);profile.setStudentId("Other");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  var profile=new StudentProfileEntity();profile.setUser(other);profile.setSection("BSHM 1A");profile.setStudentId("Other");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
   var otherId=acting.create(auth,new com.ptc.halo.dtoRequest.AdminActingSessionRequest(other.getId(),Role.STUDENT)).id();
   assertThrows(ResponseStatusException.class,()->mode.execute(auth,otherId,s->service.getAttemptResult(attempt.getId(),s.getTarget())));
   assertThrows(ResponseStatusException.class,()->mode.execute(auth,otherId,s->service.submitAttempt(attempt.getId(),s.getTarget(),request(),s)));

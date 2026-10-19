@@ -46,8 +46,14 @@ public class AuthService {
     }
 
 
+    @org.springframework.transaction.annotation.Transactional
     public void logout(org.springframework.security.core.Authentication authentication,String bearer) {
         if(authentication==null || !authentication.isAuthenticated()) throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
+        var locked = userRepository.findForPasswordChange(authentication.getName()).orElseThrow(() -> new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required"));
+        if (bearer == null || !bearer.startsWith("Bearer ") || !jwtService.isCurrent(bearer.substring(7), new com.ptc.halo.security.CustomUserDetails(locked)))
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid or expired token");
+        locked.setTokenVersion(locked.getTokenVersion() + 1);
+        userRepository.saveAndFlush(locked);
         audit.logout(authentication.getName(),bearer);
     }
 

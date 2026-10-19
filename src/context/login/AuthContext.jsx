@@ -1,10 +1,11 @@
 import apiClient from '../../services/apiClient';
 import ProfilePhotoProvider from './ProfilePhotoProvider';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthContext } from './useAuth';
 import { clearSession, readSession, writeSession } from '../../utils/session';
 
 export function AuthProvider({ children }) {
+  const logoutRequest = useRef(null);
   const [session, setSession] = useState(() => readSession());
 
   useEffect(() => {
@@ -33,11 +34,25 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    if (logoutRequest.current) return logoutRequest.current;
     const { token } = readSession();
-    window.haloTheme?.bindAccount(null);
-    clearSession();
-    setSession({ user: null, token: null });
-    if (token) return apiClient.post('/auth/logout', undefined, { skipAuth: true, timeout: 2000, headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
+    const request = (async () => {
+      if (token) {
+        try {
+          await apiClient.post('/auth/logout', undefined, { skipAuth: true, headers: { Authorization: 'Bearer ' + token } });
+        } catch (error) {
+          // A retry after a lost success response can report an already-revoked token.
+          if (error.response?.status !== 401 || error.response?.data?.code !== 'INVALID_OR_EXPIRED_TOKEN') throw error;
+        }
+      }
+      const current = readSession();
+      if (current.token && current.token !== token) throw new Error('Account changed during logout');
+      window.haloTheme?.bindAccount(null);
+      clearSession();
+      setSession({ user: null, token: null });
+    })();
+    logoutRequest.current = request.finally(() => { logoutRequest.current = null; });
+    return logoutRequest.current;
   }, []);
 
   const value = useMemo(() => ({

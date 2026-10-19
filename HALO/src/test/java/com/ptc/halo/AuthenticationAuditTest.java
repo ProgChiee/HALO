@@ -71,6 +71,13 @@ class AuthenticationAuditTest {
   assertThrows(IllegalStateException.class,()->reset.sendOtp(student.getEmail()));assertEquals(0,logs.count());
   assertThrows(PasswordResetException.class,()->reset.resetPassword(student.getEmail(),"000000","replacement-password"));assertEquals(0,logs.count());
  }
+ @Test void logoutRevocationCommitsEvenWhenAuditStorageFails() {
+  when(jwt.isCurrent(anyString(),any())).thenReturn(true);
+  doThrow(new IllegalStateException("audit unavailable")).when(org.springframework.test.util.AopTestUtils.<ActivityLogService>getUltimateTargetObject(writer)).createAuthLog(any(),any(),any(),any());
+  var identity=new UsernamePasswordAuthenticationToken(student.getEmail(),null,java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STUDENT")));
+  auth.logout(identity,"Bearer test-only-token");
+  assertEquals(1,users.findById(student.getId()).orElseThrow().getTokenVersion());assertEquals(0,logs.count());
+ }
  @Test void auditFailureDoesNotBreakSuccessfulLogin(){
   doThrow(new IllegalStateException("audit unavailable")).when(org.springframework.test.util.AopTestUtils.<ActivityLogService>getUltimateTargetObject(writer)).createAuthLog(any(),any(),any(),any());
   assertEquals("jwt-secret",auth.login(request(student.getEmail())).getToken());

@@ -64,7 +64,7 @@ class AdminStudentPreviewTest {
   var module=new AiLearningModuleEntity();module.setWeek(week);module.setAiGenerationStatus(AiGenerationStatus.COMPLETED);module.setStatus(LessonStatus.APPROVED);module=modules.saveAndFlush(module);
   var assessment=new AssessmentEntity();assessment.setModule(module);assessment.setTitle("Quiz");assessment.setPassingScore(70);assessment.setStatus(AssessmentStatus.AVAILABLE);assessment.setCreatedAt(LocalDateTime.now());assessment=assessments.saveAndFlush(assessment);
   q1=question(assessment,1,"A");q2=question(assessment,2,"B");
-  var profile=new StudentProfileEntity();profile.setUser(student);profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  var profile=new StudentProfileEntity();profile.setUser(student);profile.setSection("BSHM 1A");profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
 
   admin=new UserEntity();admin.setEmail("admin@test.example");admin.setName("Admin");admin.setRole(Role.ADMIN);admin.setStatus(Status.ACTIVE);admin=users.saveAndFlush(admin);
   auth=authentication(admin);

@@ -62,6 +62,20 @@ class AdminProfessorUpdateTransactionTest {
         assertEquals("OTHER", professors.findByUserId(other.getId()).orElseThrow().getProfessorId());
         assertEquals(0, logs.count());
     }
+    @Test void profilelessStudentRemainsManageableWithoutInventingAcademicData() {
+        var student=user("Incomplete", "incomplete@example.test",Role.STUDENT);
+        var row=service.viewAllStudents().stream().filter(r->r.getId().equals(student.getId())).findFirst().orElseThrow();
+        assertTrue(row.isProfileIncomplete());assertNull(row.getStudentId());assertNull(row.getYearLevel());
+        assertEquals(Status.INACTIVE,service.changeStudentStatus(student.getId(),Status.INACTIVE,admin).getStatus());
+        service.archiveOrRestore(student.getId(),Role.STUDENT,admin,false);
+        assertEquals(Status.ARCHIVED,service.viewStudentById(student.getId()).getStatus());
+        service.archiveOrRestore(student.getId(),Role.STUDENT,admin,true);
+        assertEquals(Status.INACTIVE,service.viewStudentById(student.getId()).getStatus());
+        service.changeStudentStatus(student.getId(),Status.ACTIVE,admin);
+        assertEquals(Status.ACTIVE,service.viewStudentById(student.getId()).getStatus());
+        assertTrue(students.findByUserId(student.getId()).isEmpty());assertEquals(4,logs.count());
+        assertEquals(4,logs.findAdminLogs(null,null,"incomplete",org.springframework.data.domain.PageRequest.of(0,20)).getTotalElements());
+    }
     @Test void missingResourcesAndWrongRolesHaveTypedErrors() {
         assertEquals(AdminApiException.Code.RESOURCE_NOT_FOUND, assertThrows(AdminApiException.class, () -> service.viewProfessorById(Long.MAX_VALUE)).code);
         assertEquals(AdminApiException.Code.RESOURCE_NOT_FOUND, assertThrows(AdminApiException.class, () -> service.viewStudentById(Long.MAX_VALUE)).code);
@@ -122,7 +136,7 @@ class AdminProfessorUpdateTransactionTest {
         assertEquals("ST-1", profile.getStudentId()); assertEquals("A", profile.getSection());
         assertEquals(YearLevel.FIRST_YEAR, profile.getYearLevel()); assertEquals(0, logs.count());
     }
-    @ParameterizedTest @ValueSource(strings={"professor", "student"})
+    @ParameterizedTest @ValueSource(strings={"professor"})
     void missingProfileAfterStatusMutationRollsBackStatusAndAudit(String role) {
         var target = user("No profile", "orphan@example.test", role.equals("professor") ? Role.PROFESSOR : Role.STUDENT);
         assertThrows(RuntimeException.class, () -> {

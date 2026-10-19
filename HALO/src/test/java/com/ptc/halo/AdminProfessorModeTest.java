@@ -31,6 +31,7 @@ class AdminProfessorModeTest {
  @Autowired ProfessorAcademicService academic;
  @Autowired ProfessorModuleService modules;
  @Autowired UserRepository users;
+ @Autowired StudentProfileRepository profiles;
  @Autowired ProfessorRepository professors;
  @Autowired SubjectRepository subjects;
  @Autowired WeekRepository weeks;
@@ -53,7 +54,7 @@ class AdminProfessorModeTest {
  String session;
  @BeforeEach void setup() {
   reset(org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit),generation,storage,assessmentAi,index);
-  logs.deleteAll();sessions.deleteAll();questions.deleteAll();assessments.deleteAll();files.deleteAll();moduleRepo.deleteAll();weeks.deleteAll();subjects.deleteAll();professors.deleteAll();users.deleteAll();
+  logs.deleteAll();sessions.deleteAll();questions.deleteAll();assessments.deleteAll();files.deleteAll();moduleRepo.deleteAll();weeks.deleteAll();subjects.deleteAll();professors.deleteAll();profiles.deleteAll();users.deleteAll();
   admin=user("admin",Role.ADMIN);professor=user("prof",Role.PROFESSOR);other=user("other",Role.PROFESSOR);
   for(var u:List.of(professor,other)){var p=new ProfessorEntity();p.setUser(u);p.setProfessorId("P"+u.getId());professors.saveAndFlush(p);}
   auth=auth(admin);session=acting.create(auth,new AdminActingSessionRequest(professor.getId(),Role.PROFESSOR)).id();
@@ -119,7 +120,7 @@ class AdminProfessorModeTest {
   assertEquals(count,logs.count());verifyNoInteractions(generation,assessmentAi,index);
  }
  @Test void invalidActingSessionsCannotExecuteWork() {
-  var student=user("student",Role.STUDENT);String wrong=acting.create(auth,new AdminActingSessionRequest(student.getId(),Role.STUDENT)).id();
+  var student=user("student",Role.STUDENT);var profile=new StudentProfileEntity();profile.setUser(student);profile.setStudentId("29AHRT-0168");profile.setSection("BSHM 1A");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);String wrong=acting.create(auth,new AdminActingSessionRequest(student.getId(),Role.STUDENT)).id();
   assertEquals(AdminApiException.Code.INVALID_TARGET_ROLE,assertThrows(AdminApiException.class,()->mode.execute(auth,wrong,s->true)).code);
   var a=user("other-admin",Role.ADMIN);assertThrows(AdminApiException.class,()->mode.execute(auth(a),session,s->true));
   acting.revoke(auth,session);assertThrows(AdminApiException.class,()->mode.execute(auth,session,s->true));
