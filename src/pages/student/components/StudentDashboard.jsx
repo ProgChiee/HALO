@@ -7,10 +7,10 @@ import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp, Flame } from 'lu
 import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
 import { useAuth } from '../../../context/login/useAuth';
-import { findAvailableWeek } from '../../../utils/backendContract';
+import { selectContinueLesson } from '../../../utils/continueLearning';
 import styles from '../styles/StudentDashboard.module.css';
 
-// Find the first published, unlocked, incomplete week across subjects.
+// Resume persisted activity across eligible subjects, with a stable no-history fallback.
 export default function StudentDashboard() {
   const workflow = useStudentWorkflow();
   const { getDashboardData, getSubjectsData, getSubjectWeeks } = workflow.api;
@@ -54,19 +54,20 @@ export default function StudentDashboard() {
     if (subjectsStatus !== 'ready') return;
     const controller = new AbortController();
 
-    const candidates = subjects.filter(subject => subject.progressPercentage < 100);
+    const candidates = subjects;
     Promise.allSettled(candidates.map(subject => getSubjectWeeks(subject.subjectId, { signal: controller.signal })))
       .then(results => {
         if (controller.signal.aborted) return;
-        let failed = false;
+        const groups = [];
         for (let i = 0; i < results.length; i++) {
           if (results[i].status === 'rejected') {
-            failed = true; logStudentError('load-continue', results[i].reason); continue;
+            logStudentError('load-continue', results[i].reason);
+            setNextLesson(null); setContinueStatus('error'); return;
           }
-          const week = findAvailableWeek(results[i].value);
-          if (week) { setNextLesson({ subject: candidates[i], week }); setContinueStatus('ready'); return; }
+          groups.push({ subject: candidates[i], weeks: results[i].value });
         }
-        setContinueStatus(failed ? 'error' : 'ready');
+        setNextLesson(selectContinueLesson(groups));
+        setContinueStatus('ready');
       });
     return () => controller.abort();
   }, [subjects, subjectsStatus, continueRetry, getSubjectWeeks]);
@@ -78,7 +79,7 @@ export default function StudentDashboard() {
     { id: 'latestScore', icon: BookOpen, value: summary.latestAssessmentScore == null ? 'No assessment yet' : `${summary.latestAssessmentScore}%`, empty: summary.latestAssessmentScore == null, label: 'Latest assessment score' },
   ] : [];
 
-  const nextSubject = subjects.find((s) => s.progressPercentage < 100);
+  const nextSubject = nextLesson?.subject;
 
   return (
     <StudentPageShell>

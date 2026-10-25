@@ -69,6 +69,9 @@ public class StudentLearningProgressionService {
         access.validateSubject(student, subject);
 
         var rows = weekRepository.findStudentWeekRows(List.of(subjectId), student.getId());
+        var activity = weekRepository.findModuleActivity(subjectId, student.getId()).stream()
+                .collect(java.util.stream.Collectors.toMap(WeekRepository.ModuleActivity::getModuleId,
+                        WeekRepository.ModuleActivity::getLastActivityAt));
         List<StudentWeekAccessResponse> responses = new ArrayList<>();
         boolean previousCompleted = true;
         for (var row : rows) {
@@ -81,6 +84,8 @@ public class StudentLearningProgressionService {
             response.setLessonAvailable(row.getModuleId() != null);
             response.setCompleted(completed);
             response.setUnlocked(previousCompleted);
+            // Do not expose activity for a currently locked module.
+            if (previousCompleted) response.setLastActivityAt(activity.get(row.getModuleId()));
             responses.add(response);
             previousCompleted = completed;
         }

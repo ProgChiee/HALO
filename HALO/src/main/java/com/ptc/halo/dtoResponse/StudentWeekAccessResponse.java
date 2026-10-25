@@ -7,6 +7,9 @@ public class StudentWeekAccessResponse {
     private String title;
 
     private Long moduleId;
+    private java.time.LocalDateTime lastActivityAt;
+    public java.time.LocalDateTime getLastActivityAt() { return lastActivityAt; }
+    public void setLastActivityAt(java.time.LocalDateTime value) { lastActivityAt = value; }
 
     private Boolean unlocked;
     private Boolean completed;

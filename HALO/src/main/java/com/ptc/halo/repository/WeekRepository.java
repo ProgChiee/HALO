@@ -7,6 +7,37 @@ import java.util.List;
 
 public interface WeekRepository
         extends JpaRepository<WeekEntity, Long> {
+    interface ModuleActivity {
+        Long getModuleId();
+        java.time.LocalDateTime getLastActivityAt();
+    }
+
+    @org.springframework.data.jpa.repository.Query(value = """
+        select activity.module_id as moduleId, max(activity.activity_at) as lastActivityAt
+        from (
+          select module_id, coalesce(last_opened_at, cast(study_date as datetime)) as activity_at
+          from lesson_study_days where student_id=:studentId
+          union all
+          select a.module_id, t.started_at from assessment_attempts t
+          join assessments a on a.id=t.assessment_id where t.student_id=:studentId
+          union all
+          select a.module_id, t.submitted_at from assessment_attempts t
+          join assessments a on a.id=t.assessment_id where t.student_id=:studentId
+          union all
+          select s.ai_learning_module_id, m.created_at from mentor_messages m
+          join mentor_sessions s on s.id=m.session_id
+          where s.student_id=:studentId and m.sender='STUDENT' and length(trim(m.message))>0
+        ) activity
+        join ai_learning_modules module on module.id=activity.module_id
+        join weeks w on w.id=module.week_id
+        where w.subject_id=:subjectId and module.status='APPROVED'
+          and module.ai_generation_status='COMPLETED' and activity.activity_at is not null
+        group by activity.module_id
+        """, nativeQuery = true)
+    List<ModuleActivity> findModuleActivity(
+            @org.springframework.data.repository.query.Param("subjectId") Long subjectId,
+            @org.springframework.data.repository.query.Param("studentId") Long studentId);
+
     interface StudentWeekRow {
         Long getSubjectId();
         Long getWeekId();

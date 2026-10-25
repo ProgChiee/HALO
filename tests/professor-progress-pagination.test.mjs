@@ -17,6 +17,31 @@ before(async () => {
 });
 after(async () => { await server?.close(); dom?.window.close(); });
 
+test('module panel scrolls into view, receives focus, switches students and restores trigger focus', async () => {
+ const adapter=api.defaults.adapter, previousScroll=HTMLElement.prototype.scrollIntoView, scrolled=[];
+ HTMLElement.prototype.scrollIntoView=function(options){scrolled.push({element:this,options});};
+ api.defaults.adapter=async config=>({status:200,headers:{},config,data:{...page(0,
+   config.url.endsWith('/engagement')?[{userId:8,name:'Student A'},{userId:9,name:'Student B'}]:[]),last:true}});
+ const ui=await mount('LearningEngagement');
+ try {
+  const triggers=[...ui.host.querySelectorAll('button')].filter(b=>b.textContent==='View module activity');
+  assert.ok(triggers.every(b=>b.getAttribute('aria-expanded')==='false'));
+  for(const [index,trigger] of triggers.entries()) {
+   await act(async()=>trigger.click());
+   const panel=document.getElementById(trigger.getAttribute('aria-controls'));
+   assert.ok(panel); assert.equal(trigger.getAttribute('aria-expanded'),'true');
+   assert.equal(document.activeElement,panel.querySelector('h3'));
+   assert.equal(document.activeElement.tabIndex,-1);
+   assert.equal(scrolled.length,index+1);assert.equal(scrolled.at(-1).element,panel);
+   assert.equal(scrolled.at(-1).options.block,'start');
+   if(index===1){assert.equal(triggers[0].getAttribute('aria-expanded'),'false');assert.equal(document.getElementById(triggers[0].getAttribute('aria-controls')),null);}
+  }
+  await act(async()=>[...ui.host.querySelectorAll('button')].find(b=>b.textContent==='Close module activity').click());
+  assert.equal(document.activeElement,triggers[1]);assert.equal(triggers[1].getAttribute('aria-expanded'),'false');
+  assert.equal(document.getElementById(triggers[1].getAttribute('aria-controls')),null);
+ } finally {await ui.close();api.defaults.adapter=adapter;HTMLElement.prototype.scrollIntoView=previousScroll;}
+});
+
 
 async function mount(name = 'StudentProgress') {
  const Component=(await server.ssrLoadModule(`/src/pages/professor/components/${name}.jsx`)).default;
