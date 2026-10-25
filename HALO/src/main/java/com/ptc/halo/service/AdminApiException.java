@@ -2,6 +2,7 @@ package com.ptc.halo.service;
 
 public class AdminApiException extends RuntimeException {
     public enum Code {
+        STUDENT_ID_CONFLICT(409, "This Student ID is already in use. Verify the academic details before trying again."),
         PROFILE_INCOMPLETE(409, "This Student profile is incomplete. Academic details are required before entering Preview or Support Mode."),
         PREVIEW_READ_ONLY(403, "Professor Preview is read-only. Use Act as Professor for changes."),
         ACCOUNT_STATE_CONFLICT(409, "Restore archived accounts before changing activation status. Only Active or Inactive accounts can be archived."),

@@ -65,6 +65,9 @@ test('protected-history response replaces deletion with real deactivation and ke
   await act(async()=>host.querySelector('[aria-label="Delete Protected"]').click());
   await act(async()=>button('Delete Account').click());
   await act(async()=>{button('Deactivate Account').click();});
+  assert.equal(patches,0);
+  assert.match(document.querySelector('[role="dialog"]').textContent,/Deactivate Admin Account/);
+  await act(async()=>button('Deactivate').click());
   assert.equal(patches,1);assert.equal(deletes,2);assert.equal(document.querySelector('[role="dialog"]'),null);
   assert.ok(host.querySelector('[aria-label="Activate"]'));
   await act(async()=>host.querySelector('[aria-label="Delete Protected"]').click());

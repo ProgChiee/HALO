@@ -21,14 +21,14 @@ import static org.mockito.ArgumentMatchers.*;
 
 class AdminForcedPasswordTest {
  String key() { return Base64.getEncoder().encodeToString(new byte[32]); }
- UserEntity account() { var u = new UserEntity(); u.setEmail("admin@example.test"); u.setName("Admin"); u.setRole(Role.ADMIN); u.setStatus(Status.ACTIVE); return u; }
+ UserEntity account() { var u = new UserEntity(); u.setId(1L); u.setEmail("admin@example.test"); u.setName("Admin"); u.setRole(Role.ADMIN); u.setStatus(Status.ACTIVE); return u; }
     @Test void passwordChangeRevokesOldTokenAndNewLoginWorks() {
         var users = mock(UserRepository.class); var encoder = new BCryptPasswordEncoder();
         var user = account(); user.setMustChangePassword(true); user.setPassword(encoder.encode("Temporary-test-123"));
-        when(users.findForPasswordChange(user.getEmail())).thenReturn(Optional.of(user));
+        when(users.findForAssessmentLifecycle(user.getId())).thenReturn(Optional.of(user));
         when(users.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         var jwt = new JwtService(key()); var old = jwt.generateToken(user);
-        var service = new PasswordResetService(mock(PasswordResetOtpRepository.class), users, mock(EmailService.class), encoder, mock(com.ptc.halo.service.AuthAuditService.class));
+        var service = new PasswordResetService(mock(PasswordResetOtpRepository.class), users, mock(EmailService.class), encoder, mock(com.ptc.halo.service.AuthAuditService.class), mock(PasswordResetProtection.class), mock(PasswordResetThrottle.class), mock(org.springframework.transaction.PlatformTransactionManager.class));
         service.changePassword(user, "Temporary-test-123", "Replacement-test-123");
         assertFalse(jwt.isCurrent(old, new CustomUserDetails(user))); assertFalse(user.isMustChangePassword());
         assertTrue(encoder.matches("Replacement-test-123", user.getPassword()));
@@ -38,6 +38,11 @@ class AdminForcedPasswordTest {
         provider.setUserDetailsService(details); provider.setPasswordEncoder(encoder);
         AuthenticationManager manager = new org.springframework.security.authentication.ProviderManager(provider);
         var auth = new AuthService(users, mock(StudentProfileRepository.class), encoder, manager, jwt, mock(com.ptc.halo.service.AuthAuditService.class));
+        var issuer = new LoginTokenIssuer(jwt);
+        var em = mock(jakarta.persistence.EntityManager.class);
+        when(em.find(UserEntity.class, user.getId(), jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)).thenReturn(user);
+        org.springframework.test.util.ReflectionTestUtils.setField(issuer, "entityManager", em);
+        org.springframework.test.util.ReflectionTestUtils.setField(auth, "tokenIssuer", issuer);
         var request = new LoginRequest(); request.setEmail(user.getEmail()); request.setPassword("Replacement-test-123");
         var response = auth.login(request);
         assertTrue(jwt.isCurrent(response.getToken(), new CustomUserDetails(user)));
@@ -47,7 +52,7 @@ class AdminForcedPasswordTest {
   for (Role role : List.of(Role.ADMIN, Role.SUPER_ADMIN)) {
    var user=account(); user.setRole(role); user.setMustChangePassword(true);
    var jwt=new JwtService(key()); var details=mock(CustomUserDetailsService.class);
-   when(details.loadUserByUsername(user.getEmail())).thenReturn(new CustomUserDetails(user));
+   when(details.loadUserById(user.getId())).thenReturn(new CustomUserDetails(user));
    var filter=new JwtAuthenticationFilter(jwt,details);
    String own=role==Role.ADMIN?"/api/admin/profile":"/api/super-admin/profile";
    for(String path:List.of("/api/admin/profile","/api/super-admin/profile","/api/admin/dashboard","/api/admin/professors","/api/super-admin/admins","/api/auth/change-password")) {

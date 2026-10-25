@@ -24,9 +24,9 @@ class SelfProfileHttpTest {
  @Autowired MockMvc mvc; @MockBean SelfProfileService profiles; @MockBean UserRepository users;
  @MockBean CustomUserDetailsService details; @MockBean JwtService jwt;
  void token(String role) {
-  when(jwt.extractUsername("token")).thenReturn("actor@test");when(jwt.isCurrent(eq("token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("actor@test")).thenReturn(User.withUsername("actor@test").password("unused").roles(role).build());
-  var u=new UserEntity();u.setId(5L);u.setRole(Role.valueOf(role));u.setStatus(Status.ACTIVE);when(users.findByEmail("actor@test")).thenReturn(Optional.of(u));
+  when(jwt.extractUserId("token")).thenReturn(5L);when(jwt.isCurrent(eq("token"),any())).thenReturn(true);
+  when(details.loadUserById(5L)).thenReturn(TestIdentity.details(5L, "actor@test", role));
+  var u=new UserEntity();u.setId(5L);u.setRole(Role.valueOf(role));u.setStatus(Status.ACTIVE);when(users.findById(5L)).thenReturn(Optional.of(u));
  }
  @Test void allRolesUseAuthenticatedOwner() throws Exception {
   mvc.perform(patch("/api/profile").contentType("application/json").content("{\"fullName\":\"New\"}")).andExpect(status().isUnauthorized());

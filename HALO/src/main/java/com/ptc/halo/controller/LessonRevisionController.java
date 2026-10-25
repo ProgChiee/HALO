@@ -31,13 +31,15 @@ public class LessonRevisionController extends ProfessorErrorResponses {
   }
   return tx.execute(status->{
    if(auth==null||request.getHeader("X-Acting-Session")!=null||auth.getAuthorities().stream().noneMatch(a->a.getAuthority().equals("ROLE_PROFESSOR")))throw new AccessDeniedException("Professor required");
-   var p=users.findByEmail(auth.getName()).filter(u->u.getRole()==Role.PROFESSOR&&u.getStatus()==Status.ACTIVE).orElseThrow(()->new AccessDeniedException("Professor unavailable"));
+   var p=com.ptc.halo.security.AuthenticatedAccount.find(users, auth).filter(u->u.getRole()==Role.PROFESSOR&&u.getStatus()==Status.ACTIVE).orElseThrow(()->new AccessDeniedException("Professor unavailable"));
    try{return work.run(p,null);}catch(RuntimeException e){throw e;}catch(Exception e){throw new IllegalStateException("Revision operation failed",e);}
   });
  }
  public record Version(@NotNull Long version){}
  public record Save(@NotNull Long version,@NotNull @Valid AiLearningModuleUpdateRequest materials,@NotNull List<String> keepFiles){}
  @GetMapping public Object get(@PathVariable Long id,Authentication auth,HttpServletRequest request){return access(auth,request,(p,a)->revisions.get(id,p));}
+ @GetMapping("/history") public Object history(@PathVariable Long id,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size,Authentication auth,HttpServletRequest request){return access(auth,request,(p,a)->revisions.history(id,p,page,size));}
+ @GetMapping("/history/{revisionNumber}") public Object historyVersion(@PathVariable Long id,@PathVariable int revisionNumber,Authentication auth,HttpServletRequest request){return access(auth,request,(p,a)->revisions.historyVersion(id,revisionNumber,p));}
  @PostMapping public Object start(@PathVariable Long id,Authentication auth,HttpServletRequest request){return access(auth,request,(p,a)->revisions.start(id,p,a));}
  @PutMapping(consumes="multipart/form-data") public Object save(@PathVariable Long id,@Valid @RequestPart("revision") Save save,@RequestPart(value="files",required=false) List<MultipartFile> files,Authentication auth,HttpServletRequest request){
   return access(auth,request,(p,a)->revisions.save(id,save.version(),save.materials(),save.keepFiles(),files,p,a));

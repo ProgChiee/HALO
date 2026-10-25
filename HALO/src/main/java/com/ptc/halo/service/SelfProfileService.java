@@ -17,7 +17,7 @@ public class SelfProfileService {
  @Transactional
  public NameResponse updateName(Authentication auth, String fullName) {
   if(auth==null || !auth.isAuthenticated()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"AUTHENTICATION_REQUIRED");
-  var user=users.findByEmail(auth.getName()).orElseThrow(()->new ResponseStatusException(HttpStatus.UNAUTHORIZED,"AUTHENTICATION_REQUIRED"));
+  var user=com.ptc.halo.security.AuthenticatedAccount.find(users, auth).orElseThrow(()->new ResponseStatusException(HttpStatus.UNAUTHORIZED,"AUTHENTICATION_REQUIRED"));
   if(user.getStatus()!=Status.ACTIVE || user.getRole()==null || auth.getAuthorities().stream().noneMatch(a->a.getAuthority().equals("ROLE_"+user.getRole().name())))
    throw new org.springframework.security.access.AccessDeniedException("Account unavailable");
   String name=FullNameValidator.normalize(fullName);

@@ -6,18 +6,26 @@ import { youtubeVideoId } from '../../../utils/youtubeVideo';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import styles from '../styles/LessonEditor.module.css';
+import { GeneratedLessonSections } from './LessonContent';
 
 export default function LessonRevision({ moduleId, onPublished }) {
  const { api, preview } = useProfessorWorkflow();
  const [revision, setRevision] = useState(null), [draft, setDraft] = useState(null), [files, setFiles] = useState([]);
  const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(''), [confirm, setConfirm] = useState(null), [reload, setReload] = useState(0);
  const alive = useRef(false), lock = useRef(false), upload = useRef(null);
+ const workspace = useRef(null), focusAfterAction = useRef(false);
  function accept(value) { setRevision(value || null); setDraft(value ? { lessonText: value.lessonText || '', youtubeLink: value.youtubeLink || '', aiNotes: value.aiNotes || '', keepFiles: value.files.map(f => f.key) } : null); setFiles([]); if (upload.current) upload.current.value = ''; }
  useEffect(() => {
   const controller = new AbortController(); alive.current = true;
   if (!preview) api.getRevision(moduleId, { signal: controller.signal }).then(value => { if (!controller.signal.aborted) accept(value); }).catch(e => { if (!controller.signal.aborted) setError(professorErrorMessage(e)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
   return () => { alive.current = false; controller.abort(); };
  }, [api, moduleId, preview, reload]);
+ useEffect(() => {
+  if (!busy && !confirm && focusAfterAction.current) {
+   focusAfterAction.current = false;
+   if (!workspace.current?.closest('[hidden]')) workspace.current?.focus();
+  }
+ }, [busy, confirm]);
  if (preview) return null;
  const changed = revision && draft && (draft.lessonText !== (revision.lessonText || '') || draft.youtubeLink !== (revision.youtubeLink || '') || draft.aiNotes !== (revision.aiNotes || '') || draft.keepFiles.length !== revision.files.length || files.length > 0);
  async function run(action) {
@@ -33,7 +41,7 @@ export default function LessonRevision({ moduleId, onPublished }) {
    if (action === 'review') { const value = await api.reviewRevision(moduleId, revision.version); if (alive.current) accept(value); }
    if (action === 'discard') { await api.discardRevision(moduleId, revision.version); if (alive.current) accept(null); }
    if (action === 'publish') { await api.publishRevision(moduleId, revision.version); if (alive.current) { accept(null); onPublished(); } }
-   if (alive.current) setConfirm(null);
+   if (alive.current) { focusAfterAction.current = action === 'start' || action === 'discard'; setConfirm(null); }
   } catch (e) { if (alive.current) setError(professorErrorMessage(e)); }
   finally { lock.current = false; if (alive.current) setBusy(false); }
  }
@@ -44,14 +52,23 @@ export default function LessonRevision({ moduleId, onPublished }) {
   setFiles(incoming); setError('');
  }
  const disabled = busy || loading;
- return <section className={styles.panelCard} aria-label="Published lesson revision">
-  <h2 className={styles.panelTitle}>{revision ? `Draft revision ${revision.revisionNumber}` : 'Published version'}</h2>
+ return <section ref={workspace} tabIndex={-1} className={styles.panelCard} aria-label="Published lesson revision">
+  <div className={styles.sectionHeading}>
+    <h2 className={styles.panelTitle}>{revision ? `Revision ${revision.revisionNumber}` : 'Published Lesson'}</h2>
+    <span className={`${styles.statusBadge} ${revision ? styles.statusPending : styles.statusApproved}`}>{revision ? (changed ? 'Unsaved edits · Not published' : revision.state === 'REVIEWED' ? 'Reviewed · Not published' : 'Draft · Not published') : 'Published'}</span>
+  </div>
   <p className={styles.panelSubtitle}>{revision ? 'Draft revision - Students are still seeing the current published version.' : 'Create a separate revision to update these published materials.'}</p>
   {loading && <p role="status">Loading revision...</p>}
   {error && <p role="alert">{error}</p>}
-  {!revision && !loading && <Button disabled={busy} onClick={() => setConfirm('start')}>Revise Materials</Button>}
+  {!revision && !loading && <Button disabled={busy} onClick={() => setConfirm('start')}>Revise Lesson</Button>}
   {error && <Button variant="secondary" disabled={busy} onClick={() => { setError(''); setLoading(true); setReload(n => n + 1); }}>Reload revision</Button>}
   {revision && draft && <>
+   <ol className={styles.revisionStages} aria-label="Revision stages">
+    <li aria-current={changed || revision.state !== 'REVIEWED' ? 'step' : undefined}><span>1</span> Edit Materials</li>
+    <li aria-current={!changed && revision.state === 'REVIEWED' ? 'step' : undefined}><span>2</span> Review Changes</li>
+    <li><span>3</span> Publish Revision</li>
+   </ol>
+   <div className={styles.sectionHeading}><h3>Edit Materials</h3><span className={styles.readOnlyLabel}>{changed ? 'Unsaved changes' : 'Draft saved'}</span></div>
    <div className={styles.field}><label className={styles.label} htmlFor="revision-text">Revision lesson text</label><textarea id="revision-text" className={styles.textarea} rows={6} maxLength={100000} value={draft.lessonText} disabled={disabled} onChange={e => setDraft({ ...draft, lessonText: e.target.value })} /></div>
    <div className={styles.field}><label className={styles.label} htmlFor="revision-youtube">Revision YouTube link</label><input id="revision-youtube" className={styles.input} maxLength={255} value={draft.youtubeLink} disabled={disabled} onChange={e => setDraft({ ...draft, youtubeLink: e.target.value })} /><VideoPreview url={draft.youtubeLink} /></div>
    <div className={styles.field}><label className={styles.label} htmlFor="revision-notes">Revision notes for the AI Mentor</label><textarea id="revision-notes" className={styles.textarea} rows={3} maxLength={10000} value={draft.aiNotes} disabled={disabled} onChange={e => setDraft({ ...draft, aiNotes: e.target.value })} /></div>
@@ -60,12 +77,21 @@ export default function LessonRevision({ moduleId, onPublished }) {
    <div className={styles.revisionActions}>
     <Button disabled={disabled || !changed} onClick={() => run('save')}>Save Draft</Button>
     <Button variant="secondary" disabled={disabled} onClick={() => setConfirm('discard')}>Discard Revision</Button>
-    <Button variant="secondary" disabled={disabled || changed} onClick={() => run('review')}>Review Changes</Button>
-    <Button disabled={disabled || changed || revision.state !== 'REVIEWED'} onClick={() => setConfirm('publish')}>Publish Revision</Button>
    </div>
    {busy && <p role="status">Processing revision...</p>}
-   {changed && <p>Save Draft before reviewing or publishing.</p>}
-   {revision.state === 'REVIEWED' && <section aria-label="Reviewed revision"><h3>Review generated lesson</h3>{[['Objectives', revision.generatedObjectives], ['Knowledge', revision.generatedKnowledge], ['Examples', revision.generatedExamples], ['Summary', revision.generatedSummary]].map(([title, text]) => <div key={title}><h4>{title}</h4><p className={styles.revisionText}>{text}</p></div>)}</section>}
+   {changed && <p className={styles.panelSubtitle}>Save Draft before reviewing or publishing. Your edits stay here when you switch tabs.</p>}
+   <section className={styles.revisionReview} aria-label="Review and publish revision">
+    <h3>Review Changes</h3>
+    <p className={styles.panelSubtitle}>{changed ? 'Save your latest edits to prepare a new review.' : revision.state === 'REVIEWED' ? 'Review the generated content below before publishing. Students still see the previous published lesson.' : 'Validate your saved materials and prepare the AI lesson for review.'}</p>
+    <div className={styles.revisionActions}>
+    <Button variant="secondary" disabled={disabled || changed} onClick={() => run('review')}>Review Changes</Button>
+    </div>
+    {revision.state === 'REVIEWED' && <section aria-label="Reviewed revision"><h4>Review generated lesson{changed ? ' (from the last saved review)' : ''}</h4><GeneratedLessonSections lesson={revision} /></section>}
+    <div className={styles.publishRow}>
+      <div><h3>Publish Revision</h3><p className={styles.panelSubtitle}>Only publishing replaces the lesson Students see.</p></div>
+      <Button disabled={disabled || changed || revision.state !== 'REVIEWED'} onClick={() => setConfirm('publish')}>Publish Revision</Button>
+    </div>
+   </section>
   </>}
   {confirm && <Dialog className={styles.confirmDialog} labelledBy="revision-confirm-title" describedBy="revision-confirm-message" busy={busy} onClose={() => setConfirm(null)} initialFocus="button">
    <h2 id="revision-confirm-title">{confirm === 'start' ? 'Revise Published Lesson?' : confirm === 'discard' ? 'Discard Revision?' : 'Publish Revision?'}</h2>

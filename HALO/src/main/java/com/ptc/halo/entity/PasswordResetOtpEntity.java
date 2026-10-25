@@ -17,7 +17,13 @@ public class PasswordResetOtpEntity {
     private UserEntity user;
 
     @Column(nullable = false)
-    private String otp;
+    private String otp; // Versioned keyed verifier, never a plaintext reset code.
+
+    @Column(nullable = false)
+    private int failedAttempts;
+
+    public int getFailedAttempts() { return failedAttempts; }
+    public void setFailedAttempts(int value) { failedAttempts = value; }
 
     @Column(nullable = false)
     private LocalDateTime expiresAt;

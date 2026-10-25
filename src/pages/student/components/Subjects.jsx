@@ -6,6 +6,7 @@ import { Search, ChevronDown, ChevronUp, CheckCircle2, Play, Lock, BookOpen } fr
 import StudentPageShell from './StudentPageShell';
 import { useSubjectWeeks } from '../../../hooks/useSubjectWeeks';
 import styles from '../styles/Subjects.module.css';
+import AcademicProfileNotice from './AcademicProfileNotice';
 
 // ⚠️ Redesigned for the real backend
 // (StudentLearningProgressionController). Structural differences from the
@@ -28,6 +29,7 @@ export default function Subjects() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [reload, setReload] = useState(0);
   const [subjects, setSubjects] = useState([]);
 
   const [activeYear, setActiveYear] = useState('All Years');
@@ -39,12 +41,14 @@ export default function Subjects() {
     let isMounted = true;
 
     async function loadData() {
+      setIsLoading(true);
+      setLoadError(false);
       try {
         const data = await getSubjectsData();
         if (isMounted) setSubjects(data);
       } catch (err) {
         logStudentError('load-subjects', err);
-        if (isMounted) setLoadError(true);
+        if (isMounted) setLoadError(err?.response?.data?.code === 'PROFILE_INCOMPLETE' ? 'PROFILE_INCOMPLETE' : true);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -52,7 +56,7 @@ export default function Subjects() {
 
     loadData();
     return () => { isMounted = false; };
-  }, [getSubjectsData]);
+  }, [getSubjectsData, reload]);
 
   async function toggleSubject(subjectId) {
     if (expandedSubjectId === subjectId) {
@@ -86,7 +90,9 @@ export default function Subjects() {
   if (loadError) {
     return (
       <StudentPageShell>
-        <p className={styles.loadingText}>Couldn't load subjects. Please refresh and try again.</p>
+        {loadError === 'PROFILE_INCOMPLETE'
+          ? <main className={styles.main}><AcademicProfileNotice onRefresh={() => setReload(value => value + 1)} /></main>
+          : <p className={styles.loadingText}>Couldn't load subjects. Please refresh and try again.</p>}
       </StudentPageShell>
     );
   }

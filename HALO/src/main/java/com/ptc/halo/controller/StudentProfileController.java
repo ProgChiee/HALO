@@ -29,8 +29,7 @@ public class StudentProfileController {
             Authentication authentication) {
 
         UserEntity student =
-                userRepository
-                        .findByEmail(authentication.getName())
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Student not found"

@@ -31,9 +31,9 @@ class ProfessorStudentScopeHttpTest {
  @MockBean CustomUserDetailsService details;
  @MockBean JwtService jwt;
  UserEntity token(String role) {
-  when(jwt.extractUsername("test-token")).thenReturn("prof@example.test");when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("prof@example.test")).thenReturn(User.withUsername("prof@example.test").password("unused").roles(role).build());
-  var actor=new UserEntity();actor.setId(7L);actor.setRole(Role.PROFESSOR);actor.setEmail("prof@example.test");when(users.findByEmail(actor.getEmail())).thenReturn(Optional.of(actor));return actor;
+  when(jwt.extractUserId("test-token")).thenReturn(7L);when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
+  when(details.loadUserById(7L)).thenReturn(TestIdentity.details(7L, "prof@example.test", role));
+  var actor=new UserEntity();actor.setId(7L);actor.setRole(com.ptc.halo.enums.Role.PROFESSOR);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);actor.setRole(Role.PROFESSOR);actor.setEmail("prof@example.test");when(users.findById(7L)).thenReturn(Optional.of(actor));return actor;
  }
  @Test void allReadsReceiveAuthenticatedProfessorIgnoringQueryOwner() throws Exception {
   var actor=token("PROFESSOR");
@@ -63,7 +63,7 @@ class ProfessorStudentScopeHttpTest {
  @Test void roleRestrictionsRemain() throws Exception {
   mvc.perform(get("/api/professor/students")).andExpect(status().isUnauthorized());
   mvc.perform(get("/api/professor/students/progress-summaries")).andExpect(status().isUnauthorized());
-  for(String role:List.of("ADMIN","STUDENT","SUPER_ADMIN")){token(role);for(String suffix:List.of("","/progress-summaries"))mvc.perform(get("/api/professor/students"+suffix).header("Authorization","Bearer test-token")).andExpect(status().isForbidden());}
+  for(String role:List.of("ADMIN","STUDENT","SUPER_ADMIN")){token(role);for(String suffix:List.of("","/progress-summaries","/10/progress","/10/subjects","/10/assessments","/10/badges"))mvc.perform(get("/api/professor/students"+suffix).header("Authorization","Bearer test-token")).andExpect(status().isForbidden());}
   verifyNoInteractions(service);
  }
 

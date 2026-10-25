@@ -92,8 +92,7 @@ class AdminStudentPreviewTest {
  }
 
  org.springframework.security.core.Authentication authentication(UserEntity user) {
-  return new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(user.getEmail(),"unused",
-   List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+user.getRole())));
+  return TestIdentity.auth(user);
  }
  Long moduleId(){return modules.findAll().get(0).getId();}
 
@@ -186,9 +185,9 @@ class AdminStudentPreviewTest {
   var context=acting.createStudentPreview(auth,student.getId());student.setTokenVersion(student.getTokenVersion()+1);users.saveAndFlush(student);
   assertThrows(AdminApiException.class,()->acting.validateStudentPreview(auth,context));
   assertThrows(AdminApiException.class,()->preview.validate(auth,actingId));
-  var fresh=preview.create(auth,student.getId()).id();admin.setTokenVersion(admin.getTokenVersion()+1);users.saveAndFlush(admin);assertThrows(AdminApiException.class,()->preview.validate(auth,fresh));
+  var fresh=preview.create(auth,student.getId()).id();admin.setTokenVersion(admin.getTokenVersion()+1);users.saveAndFlush(admin);assertThrows(org.springframework.security.authentication.BadCredentialsException.class,()->preview.validate(auth,fresh));
   var expired=new AdminActingSessionEntity(UUID.randomUUID().toString(),admin,student,java.time.Instant.now().minusSeconds(60),java.time.Instant.now().minusSeconds(1));
-  assertThrows(AdminApiException.class,()->acting.validateStudentPreview(auth,expired));noHistory();
+  assertThrows(AdminApiException.class,()->acting.validateStudentPreview(authentication(admin),expired));noHistory();
  }
  @Test void failedPreviewAuditDoesNotCreateUsableSessionOrStudentHistory(){
   ActivityLogService spy=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit);

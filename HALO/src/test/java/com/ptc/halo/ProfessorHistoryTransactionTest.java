@@ -62,9 +62,9 @@ class ProfessorHistoryTransactionTest {
   assertEquals(1, history.get(0).getWeekNumber());
   assertEquals(90, history.get(0).getScore());
   assertEquals("B", service.getStudentAssessmentHistory(student.getId(), b).get(0).getSubjectName());
-  assertTrue(service.getStudentAssessmentHistory(empty.getId(), a).isEmpty());
+  assertEquals(404, assertThrows(ResponseStatusException.class, () -> service.getStudentAssessmentHistory(empty.getId(), a)).getStatusCode().value());
   var noSubjects = user("noSubjects", Role.PROFESSOR);
-  assertTrue(service.getStudentAssessmentHistory(student.getId(), noSubjects).isEmpty());
+  assertEquals(404, assertThrows(ResponseStatusException.class, () -> service.getStudentAssessmentHistory(student.getId(), noSubjects)).getStatusCode().value());
   for(Long id : new Long[]{Long.MAX_VALUE, a.getId()}) {
    var error = assertThrows(ResponseStatusException.class, () -> service.getStudentAssessmentHistory(id, a));
    assertEquals(404, error.getStatusCode().value());

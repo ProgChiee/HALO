@@ -98,7 +98,7 @@ public class ProfessorStudentController {
     }
     private UserEntity currentProfessor(Authentication authentication) {
         if (authentication == null) throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
-        return users.findByEmail(authentication.getName()).orElseThrow(() -> new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required"));
+        return com.ptc.halo.security.AuthenticatedAccount.find(users, authentication).orElseThrow(() -> new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required"));
     }
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> notFound(ResponseStatusException error) {

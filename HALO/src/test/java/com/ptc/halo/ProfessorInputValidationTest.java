@@ -39,10 +39,10 @@ class ProfessorInputValidationTest {
  @MockBean JwtService jwt;
  final String base="/api/professor/ai-learning-modules";
  void token(String role) {
-  when(jwt.extractUsername("test-token")).thenReturn("prof@example.test");
+  when(jwt.extractUserId("test-token")).thenReturn(7L);
   when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("prof@example.test")).thenReturn(User.withUsername("prof@example.test").password("unused").roles(role).build());
-  var actor=new UserEntity();actor.setId(7L);actor.setEmail("prof@example.test");when(users.findByEmail(actor.getEmail())).thenReturn(Optional.of(actor));
+  when(details.loadUserById(7L)).thenReturn(TestIdentity.details(7L, "prof@example.test", role));
+  var actor=new UserEntity();actor.setId(7L);actor.setRole(com.ptc.halo.enums.Role.PROFESSOR);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);actor.setEmail("prof@example.test");when(users.findById(7L)).thenReturn(Optional.of(actor));
  }
 
  void bad(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request) throws Exception {

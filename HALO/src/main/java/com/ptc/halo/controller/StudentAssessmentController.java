@@ -35,10 +35,7 @@ public class StudentAssessmentController {
             Authentication authentication) {
 
         UserEntity student =
-                userRepository
-                        .findByEmail(
-                                authentication.getName()
-                        )
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
@@ -55,10 +52,10 @@ public class StudentAssessmentController {
             @PathVariable @jakarta.validation.constraints.Positive Long moduleId,
             Authentication authentication) {
 
-        String email = authentication.getName();
+
 
         UserEntity student =
-                userRepository.findByEmail(email)
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
@@ -88,10 +85,10 @@ public class StudentAssessmentController {
             @jakarta.validation.Valid @RequestBody StudentAnswerRequest request,
             Authentication authentication) {
 
-        String email = authentication.getName();
+
 
         UserEntity student =
-                userRepository.findByEmail(email)
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
@@ -117,10 +114,10 @@ public class StudentAssessmentController {
             @PathVariable @jakarta.validation.constraints.Positive Long moduleId,
             Authentication authentication) {
 
-        String email = authentication.getName();
+
 
         UserEntity student =
-                userRepository.findByEmail(email)
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
@@ -138,10 +135,10 @@ public class StudentAssessmentController {
             @PathVariable @jakarta.validation.constraints.Positive Long attemptId,
             Authentication authentication) {
 
-        String email = authentication.getName();
+
 
         UserEntity student =
-                userRepository.findByEmail(email)
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );
@@ -159,10 +156,10 @@ public class StudentAssessmentController {
             @PathVariable @jakarta.validation.constraints.Positive Long moduleId,
             Authentication authentication) {
 
-        String email = authentication.getName();
+
 
         UserEntity student =
-                userRepository.findByEmail(email)
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED")
                         );

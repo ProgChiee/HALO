@@ -13,9 +13,9 @@ import styles from '../styles/Admins.module.css';
 
 const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
 
-// ✅ getAdmins() returns AdminListResponse — { id, name, email, role,
-// status } — confirmed to include both id and status, so toggle works.
-// (Only the create-admin response is limited to name/email/role — not
+// âœ… getAdmins() returns AdminListResponse â€” { id, name, email, role,
+// status } â€” confirmed to include both id and status, so toggle works.
+// (Only the create-admin response is limited to name/email/role â€” not
 // used for display here.)
 //
 export default function Admins() {
@@ -29,6 +29,8 @@ export default function Admins() {
   const [deleting, setDeleting] = useState(false);
   const deleteLock = useRef(false);
   const statusLock = useRef(false);
+  const [statusTarget, setStatusTarget] = useState(null);
+  const [statusError, setStatusError] = useState('');
   const createLock = useRef(false);
   const instance = useRef(0);
   const mounted = useRef(false);
@@ -64,7 +66,7 @@ export default function Admins() {
   }
 
   function openAddModal(event) {
-    if (deleteTarget || createLock.current || statusLock.current) return;
+    if (deleteTarget || statusTarget || createLock.current || statusLock.current) return;
     event?.currentTarget?.focus();
     instance.current += 1;
     setName('');
@@ -114,18 +116,30 @@ export default function Admins() {
     }
   }
 
-  async function handleSetStatus(admin) {
+  function openStatus(admin, event) {
+    if (deleteTarget || statusLock.current || createLock.current) return;
+    event?.currentTarget?.focus();
+    setStatusError(''); setStatusTarget(admin);
+  }
+  function closeStatus() {
+    if (!statusLock.current) { setStatusTarget(null); setStatusError(''); }
+  }
+  async function handleSetStatus() {
+    if (!statusTarget) return;
+    const admin = statusTarget;
     if (deleteTarget || statusLock.current || createLock.current) return;
     statusLock.current = true;
     const isCurrent = () => mounted.current;
     setUpdatingStatusId(admin.id);
+    setStatusError('');
     try {
       const updated = await setAdminStatus(admin.id, admin.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
       if (!isCurrent()) return;
+      setStatusTarget(null);
       showToast('Account status: ' + (STATUS_LABELS[updated.status] ?? updated.status), 'success');
       await loadAdmins();
     } catch (err) {
-      if (isCurrent()) showToast(apiErrorMessage(err, "Couldn't update the account status. Please try again."), 'error');
+      if (isCurrent()) setStatusError(apiErrorMessage(err, "Couldn't update the account status. Please try again."));
     } finally {
       if (isCurrent()) {
         statusLock.current = false;
@@ -154,17 +168,9 @@ export default function Admins() {
     } finally { deleteLock.current = false; if (mounted.current) setDeleting(false); }
   }
 
-  async function deactivateProtectedAdmin() {
+  function deactivateProtectedAdmin() {
     if (!deleteTarget || !protectedDelete.current || deleteLock.current || deleteTarget.status === 'INACTIVE') return;
-    deleteLock.current = true; setDeleting(true);
-    try {
-      await setAdminStatus(deleteTarget.id, 'INACTIVE');
-      if (!mounted.current) return;
-      setDeleteTarget(null); showToast('Admin account deactivated.', 'success');
-      await loadAdmins();
-    } catch (error) {
-      if (mounted.current) setDeleteError(apiErrorMessage(error, 'Could not deactivate this Admin account. Please try again.'));
-    } finally { deleteLock.current = false; if (mounted.current) setDeleting(false); }
+    setStatusError(''); setStatusTarget(deleteTarget); setDeleteTarget(null);
   }
 
   return (
@@ -213,7 +219,7 @@ export default function Admins() {
                   <div className={styles.actionsCell}>
                     <button
                       className={`${styles.actionBtn} ${admin.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
-                      onClick={() => handleSetStatus(admin)}
+                      onClick={event => openStatus(admin, event)}
                       disabled={updatingStatusId !== null || isSubmitting}
                       aria-label={admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                     >
@@ -239,6 +245,24 @@ export default function Admins() {
           )}
         </main>
 
+      {statusTarget && <Dialog labelledBy="admin-status-title" describedBy="admin-status-description" onClose={closeStatus}
+        busy={updatingStatusId !== null} initialFocus="button" className={styles.modal}>
+        <div className={styles.form}>
+          <h3 id="admin-status-title" className={styles.modalTitle}>{statusTarget.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} Admin Account?</h3>
+          <p id="admin-status-description" className={styles.adminName}>
+            {statusTarget.status === 'ACTIVE'
+              ? <>Deactivate <strong>{statusTarget.name}</strong>? They will lose access to HALO and their existing sessions will be revoked. Account information and history will remain preserved.</>
+              : <>Activate <strong>{statusTarget.name}</strong>? They will regain access to HALO after signing in again.</>}
+          </p>
+          {statusError && <p role="alert" className={styles.formError}>{statusError}</p>}
+          {updatingStatusId !== null && <p role="status">Updating account status...</p>}
+          <div className={styles.confirmActions}>
+            <Button variant="secondary" onClick={closeStatus} disabled={updatingStatusId !== null}>Cancel</Button>
+            <Button variant={statusTarget.status === 'ACTIVE' ? 'danger' : 'primary'} onClick={handleSetStatus}
+              disabled={updatingStatusId !== null}>{statusTarget.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}</Button>
+          </div>
+        </div>
+      </Dialog>}
       {deleteTarget && <Dialog labelledBy="delete-admin-title" onClose={closeDelete} busy={deleting} className={styles.modal}>
         <h3 id="delete-admin-title" className={styles.modalTitle}>Delete Admin Account?</h3>
         <p>This will permanently remove this Admin account. This action cannot be undone.</p>

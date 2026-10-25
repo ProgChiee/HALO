@@ -59,30 +59,26 @@ public class AuthController {
     return ResponseEntity.ok(response);
     }
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(
-            @jakarta.validation.Valid @RequestBody ForgotPasswordRequest request) {
-
-        runReset(() -> passwordResetService.sendOtp(request.getEmail()));
-
-        return ResponseEntity.ok(
-                "Password reset OTP sent successfully"
-        );
+    public ResponseEntity<?> forgotPassword(
+            @jakarta.validation.Valid @RequestBody ForgotPasswordRequest request, jakarta.servlet.http.HttpServletRequest http) {
+        return requestReset(request.getEmail(),http.getRemoteAddr());
     }
     @PostMapping("/forgot-password/resend")
-    public ResponseEntity<String> resendPasswordOtp(
-            @jakarta.validation.Valid @RequestBody ResendPasswordOtpRequest request) {
-
-        runReset(() -> passwordResetService.sendOtp(request.getEmail()));
-
-        return ResponseEntity.ok(
-                "New password reset OTP sent successfully"
-        );
+    public ResponseEntity<?> resendPasswordOtp(
+            @jakarta.validation.Valid @RequestBody ResendPasswordOtpRequest request, jakarta.servlet.http.HttpServletRequest http) {
+        return requestReset(request.getEmail(),http.getRemoteAddr());
+    }
+    private ResponseEntity<?> requestReset(String email,String remoteAddress) {
+        int[] cooldown={0};
+        runReset(() -> cooldown[0]=passwordResetService.sendOtp(email,remoteAddress));
+        return ResponseEntity.ok().header("Retry-After",Integer.toString(cooldown[0]))
+                .body(java.util.Map.of("message","If this account can receive recovery email, a reset code will be sent. Check your inbox and spam folder.","retryAfterSeconds",cooldown[0]));
     }
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(
-            @jakarta.validation.Valid @RequestBody ResetPasswordRequest request) {
+            @jakarta.validation.Valid @RequestBody ResetPasswordRequest request, jakarta.servlet.http.HttpServletRequest http) {
 
-        runReset(() -> passwordResetService.resetPassword(request.getEmail(), request.getOtp(), request.getNewPassword()));
+        runReset(() -> passwordResetService.resetPassword(request.getEmail(), request.getOtp(), request.getNewPassword(),http.getRemoteAddr()));
 
         return ResponseEntity.ok(
                 "Password reset successfully"
@@ -93,8 +89,7 @@ public class AuthController {
             @jakarta.validation.Valid @RequestBody ChangePasswordRequest request,
             Authentication authentication) {
 
-        UserEntity user = userRepository
-                .findByEmail(authentication.getName())
+        UserEntity user = com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                 .orElseThrow(() ->
                         new RuntimeException("User not found")
                 );

@@ -154,6 +154,10 @@ async function getStudentProgressSummaries(page = 0, size = 20, config = {}) {
   async function getProfilePhoto(config = {}) { return (await apiClient.get('/professor/profile/photo', { ...config, responseType: 'blob' })).data; }
   const revisionPath = id => '/professor/ai-learning-modules/' + id + '/revision';
   const getRevision = async (id, config = {}) => (await apiClient.get(revisionPath(id), config)).data;
+  const getRevisionHistory = async (id, page = 0, size = 10, config = {}) =>
+    (await apiClient.get(revisionPath(id) + '/history', { ...config, params: { ...config.params, page, size } })).data;
+  const getRevisionHistoryVersion = async (id, revisionNumber, config = {}) =>
+    (await apiClient.get(revisionPath(id) + '/history/' + encodeURIComponent(revisionNumber), config)).data;
   const startRevision = async id => (await apiClient.post(revisionPath(id))).data;
   const saveRevision = async (id, revision, files) => {
     const data = new FormData(); data.append('revision', new Blob([JSON.stringify(revision)], { type: 'application/json' }));
@@ -167,7 +171,7 @@ async function getStudentProgressSummaries(page = 0, size = 20, config = {}) {
   const getQuizRevision = async (id, config = {}) => (await apiClient.get(quizPath(id), config)).data;
   const generateQuizRevision = async id => (await apiClient.post(quizPath(id) + '/generate', undefined, { timeout: 180000 })).data;
   const approveQuizRevision = async (id, draftId) => (await apiClient.post(quizPath(id) + '/approve', { draftId })).data;
-  return { getQuizRevision, generateQuizRevision, approveQuizRevision, getRevision, startRevision, saveRevision, reviewRevision, publishRevision, discardRevision, getProfilePhoto, createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement };
+  return { getRevisionHistory, getRevisionHistoryVersion, getQuizRevision, generateQuizRevision, approveQuizRevision, getRevision, startRevision, saveRevision, reviewRevision, publishRevision, discardRevision, getProfilePhoto, createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement };
 }
 
 export const { createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement } = createProfessorService();

@@ -121,6 +121,8 @@ test('post-create authoritative GET wins over the initial pre-mutation GET', asy
 test('status mutation performs one authoritative GET and never retries PATCH', async () => {
   await mountAdmins(); await act(async () => calls[0].resolve([{ id: 8, name: 'Admin', status: 'ACTIVE' }]));
   await click(host.querySelector('[aria-label=Deactivate]'));
+  assert.equal(calls.length, 1);
+  await click(button('Deactivate'));
   assert.equal(calls[1].config.method, 'patch');
   await act(async () => calls[1].resolve({ id: 8, status: 'INACTIVE' }));
   assert.equal(calls.length, 3); assert.equal(calls[2].config.method, 'get');
@@ -135,6 +137,48 @@ async function hookHarness(loader) {
   const render = async fetch => act(async () => root.render(React.createElement(Probe, { fetch })));
   await render(loader); return { state, render };
 }
+
+test('Admin status confirmation names the account, focuses Cancel, and supports Escape without requests', async () => {
+  await mountAdmins(); await act(async () => calls[0].resolve([{ id: 8, name: 'Named Admin', status: 'ACTIVE' }]));
+  const opener=host.querySelector('[aria-label=Deactivate]');
+  await click(opener);
+  assert.match(document.querySelector('[role="dialog"]').textContent,/Deactivate Admin Account\?/);
+  assert.match(document.querySelector('[role="dialog"]').textContent,/Named Admin/);
+  assert.equal(document.activeElement,button('Cancel'));
+  assert.equal(calls.length,1);
+  await click(button('Cancel')); assert.equal(document.querySelector('[role="dialog"]'),null);
+  assert.equal(document.activeElement,opener);
+  await click(opener);
+  await act(async()=>document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+  assert.equal(document.querySelector('[role="dialog"]'),null); assert.equal(calls.length,1);
+});
+
+test('activation confirms exact target, prevents duplicate requests, and keeps failures open for retry', async () => {
+  await mountAdmins(); await act(async()=>calls[0].resolve([{id:9,name:'Inactive Admin',status:'INACTIVE'}]));
+  await click(host.querySelector('[aria-label=Activate]'));
+  assert.match(document.querySelector('[role="dialog"]').textContent,/Activate Admin Account\?/);
+  assert.match(document.querySelector('[role="dialog"]').textContent,/Inactive Admin/);
+  assert.equal(calls.length,1);
+  const confirm=button('Activate');
+  await act(async()=>{ confirm.click(); confirm.click(); });
+  assert.equal(calls.length,2); assert.equal(calls[1].config.method,'patch');
+  assert.equal(calls[1].config.url,'/super-admin/admin/9/status');
+  assert.deepEqual(JSON.parse(calls[1].config.data),{status:'ACTIVE'});
+  assert.equal(confirm.disabled,true); assert.equal(button('Cancel').disabled,true);
+  assert.equal(document.querySelector('[role="dialog"]').getAttribute('aria-busy'),'true');
+  assert.match(document.querySelector('[role="status"]').textContent,/Updating/);
+  await act(async()=>document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+  assert.ok(document.querySelector('[role="dialog"]'));
+  await act(async()=>calls[1].reject({response:{status:500,data:{}}}));
+  assert.ok(document.querySelector('[role="dialog"] [role="alert"]'));
+  assert.equal(button('Activate').disabled,false); assert.equal(button('Cancel').disabled,false);
+  await click(button('Activate')); assert.equal(document.querySelector('[role="dialog"] [role="alert"]'),null);
+  await act(async()=>calls[2].resolve({id:9,status:'ACTIVE'}));
+  assert.equal(document.querySelector('[role="dialog"]'),null);
+  assert.equal(feedback.at(-1)[1],'success');
+  await act(async()=>calls[3].resolve([{id:9,name:'Inactive Admin',status:'ACTIVE'}]));
+  assert.ok(host.querySelector('[aria-label=Deactivate]'));
+});
 
 test('GET latest-request tracking ignores obsolete success/error even when loader ignores abort', async () => {
   const pending = [];

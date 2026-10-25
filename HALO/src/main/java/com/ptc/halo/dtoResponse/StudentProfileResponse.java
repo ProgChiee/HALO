@@ -15,6 +15,10 @@ public class StudentProfileResponse {
     private String section;
     private YearLevel yearLevel;
 
+    public boolean isProfileIncomplete() {
+        return studentId == null || studentId.isBlank() || section == null || section.isBlank() || yearLevel == null;
+    }
+
     public StudentProfileResponse() {
     }
 

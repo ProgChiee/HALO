@@ -22,7 +22,7 @@ public class ProfilePhotoController extends StudentLessonExceptionHandler {
     }
     private long owner(Authentication auth) {
         if (auth == null || !auth.isAuthenticated()) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED");
-        var user = users.findByEmail(auth.getName()).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED"));
+        var user = com.ptc.halo.security.AuthenticatedAccount.find(users, auth).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED"));
         if (user.getStatus() != com.ptc.halo.enums.Status.ACTIVE || user.getRole() == null
                 || auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_" + user.getRole().name())))
             throw new org.springframework.security.access.AccessDeniedException("Account unavailable");

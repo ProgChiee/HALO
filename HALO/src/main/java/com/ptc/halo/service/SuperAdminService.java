@@ -126,9 +126,7 @@ public class SuperAdminService {
                                             UpdateAdminRequest request,
                                             UserEntity superAdmin){
 
-        UserEntity admin = userRepository.findById(id)
-                .orElseThrow(() ->
-                        SuperAdminApiException.notFound());
+        UserEntity admin = lockCurrentAdmin(id);
 
         if(admin.getRole() != Role.ADMIN){
             throw SuperAdminApiException.notFound();
@@ -164,14 +162,15 @@ public class SuperAdminService {
     public AdminListResponse changeAdminStatus(   Long id, Status status,
                                                   UserEntity superAdmin){
 
-        UserEntity admin = userRepository.findById(id)
-                .orElseThrow(() ->
-                        SuperAdminApiException.notFound());
+        UserEntity admin = lockCurrentAdmin(id);
 
         if(admin.getRole() != Role.ADMIN){
             throw SuperAdminApiException.notFound();
         }
 
+        // Status transitions revoke prior sessions permanently, including after
+        // reactivation. The locked, refreshed row prevents lost increments.
+        if (admin.getStatus() != status) admin.setTokenVersion(Math.addExact(admin.getTokenVersion(), 1));
         admin.setStatus(status);
 
         UserEntity updatedAdmin = userRepository.saveAndFlush(admin);
@@ -196,6 +195,16 @@ public class SuperAdminService {
 
         return response;
     }
+    private UserEntity lockCurrentAdmin(Long id) {
+        // Serialize these full-entity writes with logout and password changes on
+        // the same database row. A lock alone does not refresh an entity that
+        // was already loaded into this persistence context before another commit.
+        UserEntity admin = entityManager.find(UserEntity.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        if (admin == null) throw SuperAdminApiException.notFound();
+        entityManager.refresh(admin, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        return admin;
+    }
+
     @Transactional
     public void deleteAdmin(Long id, UserEntity actor) {
         if (actor == null || actor.getRole() != Role.SUPER_ADMIN)

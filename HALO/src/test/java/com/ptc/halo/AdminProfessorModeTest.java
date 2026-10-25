@@ -60,14 +60,14 @@ class AdminProfessorModeTest {
   auth=auth(admin);session=acting.create(auth,new AdminActingSessionRequest(professor.getId(),Role.PROFESSOR)).id();
  }
  UserEntity user(String name,Role role){var u=new UserEntity();u.setName(name);u.setEmail(name+"@example.test");u.setRole(role);u.setStatus(Status.ACTIVE);return users.saveAndFlush(u);}
- Authentication auth(UserEntity u){return new UsernamePasswordAuthenticationToken(u.getEmail(),"unused",List.of(new SimpleGrantedAuthority("ROLE_"+u.getRole())));}
+ Authentication auth(UserEntity u){return TestIdentity.auth(u);}
  SubjectRequest subjectRequest(String code){var r=new SubjectRequest();r.setSubjectCode(code);r.setSubjectName(code);r.setDescription("Description");r.setYearLevel(YearLevel.FIRST_YEAR);return r;}
  Long subject(){return mode.execute(auth,session,s->academic.createSubject(subjectRequest("S"),s.getTarget(),s)).getId();}
  Long week(Long id){var r=new WeekRequest();r.setWeekNumber(1);r.setTitle("Week");return mode.execute(auth,session,s->academic.createWeek(id,r,s.getTarget(),s)).getId();}
  Long module(){return mode.execute(auth,session,s->modules.createModule(week(subject()),"Lesson",null,null,List.of(),s.getTarget(),s)).getBody().getId();}
  void tx(java.util.function.Consumer<org.springframework.transaction.TransactionStatus> f){new TransactionTemplate(manager).executeWithoutResult(f);}
  void ready(Long id){tx(t->{var m=moduleRepo.findById(id).orElseThrow();m.setAiGenerationStatus(AiGenerationStatus.COMPLETED);m.setGeneratedKnowledge("Knowledge");var file=new AiLearningFileEntity();file.setOriginalFileName("lesson.pdf");file.setStoredFileName("opaque.pdf");file.setFilePath("opaque.pdf");file.setFileType("application/pdf");m.addFile(file);moduleRepo.saveAndFlush(m);});}
- GeneratedAssessment generated(){var result=new GeneratedAssessment();var q=new GeneratedAssessmentQuestion();q.setQuestionNumber(1);q.setQuestion("Question?");q.setOptionA("A");q.setOptionB("B");q.setOptionC("C");q.setOptionD("D");q.setCorrectAnswer("A");result.setQuestions(List.of(q));return result;}
+ GeneratedAssessment generated(){var result=new GeneratedAssessment();var list=new ArrayList<GeneratedAssessmentQuestion>();for(int n=1;n<=10;n++){var q=new GeneratedAssessmentQuestion();q.setQuestionNumber(n);q.setQuestion("Question "+n+"?");q.setOptionA("A");q.setOptionB("B");q.setOptionC("C");q.setOptionD("D");q.setCorrectAnswer("A");list.add(q);}result.setQuestions(list);return result;}
  @Test void previewRechecksTokenVersionsExpiryAndUsesReadOnlyTransactions() {
   var p=preview.create(auth,professor.getId());
   assertEquals(Boolean.TRUE,preview.read(auth,p.id(),s->org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()));
@@ -148,7 +148,15 @@ class AdminProfessorModeTest {
   when(index.getOrBuild(any())).thenAnswer(call->{assertFalse(TransactionSynchronizationManager.isActualTransactionActive());return null;});
   when(assessmentAi.generateAssessment(any(),any(),any(),any(),any())).thenAnswer(call->{assertFalse(TransactionSynchronizationManager.isActualTransactionActive());return generated();});
   mode.approve(auth,session,id);
-  assertEquals(LessonStatus.APPROVED,moduleRepo.findById(id).orElseThrow().getStatus());assertTrue(assessments.findByModuleId(id).isPresent());assertEquals(1,questions.count());
+  assertEquals(LessonStatus.APPROVED,moduleRepo.findById(id).orElseThrow().getStatus());assertTrue(assessments.findByModuleId(id).isPresent());assertEquals(10,questions.count());
+ }
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+ void invalidInitialQuizCannotPublishLessonOrPersistQuestions(boolean actingMode){
+  Long id=module();ready(id);var invalid=generated();invalid.getQuestions().get(9).setCorrectAnswer("Z");
+  when(assessmentAi.generateAssessment(any(),any(),any(),any(),any())).thenReturn(invalid);
+  var error=assertThrows(ResponseStatusException.class,()->{if(actingMode)mode.approve(auth,session,id);else modules.approveLesson(id,professor,null);});
+  assertEquals("QUIZ_GENERATION_INVALID",error.getReason());assertEquals(LessonStatus.PENDING,moduleRepo.findById(id).orElseThrow().getStatus());assertEquals(0,assessments.count());assertEquals(0,questions.count());
  }
  @Test void revokedDuringAssessmentCannotPublishOrPersistQuestions() {
   Long id=module();ready(id);when(assessmentAi.generateAssessment(any(),any(),any(),any(),any())).thenAnswer(call->{acting.revoke(auth,session);return generated();});

@@ -8,6 +8,7 @@ import { User as UserIcon, KeyRound } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
 import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import styles from '../styles/Profile.module.css';
+import AcademicProfileNotice from './AcademicProfileNotice';
 
 const YEAR_LEVEL_LABELS = {
   FIRST_YEAR: '1st Year',
@@ -22,10 +23,13 @@ export default function Profile() {
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
+      setIsLoading(true);
+      setLoadError(false);
       try {
         const data = await getProfileData();
         if (isMounted) setProfile(data);
@@ -38,7 +42,7 @@ export default function Profile() {
     }
     loadData();
     return () => { isMounted = false; };
-  }, [getProfileData]);
+  }, [getProfileData, reload]);
 
   if (isLoading) {
     return (
@@ -62,7 +66,7 @@ export default function Profile() {
 
   const displayName = workflow.acting ? profile.name : (user?.name ?? profile.name);
   const avatarInitial = displayName?.trim().charAt(0).toUpperCase() || '?';
-  const yearLevelLabel = YEAR_LEVEL_LABELS[profile.yearLevel] ?? profile.yearLevel;
+  const yearLevelLabel = YEAR_LEVEL_LABELS[profile.yearLevel] ?? profile.yearLevel ?? 'Not set';
 
   return (
     <StudentPageShell>
@@ -76,10 +80,11 @@ export default function Profile() {
         </header>
 
         <main className={styles.main}>
+          {profile.profileIncomplete && <AcademicProfileNotice onRefresh={() => setReload(value => value + 1)} />}
           <div className={styles.profileHeader}>
             <ProfilePhoto key={workflow.identity} initial={avatarInitial} readOnly={workflow.acting} identityContent={<div>
               <p className={styles.fullName}>{displayName}</p>
-              <p className={styles.subMeta}>{profile.section} · {yearLevelLabel}</p>
+              <p className={styles.subMeta}>{profile.section?.trim() || 'Section not set'} · {yearLevelLabel}</p>
             </div>} />
           </div>
 
@@ -95,12 +100,12 @@ export default function Profile() {
 
           <div className={styles.infoCard}>
             <span className={styles.infoLabel}>Student ID</span>
-            <span className={styles.infoValue}>{profile.studentId}</span>
+            <span className={styles.infoValue}>{profile.studentId?.trim() || 'Not set'}</span>
           </div>
 
           <div className={styles.infoCard}>
             <span className={styles.infoLabel}>Section</span>
-            <span className={styles.infoValue}>{profile.section}</span>
+            <span className={styles.infoValue}>{profile.section?.trim() || 'Not set'}</span>
           </div>
 
           <div className={styles.infoCard}>

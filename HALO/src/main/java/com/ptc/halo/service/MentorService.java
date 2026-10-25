@@ -28,7 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.LocalDateTime;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -106,7 +106,7 @@ public class MentorService {
     }
     private void saveMessage(MentorSessionEntity session, MessageSender sender, String text, String key) {
         var message = new MentorMessageEntity(); message.setRequestId(key); message.setSession(session); message.setSender(sender);
-        message.setMessage(text); message.setCreatedAt(LocalDateTime.now()); mentorMessageRepository.save(message);
+        message.setMessage(text); message.setCreatedAt(StudyActivityTime.now()); mentorMessageRepository.save(message);
     }
 
     private String requestKey(String key) {
@@ -181,7 +181,7 @@ public class MentorService {
             if (existing != null) return existing;
             saveMessage(session, MessageSender.STUDENT, studentMessage, key);
             saveMessage(session, MessageSender.HALO, reply, key);
-            session.setLastActivityAt(LocalDateTime.now()); session.setProgressStatus(MentorProgressStatus.LEARNING);
+            session.setLastActivityAt(StudyActivityTime.now()); session.setProgressStatus(MentorProgressStatus.LEARNING);
             mentorSessionRepository.save(session);
             auditExchange.run();
             var response = new MentorSessionResponse(); response.setSessionId(sessionId);
@@ -246,10 +246,10 @@ public class MentorService {
             session.setStudent(student);
             session.setModule(module);
             session.setStartedAt(
-                    LocalDateTime.now()
+                    StudyActivityTime.now()
             );
             session.setLastActivityAt(
-                    LocalDateTime.now()
+                    StudyActivityTime.now()
             );
 
             session.setProgressStatus(
@@ -269,13 +269,13 @@ public class MentorService {
             message.setSender(MessageSender.HALO);
             message.setMessage(haloMessage);
             message.setCreatedAt(
-                    LocalDateTime.now()
+                    StudyActivityTime.now()
             );
 
             mentorMessageRepository.save(message);
 
             session.setLastActivityAt(
-                    LocalDateTime.now()
+                    StudyActivityTime.now()
             );
 
             mentorSessionRepository.save(session);

@@ -14,12 +14,13 @@ public interface ActivityLogRepository
 
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user", "actingTarget"})
     @org.springframework.data.jpa.repository.Query("""
-        select l from ActivityLogEntity l left join l.user u
+        select l from ActivityLogEntity l left join l.user u left join l.actingTarget target
         where (u.role = com.ptc.halo.enums.Role.ADMIN
             or (u.role = com.ptc.halo.enums.Role.SUPER_ADMIN and l.activityType in (com.ptc.halo.enums.ActivityType.ACCOUNT, com.ptc.halo.enums.ActivityType.AUTH))
             or (u is null and l.activityType = com.ptc.halo.enums.ActivityType.AUTH))
         and (:type is null or l.activityType = :type)
-        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0 or locate(:search, lower(u.email)) > 0 or locate(:search, lower(l.authDisplay)) > 0)
+        and (locate(:search, lower(l.action)) > 0 or locate(:search, lower(u.name)) > 0 or locate(:search, lower(u.email)) > 0 or locate(:search, lower(l.authDisplay)) > 0
+            or locate(:search, lower(target.name)) > 0 or locate(:search, lower(target.email)) > 0)
         """)
     org.springframework.data.domain.Page<ActivityLogEntity> findSuperAdminLogs(
         @org.springframework.data.repository.query.Param("type") ActivityType type,

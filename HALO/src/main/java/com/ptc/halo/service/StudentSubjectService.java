@@ -62,11 +62,11 @@ public class StudentSubjectService {
         StudentProfileEntity profile =
                 studentProfileRepository
                         .findByUserId(student.getId())
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Student profile not found"
-                                )
-                        );
+                        .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                                org.springframework.http.HttpStatus.CONFLICT, "PROFILE_INCOMPLETE"));
+
+        if (profile.getYearLevel() == null) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT, "PROFILE_INCOMPLETE");
 
 
         List<SubjectEntity> subjects =

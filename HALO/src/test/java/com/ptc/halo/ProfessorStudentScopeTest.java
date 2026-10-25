@@ -48,8 +48,9 @@ class ProfessorStudentScopeTest {
   var attempt=new AssessmentAttemptEntity();attempt.setStudent(student);attempt.setAssessment(assessment);attempt.setScore(90);attempt.setPassed(true);attempt.setStartedAt(LocalDateTime.now());attempt.setSubmittedAt(LocalDateTime.now());attempts.saveAndFlush(attempt);
   return s.getId();
  }
- @Test void listIncludesStudentAccountsEvenWithoutProfile() {
-  assertEquals(2,service.getStudents(a).size());assertEquals(2,service.getStudents(b).size());
+ @Test void listIncludesOnlyEligibleStudentsAndSharedStudentsRemainVisible() {
+  assertEquals(java.util.List.of(student.getId()),service.getStudents(a).stream().map(r->r.getUserId()).toList());
+  assertEquals(java.util.List.of(student.getId()),service.getStudents(b).stream().map(r->r.getUserId()).toList());
  }
  @Test void paginatedSummariesScopeCountsAndKeepZeroActivityStudents() {
   var eligible=new StudentProfileEntity();eligible.setUser(empty);eligible.setStudentId("S2");eligible.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(eligible);
@@ -80,6 +81,7 @@ class ProfessorStudentScopeTest {
    var former=service.getProgressSummaries(a,0,20,ProfessorStudentView.FORMER);
    assertEquals(status==Status.BLOCKED?0:1,former.getTotalElements());
    if(status!=Status.BLOCKED){assertEquals(status,former.getContent().get(0).status());assertEquals(1,former.getContent().get(0).completedModules());assertEquals(1,former.getContent().get(0).passedAssessments());}
+   if(status!=Status.BLOCKED)assertEquals(1,service.getStudentAssessmentHistory(student.getId(),a).size());
    assertEquals(attemptsBefore,attempts.count());assertEquals(progressBefore,progress.count());assertEquals(badgesBefore,badges.count());
   }
   student.setStatus(Status.ACTIVE);users.saveAndFlush(student);
@@ -95,11 +97,51 @@ class ProfessorStudentScopeTest {
   assertEquals(3,studentService.getStudentSubjects(student).size());
   assertEquals(3,progress.countByStudentIdAndCompletedTrue(student.getId()));assertEquals(3,attempts.countByStudentIdAndPassedTrue(student.getId()));
  }
- @Test void noScopedActivityReturnsZeroAndEmptyHistory() {
+ @Test void noOwnedSubjectsAndMissingProfilesCannotAccessAnyStudentDetail() {
   var c=user("c",Role.PROFESSOR);
-  assertEquals(0,service.getStudentProgress(student.getId(),c).getCompletedModules());assertEquals(0,service.getStudentProgress(student.getId(),c).getPassedAssessments());
-  assertTrue(service.getStudentAssessmentHistory(student.getId(),c).isEmpty());assertTrue(service.getStudentSubjects(student.getId(),c).isEmpty());
-  assertEquals(0,service.getStudentProgress(empty.getId(),a).getCompletedModules());assertTrue(service.getStudentAssessmentHistory(empty.getId(),a).isEmpty());
+  assertTrue(service.getStudents(c).isEmpty());
+  assertDetailsDenied(student.getId(),c);
+  assertDetailsDenied(empty.getId(),a);
+ }
+ @Test void eligibleStudentWithoutActivityRemainsAccessible() {
+  var profile=new StudentProfileEntity();profile.setUser(empty);profile.setStudentId("S2");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  assertEquals(2,service.getStudents(a).size());
+  assertEquals(0,service.getStudentProgress(empty.getId(),a).getCompletedModules());
+  assertTrue(service.getStudentAssessmentHistory(empty.getId(),a).isEmpty());
+  assertTrue(service.getStudentBadges(empty.getId(),a).isEmpty());
+ }
+ @Test void exclusiveStudentCannotBeAccessedByAnotherProfessorEvenWithHistoricalActivity() {
+  var subject=subjects.findBySubjectCode("B").orElseThrow();
+  subject.setYearLevel(YearLevel.SECOND_YEAR);subjects.saveAndFlush(subject);
+  var profile=new StudentProfileEntity();profile.setUser(empty);profile.setStudentId("S2");profile.setYearLevel(YearLevel.SECOND_YEAR);profiles.saveAndFlush(profile);
+  // A and B used to share student; historical activity does not grant current eligibility.
+  assertEquals(java.util.List.of(student.getId()),service.getStudents(a).stream().map(r->r.getUserId()).toList());
+  assertEquals(java.util.List.of(empty.getId()),service.getStudents(b).stream().map(r->r.getUserId()).toList());
+  assertDetailsDenied(empty.getId(),a);assertDetailsDenied(student.getId(),b);
+  assertEquals(empty.getId(),service.getStudentProgress(empty.getId(),b).getUserId());
+  assertEquals(3,attempts.count());assertEquals(3,progress.count());assertEquals(1,badges.count());
+ }
+ @Test void multipleOwnedSubjectsDoNotDuplicateStudentsAndUnknownYearDoesNotGrantAccess() {
+  var duplicate=new SubjectEntity();duplicate.setProfessor(subjects.findById(ownedSubject).orElseThrow().getProfessor());duplicate.setSubjectCode("A2");duplicate.setSubjectName("A2");duplicate.setYearLevel(YearLevel.FIRST_YEAR);subjects.saveAndFlush(duplicate);
+  assertEquals(1,service.getStudents(a).size());
+  var profile=new StudentProfileEntity();profile.setUser(empty);profile.setStudentId("S2");profiles.saveAndFlush(profile);
+  assertDetailsDenied(empty.getId(),a);assertEquals(1,service.getStudents(a).size());
+ }
+ @Test void serviceRejectsNonProfessorActorsForAllLegacyReads() {
+  for(var role:java.util.List.of(Role.STUDENT,Role.ADMIN,Role.SUPER_ADMIN)) {
+   var actor=user("actor"+role,role);
+   assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.getStudents(actor));
+   for(var action:detailActions(student.getId(),actor)) assertThrows(org.springframework.security.access.AccessDeniedException.class,action::run);
+  }
+ }
+ private java.util.List<Runnable> detailActions(Long id,UserEntity actor) {
+  return java.util.List.of(()->service.getStudentProgress(id,actor),()->service.getStudentSubjects(id,actor),()->service.getStudentAssessmentHistory(id,actor),()->service.getStudentBadges(id,actor));
+ }
+ private void assertDetailsDenied(Long id,UserEntity actor) {
+  for(var action:detailActions(id,actor)) {
+   var error=assertThrows(ResponseStatusException.class,action::run);
+   assertEquals(404,error.getStatusCode().value());assertEquals("RESOURCE_NOT_FOUND",error.getReason());
+  }
  }
  @Test void badgesRemainInstitutionWide() {
   assertEquals(1,service.getStudentBadges(student.getId(),a).size());assertEquals(1,service.getStudentBadges(student.getId(),b).size());

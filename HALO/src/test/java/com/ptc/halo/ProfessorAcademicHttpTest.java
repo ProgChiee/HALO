@@ -29,13 +29,13 @@ class ProfessorAcademicHttpTest {
  @MockBean CustomUserDetailsService details;
  @MockBean JwtService jwt;
  void token(String role) {
-  when(jwt.extractUsername("test-token")).thenReturn("prof@example.test");
+  when(jwt.extractUserId("test-token")).thenReturn(7L);
   when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("prof@example.test")).thenReturn(User.withUsername("prof@example.test").password("unused").roles(role).build());
+  when(details.loadUserById(7L)).thenReturn(TestIdentity.details(7L, "prof@example.test", role));
  }
  @Test void authenticatedIdentityIsPassedToEveryAcademicOperation() throws Exception {
-  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);actor.setEmail("prof@example.test");
-  when(users.findByEmail(actor.getEmail())).thenReturn(java.util.Optional.of(actor));
+  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);actor.setRole(com.ptc.halo.enums.Role.PROFESSOR);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);actor.setEmail("prof@example.test");
+  when(users.findById(7L)).thenReturn(java.util.Optional.of(actor));
   when(service.viewAllSubjects(actor)).thenReturn(List.of());
   mvc.perform(get("/api/professor/subjects").header("Authorization","Bearer test-token")).andExpect(status().isOk());
   mvc.perform(get("/api/professor/subjects/1").header("Authorization","Bearer test-token")).andExpect(status().isOk());
@@ -44,8 +44,8 @@ class ProfessorAcademicHttpTest {
   verify(service).viewAllSubjects(actor);verify(service).viewSubjectById(1L,actor);verify(service).viewAllWeeks(1L,actor);verify(service).viewWeekById(2L,actor);
  }
  @Test void scopedFailuresAreSafe404ForDirectRequests() throws Exception {
-  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);
-  when(users.findByEmail("prof@example.test")).thenReturn(java.util.Optional.of(actor));
+  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);actor.setRole(com.ptc.halo.enums.Role.PROFESSOR);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+  when(users.findById(7L)).thenReturn(java.util.Optional.of(actor));
   var denied=new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"RESOURCE_NOT_FOUND");
   when(service.viewSubjectById(1L,actor)).thenThrow(denied);
   when(service.viewWeekById(2L,actor)).thenThrow(denied);
@@ -62,8 +62,8 @@ class ProfessorAcademicHttpTest {
  }
 
  @Test void nonemptySubjectReturnsSafeConflict() throws Exception {
-  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);
-  when(users.findByEmail("prof@example.test")).thenReturn(java.util.Optional.of(actor));
+  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);actor.setRole(com.ptc.halo.enums.Role.PROFESSOR);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+  when(users.findById(7L)).thenReturn(java.util.Optional.of(actor));
   doThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"SUBJECT_HAS_CONTENT"))
     .when(service).deleteSubject(1L,actor);
   mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/professor/subjects/1").header("Authorization","Bearer test-token"))
@@ -72,7 +72,7 @@ class ProfessorAcademicHttpTest {
  }
 
  @Test void duplicateWeekReturnsSafe409() throws Exception {
-  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);when(users.findByEmail("prof@example.test")).thenReturn(java.util.Optional.of(actor));
+  token("PROFESSOR");var actor=new UserEntity();actor.setId(7L);actor.setRole(com.ptc.halo.enums.Role.PROFESSOR);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);when(users.findById(7L)).thenReturn(java.util.Optional.of(actor));
   when(service.createWeek(eq(1L),any(),eq(actor))).thenThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"WEEK_NUMBER_ALREADY_EXISTS"));
   mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/professor/subjects/1/weeks").contentType("application/json").content("{\"weekNumber\":1,\"title\":\"Week\"}").header("Authorization","Bearer test-token"))
    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("WEEK_NUMBER_ALREADY_EXISTS"));

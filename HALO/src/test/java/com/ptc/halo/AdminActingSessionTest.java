@@ -46,7 +46,7 @@ class AdminActingSessionTest {
         return users.saveAndFlush(u);
     }
     Authentication auth(UserEntity user) {
-        return new UsernamePasswordAuthenticationToken(user.getEmail(), "unused", List.of(new SimpleGrantedAuthority("ROLE_"+user.getRole())));
+        return TestIdentity.auth(user);
     }
     String create(UserEntity target) {
         return service.create(auth(admin),new AdminActingSessionRequest(target.getId(),target.getRole())).id();

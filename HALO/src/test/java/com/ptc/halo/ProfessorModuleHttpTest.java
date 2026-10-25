@@ -35,6 +35,15 @@ class ProfessorModuleHttpTest {
  @MockBean CustomUserDetailsService details;
  @MockBean JwtService jwt;
  final String base="/api/professor/ai-learning-modules";
+ @Test void initialQuizValidationFailureReturnsSafeActionableError() throws Exception {
+  token("PROFESSOR");var module=new com.ptc.halo.entity.AiLearningModuleEntity();module.setId(2L);module.setStatus(com.ptc.halo.enums.LessonStatus.PENDING);module.setAiGenerationStatus(com.ptc.halo.enums.AiGenerationStatus.COMPLETED);module.addFile(new com.ptc.halo.entity.AiLearningFileEntity());
+  when(modules.findByIdAndWeek_Subject_Professor_User_Id(2L,7L)).thenReturn(Optional.of(module));when(modules.save(module)).thenReturn(module);
+  when(assessment.generateAssessment(2L)).thenThrow(GeneratedAssessmentValidator.invalid());
+  mvc.perform(put(base+"/2/approve").header("Authorization","Bearer test-token"))
+   .andExpect(status().isBadGateway()).andExpect(jsonPath("$.code").value("QUIZ_GENERATION_INVALID"))
+   .andExpect(jsonPath("$.message").value("The AI returned an incomplete or invalid quiz. Please retry quiz generation or lesson approval. No quiz was saved."));
+  verifyNoInteractions(audit);
+ }
  @org.junit.jupiter.api.io.TempDir java.nio.file.Path directory;
  @Test void directUploadsReturnStructuredValidationErrors() throws Exception {
   token("PROFESSOR");var module=new com.ptc.halo.entity.AiLearningModuleEntity();module.setStatus(com.ptc.halo.enums.LessonStatus.PENDING);
@@ -49,10 +58,10 @@ class ProfessorModuleHttpTest {
   verifyNoInteractions(audit,files);
  }
  void token(String role) {
-  when(jwt.extractUsername("test-token")).thenReturn("prof@example.test");
+  when(jwt.extractUserId("test-token")).thenReturn(7L);
   when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("prof@example.test")).thenReturn(User.withUsername("prof@example.test").password("unused").roles(role).build());
-  var actor=new UserEntity();actor.setId(7L);actor.setEmail("prof@example.test");when(users.findByEmail(actor.getEmail())).thenReturn(Optional.of(actor));
+  when(details.loadUserById(7L)).thenReturn(TestIdentity.details(7L, "prof@example.test", role));
+  var actor=new UserEntity();actor.setId(7L);actor.setRole(com.ptc.halo.enums.Role.PROFESSOR);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);actor.setEmail("prof@example.test");when(users.findById(7L)).thenReturn(Optional.of(actor));
  }
  @Test void inaccessibleResourcesReturnStructured404ForEveryAction() throws Exception {
   token("PROFESSOR");

@@ -26,7 +26,7 @@ public class QuizRevisionController extends ProfessorErrorResponses {
   }
   return tx.execute(status->{
    if(auth==null||request.getHeader("X-Acting-Session")!=null||auth.getAuthorities().stream().noneMatch(a->a.getAuthority().equals("ROLE_PROFESSOR")))throw new AccessDeniedException("Professor required");
-   var p=users.findByEmail(auth.getName()).filter(u->u.getRole()==Role.PROFESSOR&&u.getStatus()==Status.ACTIVE).orElseThrow(()->new AccessDeniedException("Professor unavailable"));
+   var p=com.ptc.halo.security.AuthenticatedAccount.find(users, auth).filter(u->u.getRole()==Role.PROFESSOR&&u.getStatus()==Status.ACTIVE).orElseThrow(()->new AccessDeniedException("Professor unavailable"));
    try{return work.run(p,null);}catch(RuntimeException e){throw e;}catch(Exception e){throw new IllegalStateException("Revision operation failed",e);}
   });
  }

@@ -15,8 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly=true)
 public class StudentStudyActivityService {
  private final NamedParameterJdbcTemplate jdbc;
- public StudentStudyActivityService(NamedParameterJdbcTemplate jdbc){this.jdbc=jdbc;}
- public StudentStudyActivityResponse get(UserEntity student){return get(student,LocalDate.now());}
+ private final Clock clock;
+ @org.springframework.beans.factory.annotation.Autowired
+ public StudentStudyActivityService(NamedParameterJdbcTemplate jdbc){this(jdbc,Clock.systemUTC());}
+ public StudentStudyActivityService(NamedParameterJdbcTemplate jdbc,Clock clock){this.jdbc=jdbc;this.clock=clock;}
+ public StudentStudyActivityResponse get(UserEntity student){return get(student,StudyActivityTime.today(clock));}
  public StudentStudyActivityResponse get(UserEntity student,LocalDate today){
   if(student==null || student.getId()==null || student.getRole()!=Role.STUDENT)throw new AccessDeniedException("Student required");
   var counts=mentorCounts(student.getId(),today);
@@ -33,7 +36,7 @@ public class StudentStudyActivityService {
    from ranked
    """;
   return jdbc.queryForObject(sql,Map.of("student",student.getId(),"until",today.plusDays(1).atStartOfDay(),"week",week,"yesterday",today.minusDays(1)),
-   (rs,n)->new StudentStudyActivityResponse(rs.getLong("weekly"),rs.getLong("streak"),ZoneId.systemDefault().getId(),"MONDAY",counts[0],counts[1]));
+   (rs,n)->new StudentStudyActivityResponse(rs.getLong("weekly"),rs.getLong("streak"),StudyActivityTime.ZONE.getId(),"MONDAY",counts[0],counts[1]));
  }
 
  private static String activityDays(boolean bounded){
@@ -59,14 +62,14 @@ public class StudentStudyActivityService {
    """,Map.of("student",student,"week",week.atStartOfDay(),"month",month.atStartOfDay(),"from",(week.isBefore(month)?week:month).atStartOfDay(),"until",today.plusDays(1).atStartOfDay()),(rs,n)->new long[]{rs.getLong(1),rs.getLong(2)});
  }
  public record CalendarMonth(String month,LocalDate today,String timezone,java.util.List<LocalDate> activeDates){}
- public CalendarMonth calendar(UserEntity student,String month){return calendar(student,month,LocalDate.now());}
+ public CalendarMonth calendar(UserEntity student,String month){return calendar(student,month,StudyActivityTime.today(clock));}
  public CalendarMonth calendar(UserEntity student,String month,LocalDate today){
   if(student==null || student.getId()==null || student.getRole()!=Role.STUDENT)throw new AccessDeniedException("Student required");
   YearMonth selected;
   try{selected=month==null?YearMonth.from(today):YearMonth.parse(month);if(selected.getYear()<1000 || selected.getYear()>9998)throw new IllegalArgumentException();}
   catch(Exception ignored){throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"INVALID_REQUEST");}
   var from=selected.atDay(1);var until=selected.plusMonths(1).atDay(1);if(until.isAfter(today.plusDays(1)))until=today.plusDays(1);
-  java.util.List<LocalDate> dates=from.isAfter(today)?java.util.List.of():jdbc.query(activityDays(true)+" select activity_day from activity_days order by activity_day",Map.of("student",student.getId(),"from",from.atStartOfDay(),"until",until.atStartOfDay()),(rs,n)->rs.getDate(1).toLocalDate());
-  return new CalendarMonth(selected.toString(),today,ZoneId.systemDefault().getId(),dates);
+  java.util.List<LocalDate> dates=from.isAfter(today)?java.util.List.of():jdbc.query(activityDays(true)+" select activity_day from activity_days order by activity_day",Map.of("student",student.getId(),"from",from.atStartOfDay(),"until",until.atStartOfDay()),(rs,n)->rs.getObject(1,LocalDate.class));
+  return new CalendarMonth(selected.toString(),today,StudyActivityTime.ZONE.getId(),dates);
  }
 }

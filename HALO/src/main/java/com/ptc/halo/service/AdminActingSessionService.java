@@ -32,7 +32,7 @@ public class AdminActingSessionService {
             throw new AuthenticationCredentialsNotFoundException("Authentication required");
         if (authentication.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_ADMIN")))
             throw new AccessDeniedException("Admin access required");
-        var actor = users.findByEmail(authentication.getName())
+        var actor = com.ptc.halo.security.AuthenticatedAccount.find(users, authentication)
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException("Authentication required"));
         if (actor.getRole() != Role.ADMIN || actor.getStatus() != Status.ACTIVE || actor.isMustChangePassword())
             throw new AccessDeniedException("Admin access required");

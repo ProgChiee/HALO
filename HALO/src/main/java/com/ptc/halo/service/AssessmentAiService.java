@@ -2,6 +2,8 @@ package com.ptc.halo.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.ptc.halo.dtoResponse.GeneratedAssessment;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
@@ -95,31 +97,47 @@ public class AssessmentAiService {
                 summary
         );
 
-        String response = chatClient
+        String response;
+        try {
+            response = chatClient
                 .prompt()
                 .user(prompt)
                 .call()
                 .content();
+        } catch (RuntimeException error) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_GATEWAY, "QUIZ_GENERATION_FAILED");
+        }
 
         if (response == null || response.isBlank()) {
-            throw new RuntimeException(
-                    "AI returned an empty assessment response"
-            );
+            throw GeneratedAssessmentValidator.invalid();
         }
 
         try {
 
-            return objectMapper.readValue(
-                    response,
-                    GeneratedAssessment.class
-            );
+            // Check JSON types before DTO binding can coerce numbers/booleans to strings
+            // or truncate a fractional question number. Do not change the shared mapper.
+            JsonNode root = objectMapper.readerFor(JsonNode.class)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .with(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY).readValue(response);
+            if (root == null || !root.isObject() || root.size() != 1
+                    || !root.path("questions").isArray() || root.path("questions").size() != 10)
+                throw GeneratedAssessmentValidator.invalid();
+            for (JsonNode question : root.path("questions")) {
+                if (!question.isObject() || question.size() != 7
+                        || !question.path("questionNumber").isIntegralNumber()
+                        || !question.path("questionNumber").canConvertToInt())
+                    throw GeneratedAssessmentValidator.invalid();
+                for (String field : java.util.List.of("question", "optionA", "optionB", "optionC", "optionD", "correctAnswer"))
+                    if (!question.path(field).isTextual()) throw GeneratedAssessmentValidator.invalid();
+            }
+            var generated = objectMapper.treeToValue(root, GeneratedAssessment.class);
+            GeneratedAssessmentValidator.validate(generated);
+            return generated;
 
         } catch (JsonProcessingException e) {
 
-            throw new RuntimeException(
-                    "AI returned invalid assessment JSON",
-                    e
-            );
+            throw GeneratedAssessmentValidator.invalid();
         }
     }
 }

@@ -28,9 +28,9 @@ class AdminDashboardHttpTest {
     @MockBean JwtService jwt;
 
     void token(String role) {
-        when(jwt.extractUsername("test-token")).thenReturn("actor@example.test");
+        when(jwt.extractUserId("test-token")).thenReturn(1L);
         when(jwt.isCurrent(eq("test-token"), any())).thenReturn(true);
-        when(details.loadUserByUsername("actor@example.test")).thenReturn(
+        when(details.loadUserById(1L)).thenReturn(
                 User.withUsername("actor@example.test").password("unused").roles(role).build());
     }
 

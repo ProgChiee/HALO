@@ -19,9 +19,15 @@ public class AdminValidationHandler {
     public ResponseEntity<?> business(com.ptc.halo.service.AdminApiException error) {
         return response(error.code.status, error.code.name(), error.code.message);
     }
+    @ExceptionHandler(com.ptc.halo.service.RegistrationValidationException.class)
+    public ResponseEntity<?> academic(com.ptc.halo.service.RegistrationValidationException error) {
+        return invalid(error.errors);
+    }
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ResponseEntity<?> integrity(org.springframework.dao.DataIntegrityViolationException error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause.getMessage() != null && cause.getMessage().toLowerCase(java.util.Locale.ROOT).contains("ukp07cbiv7jbfpf78stw4x5hx44"))
+                return business(new com.ptc.halo.service.AdminApiException(com.ptc.halo.service.AdminApiException.Code.STUDENT_ID_CONFLICT));
             if (cause.getMessage() != null && cause.getMessage().toLowerCase(java.util.Locale.ROOT).contains("uk_professor_id_normalized"))
                 return business(new com.ptc.halo.service.AdminApiException(com.ptc.halo.service.AdminApiException.Code.PROFESSOR_ID_CONFLICT));
             if (cause.getMessage() != null && cause.getMessage().toLowerCase(java.util.Locale.ROOT).contains("uk_user_email_normalized"))

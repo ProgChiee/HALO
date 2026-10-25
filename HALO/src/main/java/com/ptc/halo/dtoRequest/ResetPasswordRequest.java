@@ -13,6 +13,11 @@ public class ResetPasswordRequest {
     @jakarta.validation.constraints.Size(min = 8, max = 72)
     private String newPassword;
 
+    @jakarta.validation.constraints.AssertTrue(message = "New password must be at most 72 UTF-8 bytes.")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isNewPasswordWithinByteLimit() {
+        return newPassword == null || newPassword.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 72;
+    }
     public ResetPasswordRequest() {
     }
 

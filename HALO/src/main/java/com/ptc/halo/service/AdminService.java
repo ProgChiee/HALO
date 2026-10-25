@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class AdminService {
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
     private final UserRepository userRepository;
     private final ProfessorRepository professorRepository;
@@ -147,6 +148,13 @@ public class AdminService {
             ProfessorUpdateRequest request,
             UserEntity admin){
 
+        // Use the same durable user-row lock as lifecycle and credential changes.
+        // Refresh also protects callers whose persistence context already contains
+        // this account from before a concurrent security update committed.
+        UserEntity user = entityManager.find(UserEntity.class, id, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        if (user == null) throw new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND);
+        entityManager.refresh(user, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+
         ProfessorEntity professor = professorRepository
                 .findByUserId(id)
                 .orElseThrow(() ->
@@ -156,7 +164,6 @@ public class AdminService {
         request.setProfessorId(request.getProfessorId());
         if (professorRepository.existsNormalizedProfessorId(request.getProfessorId(), professor.getId()))
             throw new AdminApiException(AdminApiException.Code.PROFESSOR_ID_CONFLICT);
-        UserEntity user = professor.getUser();
         request.setEmail(request.getEmail());
         if (userRepository.existsNormalizedEmail(request.getEmail(), user.getId()))
             throw new AdminApiException(AdminApiException.Code.EMAIL_ALREADY_EXISTS);
@@ -294,18 +301,32 @@ public class AdminService {
         return new StudentListResponse(updatedStudent,studentProfileRepository.findByUserId(id).orElse(null));
     }
     @org.springframework.transaction.annotation.Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public StudentListResponse updateStudent(
             Long id,
             StudentUpdateRequest request,
             UserEntity admin){
 
-        StudentProfileEntity studentProfile = studentProfileRepository.findByUserId(id)
-                        .orElseThrow(() -> new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND));
-
-
-        UserEntity user = studentProfile.getUser();
-
-        user.setName(request.getName());
+        if (admin == null || admin.getRole() != Role.ADMIN)
+            throw new org.springframework.security.access.AccessDeniedException("Admin access required");
+        // Serialize recovery and lifecycle changes for this account. No self-service eligibility changes.
+        UserEntity user = userRepository.findForAssessmentLifecycle(id)
+                .orElseThrow(() -> new AdminApiException(AdminApiException.Code.RESOURCE_NOT_FOUND));
+        if (user.getRole() != Role.STUDENT) throw new AdminApiException(AdminApiException.Code.INVALID_TARGET_ROLE);
+        StudentProfileEntity studentProfile = studentProfileRepository.findByUserId(id).orElse(null);
+        boolean recovering = studentProfile == null;
+        if (recovering) {
+            if (admin.getStatus() != Status.ACTIVE)
+                throw new org.springframework.security.access.AccessDeniedException("Active Admin access required");
+            var details = StudentRegistrationValidator.validateAcademic(request.getStudentId(), request.getSection(), request.getYearLevel());
+            request.setStudentId(details.studentId()); request.setSection(details.section());
+            if (studentProfileRepository.existsByStudentId(request.getStudentId()))
+                throw new AdminApiException(AdminApiException.Code.STUDENT_ID_CONFLICT);
+            studentProfile = new StudentProfileEntity();
+            studentProfile.setUser(user);
+        } else {
+            user.setName(request.getName());
+        }
         studentProfile.setStudentId(request.getStudentId());
         studentProfile.setSection(request.getSection());
         studentProfile.setYearLevel(request.getYearLevel());
@@ -317,7 +338,7 @@ public class AdminService {
         activityLogService.createLog(
                 admin,
                 ActivityType.ACCOUNT,
-                "Updated Student account: "
+                (recovering ? "Completed Student academic profile: " : "Updated Student account: ")
                         + updatedUser.getEmail()
         );
 

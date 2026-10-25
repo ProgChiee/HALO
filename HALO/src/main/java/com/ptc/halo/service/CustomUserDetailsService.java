@@ -23,4 +23,9 @@ public class CustomUserDetailsService implements UserDetailsService {
         return new CustomUserDetails(user);
     }
 
+    public UserDetails loadUserById(Long id) throws UsernameNotFoundException {
+        return new CustomUserDetails(userRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found")));
+    }
+
 }

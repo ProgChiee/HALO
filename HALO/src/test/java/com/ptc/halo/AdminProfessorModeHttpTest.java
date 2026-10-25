@@ -17,6 +17,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AdminProfessorModeController.class)
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class})
 class AdminProfessorModeHttpTest {
+ @Test void actingInitialQuizValidationFailureKeepsSafeErrorContract() throws Exception {
+  token("ADMIN");when(mode.approve(any(),eq(id),eq(41L))).thenThrow(GeneratedAssessmentValidator.invalid());
+  mvc.perform(put(path+"/ai-learning-modules/41/approve").header("Authorization","Bearer test-token").header("X-Acting-Session",id))
+   .andExpect(status().isBadGateway()).andExpect(jsonPath("$.code").value("QUIZ_GENERATION_INVALID"))
+   .andExpect(jsonPath("$.message").value("The AI returned an incomplete or invalid quiz. Please retry quiz generation or lesson approval. No quiz was saved."));
+ }
  @Autowired MockMvc mvc;
  @MockBean AdminProfessorModeService mode;
  @MockBean ProfessorAcademicService academic;
@@ -28,7 +34,7 @@ class AdminProfessorModeHttpTest {
  @MockBean JwtService jwt;
  final String path="/api/admin/acting/professor";
  final String id="350b29ca-a7d5-4a2d-a5d2-903db7e67e77";
- void token(String role){when(jwt.extractUsername("test-token")).thenReturn("admin@example.test");when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);when(details.loadUserByUsername("admin@example.test")).thenReturn(User.withUsername("admin@example.test").password("unused").roles(role).build());}
+ void token(String role){when(jwt.extractUserId("test-token")).thenReturn(1L);when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);when(details.loadUserById(1L)).thenReturn(User.withUsername("admin@example.test").password("unused").roles(role).build());}
  @Test void adminRequestUsesGuardWithOriginalPrincipalAndHeader() throws Exception {
   token("ADMIN");when(mode.execute(any(),eq(id),any())).thenReturn(java.util.Map.of("ok",true));
   mvc.perform(get(path+"/subjects").param("professorId","999").header("X-Acting-Session",id).header("Authorization","Bearer test-token")).andExpect(status().isOk());
@@ -48,6 +54,19 @@ class AdminProfessorModeHttpTest {
  }
  @Test void adminStillCannotUseNormalProfessorRoute() throws Exception {
   token("ADMIN");mvc.perform(get("/api/professor/subjects").header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isForbidden());verifyNoInteractions(mode);
+ }
+ @Test void studentReadsUseSessionTargetScopeAndPropagateDenial() throws Exception {
+  token("ADMIN");
+  var target=new com.ptc.halo.entity.UserEntity();target.setId(21L);target.setRole(com.ptc.halo.enums.Role.PROFESSOR);
+  var session=mock(com.ptc.halo.entity.AdminActingSessionEntity.class);when(session.getTarget()).thenReturn(target);
+  when(mode.execute(any(),eq(id),any())).thenAnswer(call->{AdminProfessorModeService.Work<Object> work=call.getArgument(2);return work.apply(session);});
+  for(String suffix:java.util.List.of("","/10/progress","/10/subjects","/10/assessments","/10/badges"))
+   mvc.perform(get(path+"/students"+suffix).param("professorId","999").header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isOk());
+  verify(students).getStudents(target);verify(students).getStudentProgress(10L,target);verify(students).getStudentSubjects(10L,target);verify(students).getStudentAssessmentHistory(10L,target);verify(students).getStudentBadges(10L,target);
+  var denied=new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"RESOURCE_NOT_FOUND");
+  when(students.getStudentProgress(99L,target)).thenThrow(denied);when(students.getStudentSubjects(99L,target)).thenThrow(denied);when(students.getStudentAssessmentHistory(99L,target)).thenThrow(denied);when(students.getStudentBadges(99L,target)).thenThrow(denied);
+  for(String suffix:java.util.List.of("progress","subjects","assessments","badges"))
+   mvc.perform(get(path+"/students/99/"+suffix).header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
  }
  @Test void noCredentialMutationEndpointIsExposed() {
   for(var method:AdminProfessorModeController.class.getDeclaredMethods()) {

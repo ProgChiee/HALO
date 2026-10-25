@@ -49,9 +49,9 @@ class ModuleFileTransactionTest {
   reset(audit,storage);files.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();professors.deleteAll();users.deleteAll();
   try(var stream=Files.list(directory)){for(var file:stream.toList())Files.delete(file);}
   var u=new UserEntity();u.setName("Owner");u.setEmail("owner@example.test");u.setRole(Role.PROFESSOR);u.setStatus(Status.ACTIVE);u=users.saveAndFlush(u);
-  owner=new UsernamePasswordAuthenticationToken(u.getEmail(),"unused");
+  owner=TestIdentity.auth(u);
   var p=new ProfessorEntity();p.setUser(u);p.setProfessorId("P");p=professors.saveAndFlush(p);
-  var stranger=new UserEntity();stranger.setName("Other");stranger.setEmail("other@example.test");stranger.setRole(Role.PROFESSOR);stranger.setStatus(Status.ACTIVE);users.saveAndFlush(stranger);other=new UsernamePasswordAuthenticationToken(stranger.getEmail(),"unused");
+  var stranger=new UserEntity();stranger.setName("Other");stranger.setEmail("other@example.test");stranger.setRole(Role.PROFESSOR);stranger.setStatus(Status.ACTIVE);users.saveAndFlush(stranger);other=TestIdentity.auth(stranger);
   var s=new SubjectEntity();s.setSubjectCode("S");s.setSubjectName("Subject");s.setProfessor(p);s=subjects.saveAndFlush(s);
   var w=new WeekEntity();w.setSubject(s);w.setTitle("Week");w.setWeekNumber(1);weekId=weeks.saveAndFlush(w).getId();
  }

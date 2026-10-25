@@ -38,15 +38,15 @@ class AdminValidationHttpTest {
     UserEntity actor;
 
     @BeforeEach void setup() {
-        actor = new UserEntity(); actor.setEmail("admin@example.test"); actor.setRole(Role.ADMIN);
-        when(users.findByEmail(actor.getEmail())).thenReturn(Optional.of(actor));
-        when(jwt.extractUsername("test-token")).thenReturn(actor.getEmail());
+        actor = new UserEntity();actor.setId(1L);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE); actor.setEmail("admin@example.test"); actor.setRole(Role.ADMIN);
+        when(users.findById(1L)).thenReturn(Optional.of(actor));
+        when(jwt.extractUserId("test-token")).thenReturn(1L);
         when(jwt.isCurrent(eq("test-token"), any())).thenReturn(true);
         role("ADMIN");
     }
     void role(String role) {
-        when(details.loadUserByUsername(actor.getEmail())).thenReturn(
-                User.withUsername(actor.getEmail()).password("unused").roles(role).build());
+        when(details.loadUserById(1L)).thenReturn(
+                TestIdentity.details(1L, actor.getEmail(), role));
     }
     Map<String, Object> professor() {
         return new HashMap<>(Map.of("name", "Professor", "email", "prof@example.test",
@@ -148,6 +148,23 @@ class AdminValidationHttpTest {
                     .contentType("application/json").content("{}")).andExpect(status().isForbidden());
         }
         verifyNoInteractions(admins);
+    }
+    @Test void academicRecoveryUsesExistingAdminPermissionAndSafeValidationErrors() throws Exception {
+        String path="/api/admin/students/26";
+        mvc.perform(put(path).contentType("application/json").content(json.writeValueAsBytes(student())))
+                .andExpect(status().isUnauthorized());
+        for(String value:List.of("STUDENT","PROFESSOR","SUPER_ADMIN")) {
+            role(value);
+            mvc.perform(put(path).header("Authorization","Bearer test-token").contentType("application/json")
+                    .content(json.writeValueAsBytes(student()))).andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(admins);
+        role("ADMIN");
+        doThrow(new RegistrationValidationException(Map.of("studentId","Use 29AHRT-0168 format."),400))
+                .when(admins).updateStudent(eq(26L),any(),any());
+        mvc.perform(put(path).header("Authorization","Bearer test-token").contentType("application/json")
+                .content(json.writeValueAsBytes(student()))).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED")).andExpect(jsonPath("$.errors.studentId").exists());
     }
     @Test void businessErrorsAreStructuredAndSafe() throws Exception {
         for (var code : AdminApiException.Code.values()) {

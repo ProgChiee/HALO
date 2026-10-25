@@ -1,0 +1,36 @@
+.container { margin-top: var(--space-4); min-width: 0; }
+.embedded { display: grid; gap: var(--space-4); min-width: 0; }
+.embedded > h2 { margin: 0; font-size: var(--font-size-xl); color: var(--color-text-primary); }
+.action {
+  composes: btn secondary from "../../../components/shared/Button.module.css";
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 44px; max-width: 100%; white-space: normal;
+}
+.action:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.action:hover:not(:disabled) { background: var(--color-primary-soft); }
+.action:disabled { opacity: .6; cursor: not-allowed; }
+.section { display: grid; gap: var(--space-3); margin-top: var(--space-4); border-top: 1px solid var(--color-border); padding-top: var(--space-4); min-width: 0; }
+.section h3, .header h2, .header h4, .content h3 { margin: 0; color: var(--color-text-primary); }
+.section h3, .header h4, .content h3 { font-size: var(--font-size-md); }
+.header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.header h2 { font-size: var(--font-size-xl); }
+.helper { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: var(--line-height-relaxed); }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-3); }
+.row { composes: surface from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-4); display: grid; gap: var(--space-3); min-width: 0; overflow-wrap: anywhere; box-shadow: none; }
+.badge { composes: chip neutral from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-1) var(--space-2); width: fit-content; max-width: 100%; overflow-wrap: anywhere; }
+.metadata { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin: 0; font-size: var(--font-size-sm); }
+.metadata dt { color: var(--color-text-secondary); }
+.metadata dd { margin: var(--space-1) 0 0; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); font-size: var(--font-size-sm); }
+.dialog { composes: dialogSurface from "../../../components/shared/UIPrimitives.module.css"; width: min(100%, 52rem); padding: var(--space-6); color: var(--color-text-primary); display: grid; gap: var(--space-4); }
+.content { min-width: 0; border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
+.content p, .content ul { margin: var(--space-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--font-size-sm); line-height: var(--line-height-relaxed); }
+.content ul { padding-left: var(--space-5); }
+.feedback p { color: var(--color-text-secondary); }
+@media (max-width: 900px) { .metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px) {
+  .metadata { grid-template-columns: minmax(0, 1fr); }
+  .dialog { padding: var(--space-4); }
+  .row .header > button { width: 100%; }
+  .pagination { justify-content: center; }
+}

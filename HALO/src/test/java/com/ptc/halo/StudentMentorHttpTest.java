@@ -30,8 +30,8 @@ class StudentMentorHttpTest {
 
     void token(String role) {
         when(jwt.isCurrent(eq("test-token"), any())).thenReturn(true);
-        when(jwt.extractUsername("test-token")).thenReturn("student@example.test");
-        when(details.loadUserByUsername("student@example.test")).thenReturn(
+        when(jwt.extractUserId("test-token")).thenReturn(1L);
+        when(details.loadUserById(1L)).thenReturn(
                 User.withUsername("student@example.test").password("unused").roles(role).build());
     }
     @Test void bearerStudentPostReturns200WithModuleId() throws Exception {
@@ -47,7 +47,7 @@ class StudentMentorHttpTest {
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     }
     @Test void invalidTokenReturns401() throws Exception {
-        when(jwt.extractUsername("bad")).thenThrow(new io.jsonwebtoken.MalformedJwtException("bad"));
+        when(jwt.extractUserId("bad")).thenThrow(new io.jsonwebtoken.MalformedJwtException("bad"));
         mvc.perform(post("/api/student/mentor/open/15").header("Authorization", "Bearer bad"))
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("INVALID_OR_EXPIRED_TOKEN"));
     }

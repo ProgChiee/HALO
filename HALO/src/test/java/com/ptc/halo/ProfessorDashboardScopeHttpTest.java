@@ -31,9 +31,9 @@ class ProfessorDashboardScopeHttpTest {
  @MockBean CustomUserDetailsService details;
  @MockBean JwtService jwt;
  UserEntity token(String role) {
-  when(jwt.extractUsername("test-token")).thenReturn("prof@example.test");when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("prof@example.test")).thenReturn(User.withUsername("prof@example.test").password("unused").roles(role).build());
-  var actor=new UserEntity();actor.setId(7L);actor.setRole(Role.PROFESSOR);actor.setEmail("prof@example.test");when(users.findByEmail(actor.getEmail())).thenReturn(Optional.of(actor));return actor;
+  when(jwt.extractUserId("test-token")).thenReturn(7L);when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
+  when(details.loadUserById(7L)).thenReturn(TestIdentity.details(7L, "prof@example.test", role));
+  var actor=new UserEntity();actor.setId(7L);actor.setRole(com.ptc.halo.enums.Role.PROFESSOR);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);actor.setRole(Role.PROFESSOR);actor.setEmail("prof@example.test");when(users.findById(7L)).thenReturn(Optional.of(actor));return actor;
  }
 
  @Test void dashboardUsesAuthenticatedProfessorNotRequestOwner() throws Exception {

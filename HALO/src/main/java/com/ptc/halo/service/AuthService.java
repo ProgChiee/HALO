@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthService {
     private final AuthAuditService audit;
+    @org.springframework.beans.factory.annotation.Autowired
+    private LoginTokenIssuer tokenIssuer;
 
     private final UserRepository userRepository;
     private final StudentProfileRepository studentProfileRepository;
@@ -49,12 +51,12 @@ public class AuthService {
     @org.springframework.transaction.annotation.Transactional
     public void logout(org.springframework.security.core.Authentication authentication,String bearer) {
         if(authentication==null || !authentication.isAuthenticated()) throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
-        var locked = userRepository.findForPasswordChange(authentication.getName()).orElseThrow(() -> new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required"));
+        var locked = com.ptc.halo.security.AuthenticatedAccount.lock(userRepository, authentication);
         if (bearer == null || !bearer.startsWith("Bearer ") || !jwtService.isCurrent(bearer.substring(7), new com.ptc.halo.security.CustomUserDetails(locked)))
             throw new org.springframework.security.authentication.BadCredentialsException("Invalid or expired token");
         locked.setTokenVersion(locked.getTokenVersion() + 1);
         userRepository.saveAndFlush(locked);
-        audit.logout(authentication.getName(),bearer);
+        audit.logoutUser(locked.getId(),bearer);
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -116,7 +118,8 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest loginRequest){
 
-        try { authenticationManager.authenticate(
+        org.springframework.security.core.Authentication authenticated;
+        try { authenticated = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.getEmail(),
                         loginRequest.getPassword()
@@ -125,6 +128,12 @@ public class AuthService {
         } catch (org.springframework.security.authentication.DisabledException disabled) {
             UserEntity disabledUser = userRepository.findByEmail(loginRequest.getEmail()).orElse(null);
             if (disabledUser != null && passwordEncoder.matches(loginRequest.getPassword(), disabledUser.getPassword())) {
+                // Missing lifecycle data must never authenticate or enter the
+                // enum switch. Do not expose or automatically repair the account.
+                if (disabledUser.getStatus() == null) {
+                    audit.record(com.ptc.halo.enums.AuthEvent.ACCOUNT_LOGIN_BLOCKED, loginRequest.getEmail());
+                    throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
+                }
                 audit.record(switch(disabledUser.getStatus()) {
                     case INACTIVE -> com.ptc.halo.enums.AuthEvent.ACCOUNT_INACTIVE_LOGIN_ATTEMPT;
                     case ARCHIVED -> com.ptc.halo.enums.AuthEvent.ACCOUNT_ARCHIVED_LOGIN_ATTEMPT;
@@ -140,28 +149,21 @@ public class AuthService {
             audit.record(failure instanceof org.springframework.security.authentication.LockedException ? com.ptc.halo.enums.AuthEvent.ACCOUNT_LOGIN_BLOCKED : com.ptc.halo.enums.AuthEvent.LOGIN_FAILED,loginRequest.getEmail());
             throw failure;
         }
-        UserEntity user =
-                userRepository.findByEmail(loginRequest.getEmail())
-                        .orElseThrow();
-
-
-
-        String token =
-                jwtService.generateToken(user);
-
-        LoginResponse response = new LoginResponse();
-
-
-        response.setName(user.getName());
-        response.setEmail(user.getEmail());
-        response.setRole(user.getRole());
-        response.setToken(token);
-        response.setMustChangePassword(user.isMustChangePassword());
-        audit.record(com.ptc.halo.enums.AuthEvent.LOGIN_SUCCESS,user.getEmail());
-
-
+        LoginResponse response;
+        try {
+            if (authenticated == null || !authenticated.isAuthenticated()
+                    || !(authenticated.getPrincipal() instanceof com.ptc.halo.security.CustomUserDetails principal))
+                throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
+            // Copy verified identity/security state before the fresh transaction loads the account.
+            response = tokenIssuer.issue(principal.getUserId(), principal.getPassword(), principal.getTokenVersion(),
+                    principal.getAuthorities().stream().map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                            .collect(java.util.stream.Collectors.toUnmodifiableSet()));
+        } catch (org.springframework.security.core.AuthenticationException failure) {
+            audit.record(com.ptc.halo.enums.AuthEvent.LOGIN_FAILED, loginRequest.getEmail());
+            throw failure;
+        }
+        // Audit runs after the issuance transaction releases its account lock.
+        audit.recordUser(com.ptc.halo.enums.AuthEvent.LOGIN_SUCCESS, com.ptc.halo.security.AuthenticatedAccount.principal(authenticated).getUserId());
         return response;
-
     }
-
 }

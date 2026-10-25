@@ -33,7 +33,7 @@ public class ProfessorDashboardController {
     public ResponseEntity<ProfessorDashboardResponse>
     getDashboard(Authentication authentication) {
         if (authentication == null) throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
-        var professor = users.findByEmail(authentication.getName())
+        var professor = com.ptc.halo.security.AuthenticatedAccount.find(users, authentication)
                 .orElseThrow(() -> new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required"));
 
         return ResponseEntity.ok(

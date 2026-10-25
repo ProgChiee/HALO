@@ -21,22 +21,22 @@ import static org.mockito.ArgumentMatchers.*;
 
 class SuperAdminSecurityTest {
     String key() { byte[] bytes = new byte[32]; new java.security.SecureRandom().nextBytes(bytes); return Base64.getEncoder().encodeToString(bytes); }
-    UserEntity account() { var u = new UserEntity(); u.setEmail("security@example.test"); u.setName("Security test"); u.setRole(Role.SUPER_ADMIN); u.setStatus(Status.ACTIVE); return u; }
+    UserEntity account() { var u = new UserEntity(); u.setId(1L); u.setEmail("security@example.test"); u.setName("Security test"); u.setRole(Role.SUPER_ADMIN); u.setStatus(Status.ACTIVE); return u; }
     @Test void externalKeyRequiredAndRotationInvalidatesTokens() {
         assertThrows(IllegalStateException.class, () -> new JwtService(""));
         assertThrows(IllegalStateException.class, () -> new JwtService("invalid!"));
         assertThrows(IllegalStateException.class, () -> new JwtService(Base64.getEncoder().encodeToString(new byte[8])));
         var jwt = new JwtService(key()); var user = account(); var token = jwt.generateToken(user);
         assertTrue(jwt.isCurrent(token, new CustomUserDetails(user)));
-        assertThrows(io.jsonwebtoken.JwtException.class, () -> new JwtService(key()).extractUsername(token));
+        assertThrows(io.jsonwebtoken.JwtException.class, () -> new JwtService(key()).extractUserId(token));
     }
     @Test void passwordChangeRevokesOldTokenAndNewLoginWorks() {
         var users = mock(UserRepository.class); var encoder = new BCryptPasswordEncoder();
         var user = account(); user.setMustChangePassword(true); user.setPassword(encoder.encode("Temporary-test-123"));
-        when(users.findForPasswordChange(user.getEmail())).thenReturn(Optional.of(user));
+        when(users.findForAssessmentLifecycle(user.getId())).thenReturn(Optional.of(user));
         when(users.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
         var jwt = new JwtService(key()); var old = jwt.generateToken(user);
-        var service = new PasswordResetService(mock(PasswordResetOtpRepository.class), users, mock(EmailService.class), encoder, mock(com.ptc.halo.service.AuthAuditService.class));
+        var service = new PasswordResetService(mock(PasswordResetOtpRepository.class), users, mock(EmailService.class), encoder, mock(com.ptc.halo.service.AuthAuditService.class), mock(PasswordResetProtection.class), mock(PasswordResetThrottle.class), mock(org.springframework.transaction.PlatformTransactionManager.class));
         service.changePassword(user, "Temporary-test-123", "Replacement-test-123");
         assertFalse(jwt.isCurrent(old, new CustomUserDetails(user))); assertFalse(user.isMustChangePassword());
         assertTrue(encoder.matches("Replacement-test-123", user.getPassword()));
@@ -46,6 +46,11 @@ class SuperAdminSecurityTest {
         provider.setUserDetailsService(details); provider.setPasswordEncoder(encoder);
         AuthenticationManager manager = new org.springframework.security.authentication.ProviderManager(provider);
         var auth = new AuthService(users, mock(StudentProfileRepository.class), encoder, manager, jwt, mock(com.ptc.halo.service.AuthAuditService.class));
+        var issuer = new LoginTokenIssuer(jwt);
+        var em = mock(jakarta.persistence.EntityManager.class);
+        when(em.find(UserEntity.class, user.getId(), jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)).thenReturn(user);
+        org.springframework.test.util.ReflectionTestUtils.setField(issuer, "entityManager", em);
+        org.springframework.test.util.ReflectionTestUtils.setField(auth, "tokenIssuer", issuer);
         var request = new LoginRequest(); request.setEmail(user.getEmail()); request.setPassword("Replacement-test-123");
         var response = auth.login(request);
         assertTrue(jwt.isCurrent(response.getToken(), new CustomUserDetails(user)));
@@ -64,11 +69,14 @@ class SuperAdminSecurityTest {
     @Test void resetAlsoRevokesOldToken() {
         var users = mock(UserRepository.class); var otps = mock(PasswordResetOtpRepository.class);
         var encoder = new BCryptPasswordEncoder(); var user = account(); user.setId(5L); user.setPassword(encoder.encode("Old-test-123"));
+        when(users.findForAssessmentLifecycle(user.getId())).thenReturn(Optional.of(user));
         when(users.findForPasswordChange(user.getEmail())).thenReturn(Optional.of(user));
-        var otp = new PasswordResetOtpEntity(); otp.setOtp("123456"); otp.setExpiresAt(LocalDateTime.now().plusMinutes(5));
+        var policy = new PasswordResetProtection(key(),5,600,60,3600,3,20,10,100);
+        var throttle = mock(PasswordResetThrottle.class); when(throttle.databaseNow()).thenReturn(LocalDateTime.now());
+        var otp = new PasswordResetOtpEntity(); otp.setOtp(policy.verifier(5L,"123456")); otp.setExpiresAt(LocalDateTime.now().plusMinutes(5));
         when(otps.findByUserId(5L)).thenReturn(Optional.of(otp));
         var jwt = new JwtService(key()); var old = jwt.generateToken(user);
-        new PasswordResetService(otps, users, mock(EmailService.class), encoder, mock(com.ptc.halo.service.AuthAuditService.class)).resetPassword(user.getEmail(), "123456", "New-test-123");
+        new PasswordResetService(otps, users, mock(EmailService.class), encoder, mock(com.ptc.halo.service.AuthAuditService.class), policy, throttle, mock(org.springframework.transaction.PlatformTransactionManager.class)).resetPassword(user.getEmail(), "123456", "New-test-123");
         assertFalse(jwt.isCurrent(old, new CustomUserDetails(user))); verify(otps).deleteByUserId(5L);
     }
     @Test void bootstrapEncodesPasswordAndDoesNotOverwriteExistingAccount() throws Exception {
@@ -84,7 +92,7 @@ class SuperAdminSecurityTest {
     @Test void backendBlocksTemporaryAccountAndRevokedToken() throws Exception {
         var jwt = new JwtService(key()); var user = account(); user.setMustChangePassword(true);
         var details = mock(CustomUserDetailsService.class); when(details.loadUserByUsername(user.getEmail())).thenReturn(new CustomUserDetails(user));
-        var filter = new JwtAuthenticationFilter(jwt, details); var token = jwt.generateToken(user);
+        when(details.loadUserById(user.getId())).thenAnswer(call -> new CustomUserDetails(user)); var filter = new JwtAuthenticationFilter(jwt, details); var token = jwt.generateToken(user);
         try {
             var req = new MockHttpServletRequest("GET", "/api/super-admin/admins"); req.setServletPath("/api/super-admin/admins"); req.addHeader("Authorization", "Bearer " + token);
             var res = new MockHttpServletResponse(); filter.doFilter(req, res, new MockFilterChain());

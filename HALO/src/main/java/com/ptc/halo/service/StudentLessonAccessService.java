@@ -22,7 +22,7 @@ public class StudentLessonAccessService {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED");
         }
-        UserEntity student = users.findByEmail(authentication.getName())
+        UserEntity student = com.ptc.halo.security.AuthenticatedAccount.find(users, authentication)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED"));
         validateStudent(student);
         return student;

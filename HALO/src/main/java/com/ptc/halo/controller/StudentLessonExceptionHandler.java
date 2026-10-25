@@ -54,6 +54,9 @@ public class StudentLessonExceptionHandler {
     private ResponseEntity<Map<String, Object>> response(int status, String code, HttpServletRequest request) {
         log.warn("request_rejected method={} path={} status={} reason={}",
                 request.getMethod(), request.getRequestURI(), status, code);
-        return ResponseEntity.status(status).body(Map.of("status", status, "code", code, "message", code));
+        String message = "PROFILE_INCOMPLETE".equals(code)
+                ? "Your academic profile is incomplete. Contact an administrator to verify your Student ID, section and year level."
+                : code;
+        return ResponseEntity.status(status).body(Map.of("status", status, "code", code, "message", message));
     }
 }

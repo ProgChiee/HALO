@@ -22,16 +22,24 @@ public class JwtService {
         key = Keys.hmacShaKeyFor(bytes);
     }
     public String generateToken(UserEntity user) {
-        return Jwts.builder().subject(user.getEmail()).claim("ver", user.getTokenVersion())
+        if (user.getId() == null || user.getId() <= 0) throw new IllegalArgumentException("Persisted account required");
+        return Jwts.builder().subject(user.getId().toString()).claim("identity", "user-id-v1").claim("ver", user.getTokenVersion())
                 .issuedAt(new Date()).expiration(new Date(System.currentTimeMillis() + 86400000L))
                 .signWith(key, Jwts.SIG.HS256).compact();
     }
-    public String extractUsername(String token) { return claims(token).getSubject(); }
+    public Long extractUserId(String token) { return accountId(claims(token)); }
+    private Long accountId(Claims parsed) {
+        // No fallback to email: legacy tokens must be replaced by a fresh login.
+        if (!"user-id-v1".equals(parsed.get("identity")) || parsed.getExpiration() == null
+                || parsed.getSubject() == null || !parsed.getSubject().matches("[1-9][0-9]*"))
+            throw new IllegalArgumentException("Invalid token identity");
+        return Long.valueOf(parsed.getSubject());
+    }
     public boolean isCurrent(String token, UserDetails details) {
         if (!(details instanceof CustomUserDetails account)) return false;
         Claims parsed = claims(token);
         Object version = parsed.get("ver");
-        return details.getUsername().equals(parsed.getSubject()) && version instanceof Number
+        return accountId(parsed).equals(account.getUserId()) && version instanceof Number
                 && ((Number) version).longValue() == account.getTokenVersion();
     }
     private Claims claims(String token) {

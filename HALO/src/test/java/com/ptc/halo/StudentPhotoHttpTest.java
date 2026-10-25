@@ -31,9 +31,9 @@ class StudentPhotoHttpTest {
  @MockBean CustomUserDetailsService details;
  @MockBean JwtService jwt;
  UserEntity token(String role){
-  when(jwt.extractUsername("token")).thenReturn("actor@test");when(jwt.isCurrent(eq("token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("actor@test")).thenReturn(User.withUsername("actor@test").password("unused").roles(role).build());
-  var u=new UserEntity();u.setId(5L);u.setRole(Role.valueOf(role));u.setStatus(Status.ACTIVE);when(users.findByEmail("actor@test")).thenReturn(Optional.of(u));when(access.requireStudent(any())).thenReturn(u);return u;
+  when(jwt.extractUserId("token")).thenReturn(5L);when(jwt.isCurrent(eq("token"),any())).thenReturn(true);
+  when(details.loadUserById(5L)).thenReturn(TestIdentity.details(5L, "actor@test", role));
+  var u=new UserEntity();u.setId(5L);u.setRole(Role.valueOf(role));u.setStatus(Status.ACTIVE);when(users.findById(5L)).thenReturn(Optional.of(u));when(access.requireStudent(any())).thenReturn(u);return u;
  }
  @Test void studentUploadAndReadUseAuthenticatedIdNotClientTarget() throws Exception {
   token("STUDENT");var file=new MockMultipartFile("photo","photo.png","image/png",new byte[]{1});

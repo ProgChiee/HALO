@@ -163,7 +163,7 @@ public class AiLearningModuleController {
             );
         }
 
-        return userRepository.findByEmail(authentication.getName())
+        return com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                 .orElseThrow(() ->
                         new ResponseStatusException(
                                 HttpStatus.UNAUTHORIZED,

@@ -111,7 +111,7 @@ class AssessmentSubmissionAccessTest {
     new com.ptc.halo.controller.StudentAssessmentController(service,users))
     .setControllerAdvice(new com.ptc.halo.controller.StudentLessonExceptionHandler()).build();
   mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/student/assessment/result/"+Long.MAX_VALUE)
-    .principal(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(student.getEmail(),"unused")))
+    .principal(TestIdentity.auth(student)))
     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound())
     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("ATTEMPT_NOT_FOUND"))
     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("ATTEMPT_NOT_FOUND"))
@@ -164,7 +164,7 @@ class AssessmentSubmissionAccessTest {
   var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
     new com.ptc.halo.controller.StudentAssessmentController(service,users)).build();
   mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/student/assessment/status/"+moduleId)
-    .principal(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(student.getEmail(),"unused")))
+    .principal(TestIdentity.auth(student)))
     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.hasUnfinishedAttempt").value(true));
   assertUnchanged();

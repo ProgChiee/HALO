@@ -22,7 +22,7 @@ class SelfProfileTest {
    var u=new UserEntity();u.setName("Before");u.setEmail(role+"@example.test");u.setRole(role);u.setStatus(Status.ACTIVE);u.setPassword("unchanged-hash");u.setTokenVersion(5);u=users.saveAndFlush(u);
    if(role==Role.STUDENT){var p=new StudentProfileEntity();p.setUser(u);p.setStudentId("S123");p.setSection("A");p.setYearLevel(YearLevel.FIRST_YEAR);students.saveAndFlush(p);}
    if(role==Role.PROFESSOR){var p=new ProfessorEntity();p.setUser(u);p.setProfessorId("P123");professors.saveAndFlush(p);}
-   var auth=new UsernamePasswordAuthenticationToken(u.getEmail(),null,List.of(new SimpleGrantedAuthority("ROLE_"+role.name())));
+   var auth=TestIdentity.auth(u);
    var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new com.ptc.halo.controller.SelfProfileController(service)).build();
    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/profile").principal(auth)
      .contentType("application/json").content("{\"fullName\":\"  Talidong, Archie V.  \"}"))

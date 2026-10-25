@@ -91,8 +91,7 @@ class AdminStudentModeTest {
  }
 
  org.springframework.security.core.Authentication authentication(UserEntity user) {
-  return new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(user.getEmail(),"unused",
-   List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+user.getRole())));
+  return TestIdentity.auth(user);
  }
  Long moduleId(){return modules.findAll().get(0).getId();}
  AssessmentAttemptEntity submit(){return mode.execute(auth,actingId,s->service.submitAttempt(attempt.getId(),s.getTarget(),request(item(q1.getId(),"A"),item(q2.getId(),"B")),s));}
@@ -115,7 +114,7 @@ class AdminStudentModeTest {
  }
  @Test void sessionGuardRejectsOtherAdminWrongRoleRevokedExpiredAndInactive(){
   var original=auth;
-  auth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(student.getEmail(),"unused",List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STUDENT")));
+  auth=TestIdentity.auth(student);
   assertThrows(org.springframework.security.access.AccessDeniedException.class,()->mode.execute(auth,actingId,s->true));auth=original;
   var other=new UserEntity();other.setEmail("other-admin@test.example");other.setName("Other");other.setRole(Role.ADMIN);other.setStatus(Status.ACTIVE);other=users.saveAndFlush(other);
   var otherAuth=authentication(other);assertThrows(AdminApiException.class,()->mode.execute(otherAuth,actingId,s->true));

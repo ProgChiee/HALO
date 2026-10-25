@@ -16,6 +16,54 @@ class StudentStudyActivityTest {
   student=new UserEntity();student.setId(1L);student.setRole(Role.STUDENT);
  }
  void study(String date){db.update("insert into lesson_study_days values(1,?)",date);}
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(strings={"UTC","Asia/Manila"})
+ void manilaMidnightStartsMondayRegardlessOfJvmZone(String zone){
+  var previous=java.util.TimeZone.getDefault();
+  try {
+   java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone(zone));
+   study("2026-10-10");study("2026-10-11");
+   db.update("insert into mentor_sessions values(1,1)");
+   db.update("insert into mentor_messages values(1,'STUDENT','Sunday','2026-10-11 23:59:59')");
+   var jdbc=new NamedParameterJdbcTemplate(db);
+   var before=new StudentStudyActivityService(jdbc,java.time.Clock.fixed(java.time.Instant.parse("2026-10-11T15:59:59Z"),java.time.ZoneId.of(zone)));
+   var after=new StudentStudyActivityService(jdbc,java.time.Clock.fixed(java.time.Instant.parse("2026-10-11T16:00:00Z"),java.time.ZoneId.of(zone)));
+   assertEquals(2,before.get(student).weeklyStudyDays());
+   assertEquals(1,before.get(student).mentorSessionsWeek());
+   assertEquals(0,after.get(student).weeklyStudyDays());
+   assertEquals(0,after.get(student).mentorSessionsWeek());
+   assertEquals(1,after.get(student).mentorSessionsMonth());
+   assertEquals(2,after.get(student).studyStreak());
+   assertEquals("Asia/Manila",after.get(student).timezone());
+   assertEquals(LocalDate.of(2026,10,12),after.calendar(student,null).today());
+   assertEquals("Asia/Manila",after.calendar(student,null).timezone());
+   // DATE rows remain calendar dates; they are not shifted through UTC.
+   assertEquals(java.util.List.of(LocalDate.of(2026,10,10),LocalDate.of(2026,10,11)),after.calendar(student,null).activeDates());
+   db.update("insert into assessment_attempts values(1,'2026-10-12 00:00:00',null)");
+   assertEquals(0,after.get(student).mentorSessionsWeek());
+   assertEquals(1,after.get(student).weeklyStudyDays());
+   assertEquals(3,after.get(student).studyStreak());
+   assertEquals(2,before.get(student).weeklyStudyDays());
+  } finally {java.util.TimeZone.setDefault(previous);}
+ }
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(strings={"UTC","Asia/Manila"})
+ void manilaMonthBoundaryAndTimestampWriter(String zone){
+  var previous=java.util.TimeZone.getDefault();
+  try {
+   java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone(zone));
+   var clock=java.time.Clock.fixed(java.time.Instant.parse("2026-09-30T16:00:00Z"),java.time.ZoneId.of(zone));
+   var now=com.ptc.halo.service.StudyActivityTime.now(clock);
+   assertEquals(java.time.LocalDateTime.of(2026,10,1,0,0),now);
+   db.update("insert into mentor_sessions values(1,1)");
+   db.update("insert into mentor_messages values(1,'STUDENT','First October activity',?)",now);
+   var timed=new StudentStudyActivityService(new NamedParameterJdbcTemplate(db),clock);
+   assertEquals("2026-10",timed.calendar(student,null).month());
+   assertEquals(java.util.List.of(LocalDate.of(2026,10,1)),timed.calendar(student,null).activeDates());
+   assertEquals(1,timed.get(student).mentorSessionsMonth());
+   assertEquals(1,timed.get(student).studyStreak());
+  } finally {java.util.TimeZone.setDefault(previous);}
+ }
  @Test void mixedSourcesDeduplicateAndWeekBoundary(){
   study("2026-10-05");study("2026-10-05");
   db.update("insert into assessment_attempts values(1,'2026-10-05 09:00:00','2026-10-07 09:00:00')");

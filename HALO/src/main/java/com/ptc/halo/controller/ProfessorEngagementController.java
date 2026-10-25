@@ -15,7 +15,7 @@ public class ProfessorEngagementController extends ProfessorErrorResponses {
  @PreAuthorize("hasRole('PROFESSOR')")
  public Object get(Authentication auth,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){
   if(auth==null)throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
-  return engagement.get(users.findByEmail(auth.getName()).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),page,size,view);
+  return engagement.get(com.ptc.halo.security.AuthenticatedAccount.find(users, auth).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),page,size,view);
  }
  @GetMapping("/api/admin/acting/professor/students/engagement")
  @PreAuthorize("hasRole('ADMIN')")
@@ -26,7 +26,7 @@ public class ProfessorEngagementController extends ProfessorErrorResponses {
  @PreAuthorize("hasRole('PROFESSOR')")
  public Object modules(Authentication auth,@PathVariable Long studentId,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){
   if(auth==null)throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
-  return engagement.modules(users.findByEmail(auth.getName()).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),studentId,page,size,view);
+  return engagement.modules(com.ptc.halo.security.AuthenticatedAccount.find(users, auth).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),studentId,page,size,view);
  }
  @GetMapping("/api/admin/acting/professor/students/{studentId}/engagement/modules")
  @PreAuthorize("hasRole('ADMIN')")

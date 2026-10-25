@@ -1,6 +1,7 @@
 // Fixed messages only: never display arbitrary server messages or payloads.
 const MESSAGES = {
   QUIZ_GENERATION_FAILED: "The quiz could not be generated. Please try again.",
+  QUIZ_GENERATION_INVALID: "The AI returned an incomplete or invalid quiz. Please retry quiz generation or lesson approval. No quiz was saved.",
   REVISION_REQUIRES_PUBLISHED: "Only published lessons can be revised.",
   REVISION_NOT_FOUND: "This revision is no longer available. Reload the lesson.",
   REVISION_REVIEW_REQUIRED: "Save and review the latest revision before publishing.",

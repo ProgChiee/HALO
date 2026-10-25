@@ -44,8 +44,8 @@ class ProfessorModuleOwnershipTest {
  Path original;
  @BeforeEach void setup() throws Exception {
   var a = user("owner"); var b = user("stranger");
-  owner = new UsernamePasswordAuthenticationToken(a.getEmail(), "unused");
-  stranger = new UsernamePasswordAuthenticationToken(b.getEmail(), "unused");
+  owner = TestIdentity.auth(a);
+  stranger = TestIdentity.auth(b);
   var professor = new ProfessorEntity(); professor.setUser(a); professor.setProfessorId("owner"); professor=professors.saveAndFlush(professor);
   var subject = new SubjectEntity(); subject.setSubjectCode("OWN"); subject.setSubjectName("Owned"); subject.setProfessor(professor); subject=subjects.saveAndFlush(subject);
   week=new WeekEntity(); week.setSubject(subject); week.setWeekNumber(1); week.setTitle("Week"); week=weeks.saveAndFlush(week);

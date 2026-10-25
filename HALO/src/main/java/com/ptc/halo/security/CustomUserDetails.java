@@ -11,12 +11,17 @@ import java.util.List;
 
 public class CustomUserDetails implements UserDetails {
     private final UserEntity user;
+    private final Long userId;
+    private final long tokenVersion;
 
     public CustomUserDetails(UserEntity user) {
         this.user = user;
+        this.userId = user.getId();
+        this.tokenVersion = user.getTokenVersion();
     }
 
-    public long getTokenVersion() { return user.getTokenVersion(); }
+    public Long getUserId() { return userId; }
+    public long getTokenVersion() { return tokenVersion; }
     public boolean isMustChangePassword() { return user.isMustChangePassword(); }
 
     @Override

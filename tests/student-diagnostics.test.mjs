@@ -98,7 +98,7 @@ test('dashboard and profile retain error UI while logging only sanitized diagnos
     try {
       await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, logout() {} } },
         React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Component))))));
-      assert.match(host.textContent, /couldn't load|could not load|unable to load|failed to load/i);
+      assert.match(host.textContent, name === 'Quiz' ? /do not have access to this quiz/i : /couldn't load|could not load|unable to load|failed to load/i);
       assert.ok(calls.some(call => call[0] === '[HALO Student]' && call[1].status === 403));
       assert.ok(!JSON.stringify(calls).includes(secret));
     } finally {

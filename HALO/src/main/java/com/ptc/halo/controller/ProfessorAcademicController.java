@@ -216,8 +216,7 @@ public class ProfessorAcademicController {
     private UserEntity getCurrentProfessor(
             Authentication authentication) {
 
-        return userRepository
-                .findByEmail(authentication.getName())
+        return com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                 .orElseThrow(() ->
                         new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                 );

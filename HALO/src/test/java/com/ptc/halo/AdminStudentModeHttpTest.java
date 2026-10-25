@@ -32,7 +32,7 @@ class AdminStudentModeHttpTest {
  @MockBean JwtService jwt;
  final String path="/api/admin/acting/student";
  final String id="350b29ca-a7d5-4a2d-a5d2-903db7e67e77";
- void token(String role){when(jwt.extractUsername("test-token")).thenReturn("admin@example.test");when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);when(details.loadUserByUsername("admin@example.test")).thenReturn(User.withUsername("admin@example.test").password("unused").roles(role).build());}
+ void token(String role){when(jwt.extractUserId("test-token")).thenReturn(1L);when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);when(details.loadUserById(1L)).thenReturn(User.withUsername("admin@example.test").password("unused").roles(role).build());}
  @Test void adminRequestUsesGuardWithOriginalPrincipalAndHeader() throws Exception {
   token("ADMIN");when(mode.execute(any(),eq(id),any())).thenReturn(java.util.Map.of("ok",true));
   mvc.perform(get(path+"/subjects").param("studentId","999").header("X-Acting-Session",id).header("Authorization","Bearer test-token")).andExpect(status().isOk());

@@ -27,14 +27,14 @@ class SuperAdminActivityHttpTest {
  @MockBean CustomUserDetailsService details;
  @MockBean JwtService jwt;
  void token(String role) {
-  when(jwt.extractUsername("test-token")).thenReturn("test@example.test");
+  when(jwt.extractUserId("test-token")).thenReturn(1L);
   when(jwt.isCurrent(eq("test-token"), any())).thenReturn(true);
-  when(details.loadUserByUsername("test@example.test")).thenReturn(User.withUsername("test@example.test").password("unused").roles(role).build());
+  when(details.loadUserById(1L)).thenReturn(TestIdentity.details(1L, "test@example.test", role));
  }
  @Test void deleteIsSuperAdminOnlyAndReturnsNoContent() throws Exception {
   token("SUPER_ADMIN");
-  var actor = new com.ptc.halo.entity.UserEntity(); actor.setRole(Role.SUPER_ADMIN); actor.setId(1L);
-  when(users.findByEmail("test@example.test")).thenReturn(java.util.Optional.of(actor));
+  var actor = new com.ptc.halo.entity.UserEntity(); actor.setRole(Role.SUPER_ADMIN); actor.setId(1L);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+  when(users.findById(1L)).thenReturn(java.util.Optional.of(actor));
   mvc.perform(delete("/api/super-admin/admin/2").header("Authorization","Bearer test-token")).andExpect(status().isNoContent());
   verify(admins).deleteAdmin(2L, actor);
   for (String role : java.util.List.of("ADMIN", "STUDENT", "PROFESSOR")) {
@@ -98,8 +98,8 @@ class SuperAdminActivityHttpTest {
 
  @Test void createAndStatusPassNormalizedValidatedPayloadToService() throws Exception {
   token("SUPER_ADMIN");
-  var actor = new com.ptc.halo.entity.UserEntity(); actor.setEmail("test@example.test"); actor.setRole(Role.SUPER_ADMIN);
-  when(users.findByEmail("test@example.test")).thenReturn(java.util.Optional.of(actor));
+  var actor = new com.ptc.halo.entity.UserEntity(); actor.setId(1L);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);actor.setEmail("test@example.test"); actor.setRole(Role.SUPER_ADMIN);
+  when(users.findById(1L)).thenReturn(java.util.Optional.of(actor));
   mvc.perform(post("/api/super-admin/create-admin").header("Authorization","Bearer test-token").contentType("application/json")
     .content("""
       {"name":"  New Admin  ","email":" NEW@EXAMPLE.TEST ","password":"test-password-12"}

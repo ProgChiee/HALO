@@ -10,6 +10,7 @@ import { useToast } from '../../../context/notifications/useToast';
 import { buildAssessmentAnswers } from '../../../utils/backendContract';
 import { shouldReconcileQuiz, isSavedQuizResult } from '../../../utils/quizReconciliation';
 import { validateLessonRoute } from '../../../utils/lessonLoader';
+import { quizLoadError } from '../../../utils/quizLoadError';
 import styles from '../styles/Quiz.module.css';
 
 // The server scores A/B/C/D answers and completes module progress on a passing attempt.
@@ -29,6 +30,8 @@ function WeekQuiz({ subjectId, weekId }) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [loadRetry, setLoadRetry] = useState(0);
+  const loadLock = useRef(true);
   const [moduleId, setModuleId] = useState(null);
   const [weekNumber, setWeekNumber] = useState(null);
   const [status, setStatus] = useState(null); // AssessmentStatusResponse
@@ -55,6 +58,7 @@ function WeekQuiz({ subjectId, weekId }) {
     const config = { signal: controller.signal };
 
     async function loadQuiz() {
+      loadLock.current = true;
       setIsLoading(true);
       setLoadError(false);
       try {
@@ -77,21 +81,29 @@ function WeekQuiz({ subjectId, weekId }) {
         }
       } catch (err) {
         logStudentError('load-quiz', err);
-        if (isMounted) setLoadError(true);
+        if (isMounted) setLoadError(quizLoadError(err));
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isMounted) { loadLock.current = false; setIsLoading(false); }
       }
     }
 
     loadQuiz();
     return () => { isMounted = false; controller.abort(); };
-  }, [subjectId, weekId, navigate, workflow.basePath, getWeekLesson, getAssessmentStatus, getAssessment]);
+  }, [subjectId, weekId, navigate, workflow.basePath, getWeekLesson, getAssessmentStatus, getAssessment, loadRetry]);
+
+  function retryLoad() {
+    if (loadLock.current) return;
+    loadLock.current = true;
+    setLoadError(false);
+    setIsLoading(true);
+    setLoadRetry(value => value + 1);
+  }
 
   if (isLoading) {
     return (
       <StudentPageShell>
         <div className={styles.contentArea}>
-          <p className={styles.loadingText}>Loading quiz...</p>
+          <p className={styles.loadingText} role="status">Loading quiz...</p>
         </div>
       </StudentPageShell>
     );
@@ -102,10 +114,10 @@ function WeekQuiz({ subjectId, weekId }) {
       <StudentPageShell>
         <div className={styles.contentArea}>
           <div className={styles.introCard}>
-            <p className={styles.introDescription}>
-              Couldn't load this quiz. Please check your connection and try again.
+            <p className={styles.introDescription} role="alert">
+              {loadError}
             </p>
-            <Button onClick={() => navigate(0)}>Retry</Button>
+            <Button onClick={retryLoad} disabled={isLoading}>Retry</Button>
           </div>
         </div>
       </StudentPageShell>

@@ -29,9 +29,9 @@ class AdminActingHttpTest {
  static final String PATH="/api/admin/acting";
  static final String ID="acdf8250-f785-4e34-b508-a9b1546c1470";
  void token(String role) {
-  when(jwt.extractUsername("test-token")).thenReturn("admin@example.test");
+  when(jwt.extractUserId("test-token")).thenReturn(1L);
   when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("admin@example.test")).thenReturn(User.withUsername("admin@example.test").password("unused").roles(role).build());
+  when(details.loadUserById(1L)).thenReturn(User.withUsername("admin@example.test").password("unused").roles(role).build());
  }
  @Test void adminEndpointsKeepPrincipalAndUseStoredTarget() throws Exception {
   token("ADMIN");

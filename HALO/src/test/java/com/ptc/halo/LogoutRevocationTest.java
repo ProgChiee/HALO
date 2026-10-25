@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect", "jwt.secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},showSql=false)
-@Import({AuthService.class,JwtService.class})
+@Import({AuthService.class, com.ptc.halo.service.LoginTokenIssuer.class,JwtService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class LogoutRevocationTest {
  @Autowired AuthService auth; @Autowired JwtService jwt; @Autowired UserRepository users;
@@ -30,17 +30,17 @@ class LogoutRevocationTest {
   var user=new UserEntity();user.setName("Logout account");user.setEmail(role+"@logout.test");user.setRole(role);user.setStatus(Status.ACTIVE);user=users.saveAndFlush(user);
   String token=jwt.generateToken(user);String email=user.getEmail();Long id=user.getId();
   var details=mock(CustomUserDetailsService.class);
-  when(details.loadUserByUsername(email)).thenAnswer(call->new CustomUserDetails(users.findById(id).orElseThrow()));
+  when(details.loadUserById(id)).thenAnswer(call->new CustomUserDetails(users.findById(id).orElseThrow()));
   var filter=new JwtAuthenticationFilter(jwt,details);
   assertEquals(200,request(filter,token));
-  var identity=new UsernamePasswordAuthenticationToken(email,null,java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_"+role)));
+  var identity=TestIdentity.auth(user);
   auth.logout(identity,"Bearer "+token);
   assertEquals(1,users.findById(id).orElseThrow().getTokenVersion());
   assertEquals(401,request(filter,token));
   assertThrows(BadCredentialsException.class,()->auth.logout(identity,"Bearer "+token));
   assertEquals(1,users.findById(id).orElseThrow().getTokenVersion());
   assertEquals(200,request(filter,jwt.generateToken(users.findById(id).orElseThrow())));
-  verify(audit,times(1)).logout(email,"Bearer "+token);
+  verify(audit,times(1)).logoutUser(id,"Bearer "+token);
  }
  private int request(JwtAuthenticationFilter filter,String token) throws Exception {
   SecurityContextHolder.clearContext();

@@ -31,10 +31,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ") &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
-                // extractUsername verifies the signature and expiry through JwtService's parser.
-                String email = jwtService.extractUsername(header.substring(7));
-                if (email == null || email.isBlank()) throw new IllegalArgumentException("Missing subject");
-                UserDetails details = userDetailsService.loadUserByUsername(email);
+                // Verify signature, expiry and identity format before the immutable-ID lookup.
+                Long userId = jwtService.extractUserId(header.substring(7));
+                if (userId == null || userId <= 0) throw new IllegalArgumentException("Missing subject");
+                UserDetails details = userDetailsService.loadUserById(userId);
                 if (!jwtService.isCurrent(header.substring(7), details)) {
                     ApiSecurityErrors.write(request, response, 401, "INVALID_OR_EXPIRED_TOKEN");
                     return;

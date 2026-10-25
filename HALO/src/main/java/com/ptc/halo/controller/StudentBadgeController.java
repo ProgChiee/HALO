@@ -30,11 +30,10 @@ public class StudentBadgeController {
     getStudentBadges(
             Authentication authentication) {
 
-        String email =
-                authentication.getName();
+
 
         UserEntity student =
-                userRepository.findByEmail(email)
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Student not found"

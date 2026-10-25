@@ -25,9 +25,9 @@ class QuizRevisionHttpTest {
  @MockBean CustomUserDetailsService details;@MockBean JwtService jwt;@MockBean org.springframework.transaction.PlatformTransactionManager manager;
  final String path="/api/professor/ai-learning-modules/41/quiz-revision";
  UserEntity token(String role){
-  when(jwt.extractUsername("token")).thenReturn("actor@test");when(jwt.isCurrent(eq("token"),any())).thenReturn(true);
-  when(details.loadUserByUsername("actor@test")).thenReturn(User.withUsername("actor@test").password("unused").roles(role).build());
-  var u=new UserEntity();u.setId(5L);u.setRole(Role.valueOf(role));u.setStatus(Status.ACTIVE);when(users.findByEmail("actor@test")).thenReturn(Optional.of(u));
+  when(jwt.extractUserId("token")).thenReturn(5L);when(jwt.isCurrent(eq("token"),any())).thenReturn(true);
+  when(details.loadUserById(5L)).thenReturn(TestIdentity.details(5L, "actor@test", role));
+  var u=new UserEntity();u.setId(5L);u.setRole(Role.valueOf(role));u.setStatus(Status.ACTIVE);when(users.findById(5L)).thenReturn(Optional.of(u));
   when(manager.getTransaction(any())).thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());return u;
  }
 
@@ -42,8 +42,17 @@ class QuizRevisionHttpTest {
  @Test void professorGenerationRevalidatesAndApprovalRequiresExplicitDraft()throws Exception{
   var professor=token("PROFESSOR");var captured=new QuizRevisionService.Prepared(1L,2L,1,new AiLearningModuleEntity());var generated=new com.ptc.halo.dtoResponse.GeneratedAssessment();
   when(revisions.prepare(41L,professor)).thenReturn(captured);when(revisions.generate(captured)).thenReturn(generated);
-  mvc.perform(post(path+"/generate").header("Authorization","Bearer token")).andExpect(status().isOk());verify(revisions).save(41L,captured,generated,professor,null);verify(users,atLeast(2)).findByEmail("actor@test");
+  mvc.perform(post(path+"/generate").header("Authorization","Bearer token")).andExpect(status().isOk());verify(revisions).save(41L,captured,generated,professor,null);verify(users,atLeast(2)).findById(5L);
   mvc.perform(post(path+"/approve").header("Authorization","Bearer token").contentType("application/json").content("{}")).andExpect(status().isBadRequest());
   mvc.perform(post(path+"/approve").header("Authorization","Bearer token").contentType("application/json").content("{\"draftId\":7}")).andExpect(status().isOk());verify(revisions).approve(41L,7L,professor,null);
+ }
+ @Test void invalidAiResponseReturnsActionableErrorWithoutPersisting()throws Exception{
+  var professor=token("PROFESSOR");var captured=new QuizRevisionService.Prepared(1L,2L,1,new AiLearningModuleEntity());
+  when(revisions.prepare(41L,professor)).thenReturn(captured);
+  when(revisions.generate(captured)).thenThrow(GeneratedAssessmentValidator.invalid());
+  mvc.perform(post(path+"/generate").header("Authorization","Bearer token"))
+   .andExpect(status().isBadGateway()).andExpect(jsonPath("$.code").value("QUIZ_GENERATION_INVALID"))
+   .andExpect(jsonPath("$.message").value("The AI returned an incomplete or invalid quiz. Please retry quiz generation or lesson approval. No quiz was saved."));
+  verify(revisions,never()).save(any(),any(),any(),any(),any());
  }
 }

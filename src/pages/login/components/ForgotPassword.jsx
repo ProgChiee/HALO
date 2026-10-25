@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
 import Button from '../../../components/shared/Button';
@@ -10,12 +10,13 @@ import {
 } from '../../../services/authService';
 import bgImage from '../../../assets/login/Background.png';
 import styles from '../styles/ForgotPassword.module.css';
+import { recoveryRequestMessage, recoveryCooldown, recoveryError } from '../../../utils/passwordReset';
 
 // Change this if your institutional domain is different
 const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
-const RESEND_COOLDOWN_SECONDS = 30;
 
 export default function ForgotPassword() {
+  const pending = useRef(false);
   const [step, setStep] = useState(1); // 1 = enter email, 2 = enter code + new password
 
   const [email, setEmail] = useState('');
@@ -29,6 +30,7 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [retryCooldown, setRetryCooldown] = useState(0);
 
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -42,9 +44,21 @@ export default function ForgotPassword() {
     return () => clearInterval(timer);
   }, [resendCooldown]);
 
+  useEffect(() => {
+    if (retryCooldown <= 0) return;
+    const timer = setTimeout(() => setRetryCooldown(value => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [retryCooldown]);
+
+  function showRecoveryError(failure) {
+    const feedback = recoveryError(failure);
+    setError(feedback.message);
+    if (feedback.seconds) setRetryCooldown(feedback.seconds);
+  }
+
   async function handleSendCode(e) {
     e.preventDefault();
-    if (isLoading) return;
+    if (pending.current || retryCooldown > 0 || resendCooldown > 0) return;
     setError('');
 
     if (!email) {
@@ -52,43 +66,48 @@ export default function ForgotPassword() {
       return;
     }
 
-    if (!email.toLowerCase().endsWith(INSTITUTIONAL_DOMAIN)) {
+    if (!email.trim().toLowerCase().endsWith(INSTITUTIONAL_DOMAIN)) {
       setShowEmailModal(true);
       return;
     }
 
+    pending.current = true;
     setIsLoading(true);
 
     try {
-      await sendPasswordResetCode(email);
-      showToast('Verification code sent to your email.', 'success');
+      const response = await sendPasswordResetCode(email.trim());
+      showToast(recoveryRequestMessage, 'success');
       setStep(2);
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    } catch {
-      setError('Something went wrong. Please try again.');
+      setResendCooldown(recoveryCooldown(response?.retryAfterSeconds));
+    } catch (failure) {
+      showRecoveryError(failure);
     } finally {
+      pending.current = false;
       setIsLoading(false);
     }
   }
 
   async function handleResend() {
-    if (resendCooldown > 0 || isResending) return;
+    if (resendCooldown > 0 || retryCooldown > 0 || pending.current) return;
 
+    pending.current = true;
     setIsResending(true);
     try {
-      await resendPasswordResetCode(email);
-      showToast('Verification code resent.', 'success');
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    } catch {
-      showToast("Couldn't resend the code. Please try again.", 'error');
+      const response = await resendPasswordResetCode(email.trim());
+      setError('');
+      showToast(recoveryRequestMessage, 'success');
+      setResendCooldown(recoveryCooldown(response?.retryAfterSeconds));
+    } catch (failure) {
+      showRecoveryError(failure);
     } finally {
+      pending.current = false;
       setIsResending(false);
     }
   }
 
   async function handleResetPassword(e) {
     e.preventDefault();
-    if (isLoading) return;
+    if (pending.current || retryCooldown > 0) return;
     setError('');
 
     if (!code || !newPassword || !confirmPassword) {
@@ -101,20 +120,22 @@ export default function ForgotPassword() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
+    if (newPassword.length < 8 || new TextEncoder().encode(newPassword).length > 72) {
+      setError('Password must be at least 8 characters and at most 72 UTF-8 bytes.');
       return;
     }
 
+    pending.current = true;
     setIsLoading(true);
 
     try {
-      await resetPassword(email, code, newPassword);
+      await resetPassword(email.trim(), code, newPassword);
       showToast('Password reset successfully. Please sign in.', 'success');
       navigate('/login');
-    } catch {
-      setError('Something went wrong. Please try again.');
+    } catch (failure) {
+      showRecoveryError(failure);
     } finally {
+      pending.current = false;
       setIsLoading(false);
     }
   }
@@ -164,9 +185,10 @@ export default function ForgotPassword() {
                   </div>
                 </div>
 
-                {error && <p className={styles.error}>{error}</p>}
+                {error && <p role="alert" className={styles.error}>{error}</p>}
+                {Math.max(resendCooldown, retryCooldown) > 0 && <p role="status">Try again in {Math.max(resendCooldown, retryCooldown)} seconds.</p>}
 
-                <Button type="submit" isLoading={isLoading}>Send Code</Button>
+                <Button type="submit" isLoading={isLoading} disabled={retryCooldown > 0 || resendCooldown > 0 || isResending}>Send Code</Button>
 
                 <p className={styles.signinText}>
                   Remember your password?{' '}
@@ -199,10 +221,10 @@ export default function ForgotPassword() {
                     type="button"
                     className={styles.resendBtn}
                     onClick={handleResend}
-                    disabled={resendCooldown > 0 || isResending}
+                    disabled={resendCooldown > 0 || retryCooldown > 0 || isResending || isLoading}
                   >
-                    {resendCooldown > 0
-                      ? `Resend code in ${resendCooldown}s`
+                    {Math.max(resendCooldown,retryCooldown) > 0
+                      ? `Resend code in ${Math.max(resendCooldown,retryCooldown)}s`
                       : isResending
                         ? 'Resending...'
                         : 'Resend code'}
@@ -245,9 +267,10 @@ export default function ForgotPassword() {
                   </div>
                 </div>
                       
-                {error && <p className={styles.error}>{error}</p>}
+                {error && <p role="alert" className={styles.error}>{error}</p>}
+                {retryCooldown > 0 && <p role="status">Try again in {retryCooldown} seconds.</p>}
 
-                <Button type="submit" isLoading={isLoading}>Reset Password</Button>
+                <Button type="submit" isLoading={isLoading} disabled={retryCooldown > 0 || isResending}>Reset Password</Button>
               </form>
             </div>
           </>

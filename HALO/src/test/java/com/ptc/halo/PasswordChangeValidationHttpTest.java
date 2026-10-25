@@ -18,11 +18,11 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class})
 class PasswordChangeValidationHttpTest {
  @Test void incorrectPasswordReturnsActionable400() throws Exception {
-  var account = new com.ptc.halo.entity.UserEntity();
-  org.mockito.Mockito.when(users.findByEmail("prof@example.test")).thenReturn(java.util.Optional.of(account));
+  var account = new com.ptc.halo.entity.UserEntity();account.setId(1L);account.setRole(com.ptc.halo.enums.Role.PROFESSOR);account.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+  org.mockito.Mockito.when(users.findById(1L)).thenReturn(java.util.Optional.of(account));
   org.mockito.Mockito.doThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "INCORRECT_CURRENT_PASSWORD"))
    .when(passwords).changePassword(account, "wrong-password", "replacement-password");
-  mvc.perform(post("/api/auth/change-password").with(user("prof@example.test").roles("PROFESSOR"))
+  mvc.perform(post("/api/auth/change-password").with(user(new CustomUserDetails(account)))
    .contentType("application/json").content("{\"currentPassword\":\"wrong-password\",\"newPassword\":\"replacement-password\"}"))
    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INCORRECT_CURRENT_PASSWORD"))
    .andExpect(jsonPath("$.message").value("Your current password is incorrect. Try again."));

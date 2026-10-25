@@ -17,14 +17,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class AssessmentAnswerSetHttpTest {
  @Test void validationAndDatabaseConflictAreSafeStructuredClientErrors() throws Exception {
-  var service=mock(AssessmentService.class);var users=mock(UserRepository.class);var student=new UserEntity();student.setId(1L);
-  when(users.findByEmail("student@example.test")).thenReturn(Optional.of(student));
+  var service=mock(AssessmentService.class);var users=mock(UserRepository.class);var student=new UserEntity();student.setId(1L);student.setRole(com.ptc.halo.enums.Role.STUDENT);student.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+  when(users.findById(1L)).thenReturn(Optional.of(student));
   var mvc=MockMvcBuilders.standaloneSetup(new StudentAssessmentController(service,users)).setControllerAdvice(new StudentLessonExceptionHandler()).build();
   for(var code:new String[]{"INVALID_ANSWER_SET","ANSWERS_ALREADY_RECORDED"}) {
    int status=code.equals("INVALID_ANSWER_SET")?400:409;
    doThrow(new ResponseStatusException(HttpStatus.valueOf(status),code)).when(service).submitAttempt(eq(2L),eq(student),any());
    mvc.perform(post("/api/student/assessment/submit/2")
-     .principal(new UsernamePasswordAuthenticationToken("student@example.test","unused"))
+     .principal(TestIdentity.auth(student))
      .contentType("application/json").content("{\"answers\":[{\"questionId\":1,\"answer\":\"A\"},{\"questionId\":1,\"answer\":\"A\"}]}"))
      .andExpect(status().is(status)).andExpect(jsonPath("$.status").value(status))
      .andExpect(jsonPath("$.code").value(code)).andExpect(jsonPath("$.message").value(code))

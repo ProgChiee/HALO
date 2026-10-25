@@ -134,8 +134,7 @@ public class SuperAdminController {
     private UserEntity getCurrentSuperAdmin(
             Authentication authentication) {
 
-        return userRepository
-                .findByEmail(authentication.getName())
+        return com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Super Admin not found"
@@ -175,8 +174,7 @@ public class SuperAdminController {
             Authentication authentication) {
 
         UserEntity superAdmin =
-                userRepository
-                        .findByEmail(authentication.getName())
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Super Admin not found"

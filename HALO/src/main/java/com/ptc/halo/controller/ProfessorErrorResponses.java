@@ -22,6 +22,7 @@ public class ProfessorErrorResponses {
         Map.entry("MODULE_ALREADY_APPROVED", "This lesson is already approved. Reload to see its current status."),
         Map.entry("MODULE_GENERATION_REQUIRED", "Generate the lesson successfully before this action."),
         Map.entry("QUIZ_GENERATION_FAILED", "The quiz could not be generated. Please try again."),
+        Map.entry("QUIZ_GENERATION_INVALID", "The AI returned an incomplete or invalid quiz. Please retry quiz generation or lesson approval. No quiz was saved."),
         Map.entry("REVISION_REQUIRES_PUBLISHED", "Only published lessons can be revised."),
         Map.entry("REVISION_NOT_FOUND", "This revision is no longer available. Reload the lesson."),
         Map.entry("REVISION_REVIEW_REQUIRED", "Save and review the latest revision before publishing."),

@@ -48,10 +48,7 @@ public class StudentLearningProgressionController {
 
 
         UserEntity student =
-                userRepository
-                        .findByEmail(
-                                authentication.getName()
-                        )
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Student not found"
@@ -74,10 +71,7 @@ public class StudentLearningProgressionController {
             Authentication authentication) {
 
         UserEntity student =
-                userRepository
-                        .findByEmail(
-                                authentication.getName()
-                        )
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new RuntimeException(
                                         "Student not found"

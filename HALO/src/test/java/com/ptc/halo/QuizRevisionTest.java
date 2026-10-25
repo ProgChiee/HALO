@@ -37,6 +37,64 @@ class QuizRevisionTest {
  UserEntity user(String name,Role role){var u=new UserEntity();u.setName(name);u.setEmail(name+"@quiz.test");u.setRole(role);u.setStatus(Status.ACTIVE);return users.saveAndFlush(u);}
  GeneratedAssessment generated(){var g=new GeneratedAssessment();var list=new ArrayList<GeneratedAssessmentQuestion>();for(int n=1;n<=10;n++){var q=new GeneratedAssessmentQuestion();q.setQuestionNumber(n);q.setQuestion("Latest question "+n);q.setOptionA("A");q.setOptionB("B");q.setOptionC("C");q.setOptionD("D");q.setCorrectAnswer("B");list.add(q);}g.setQuestions(list);return g;}
  QuizRevisionService.View draft(AdminActingSessionEntity a){var p=service.prepare(module.getId(),professor);return service.save(module.getId(),p,service.generate(p),professor,a);}
+ AiLearningModuleEntity initialModule(){
+  var week=new WeekEntity();week.setSubject(module.getWeek().getSubject());week.setWeekNumber(2);week.setTitle("Initial lesson");weeks.saveAndFlush(week);
+  var initial=new AiLearningModuleEntity();initial.setWeek(week);initial.setStatus(LessonStatus.APPROVED);initial.setAiGenerationStatus(AiGenerationStatus.COMPLETED);initial.setLessonText("Approved lesson");return modules.saveAndFlush(initial);
+ }
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.ValueSource(strings={"one-question","eleven-questions","invalid-answer","null-response","null-questions","empty-questions","null-question","missing-number","zero-number","large-number","duplicate-number","missing-text","blank-text","long-text","duplicate-text","missing-A","blank-B","blank-C","missing-D","long-option","null-answer","lowercase-answer","padded-answer"})
+ void initialAndReplacementBothRejectInvalidGeneratedQuiz(String problem){
+  var invalid=invalidQuiz(problem);
+  var attempt=new AssessmentAttemptEntity();attempt.setAssessment(original);attempt.setStudent(student);attempt.setStartedAt(LocalDateTime.now());attempt.setSubmittedAt(LocalDateTime.now());attempt.setScore(100);attempt.setPassed(true);attempts.saveAndFlush(attempt);
+  var answer=new StudentAnswerEntity();answer.setAttempt(attempt);answer.setQuestion(original.getQuestions().get(0));answer.setAnswer("A");answers.saveAndFlush(answer);
+  var captured=service.prepare(module.getId(),professor);
+  assertInvalid(()->service.save(module.getId(),captured,invalid,professor,null));
+  var initial=initialModule();
+  assertInvalid(()->assessmentService.persistGeneratedAssessment(initial,invalid));
+  when(ai.generateAssessment(any(),any(),any(),any(),any())).thenReturn(invalid);
+  assertInvalid(()->assessmentService.prepareAssessment(initial));assertInvalid(()->service.generate(captured));
+  assertEquals(1,quizzes.count());
+  assertEquals(1,em.createQuery("select count(q) from AssessmentQuestionEntity q",Long.class).getSingleResult());
+  assertEquals(AssessmentStatus.AVAILABLE,quizzes.findById(original.getId()).orElseThrow().getStatus());
+  assertEquals(100,attempts.findById(attempt.getId()).orElseThrow().getScore());assertEquals(1,answers.count());assertEquals(0,logs.count());
+ }
+ void assertInvalid(org.junit.jupiter.api.function.Executable operation){
+  var error=assertThrows(org.springframework.web.server.ResponseStatusException.class,operation);
+  assertEquals(502,error.getStatusCode().value());assertEquals("QUIZ_GENERATION_INVALID",error.getReason());
+ }
+ GeneratedAssessment invalidQuiz(String problem){
+  var g=generated();var q=g.getQuestions().get(0);
+  switch(problem){
+   case "one-question" -> g.setQuestions(List.of(q));
+   case "eleven-questions" -> g.getQuestions().add(q);
+   case "null-response" -> {return null;}
+   case "null-questions" -> g.setQuestions(null);
+   case "empty-questions" -> g.setQuestions(List.of());
+   case "null-question" -> g.getQuestions().set(0,null);
+   case "missing-number" -> q.setQuestionNumber(null);
+   case "zero-number" -> q.setQuestionNumber(0);
+   case "large-number" -> q.setQuestionNumber(11);
+   case "duplicate-number" -> q.setQuestionNumber(2);
+   case "missing-text" -> q.setQuestion(null);
+   case "blank-text" -> q.setQuestion(" \n ");
+   case "long-text" -> q.setQuestion("x".repeat(12001));
+   case "duplicate-text" -> q.setQuestion(" LATEST QUESTION 2 ");
+   case "missing-A" -> q.setOptionA(null);
+   case "blank-B" -> q.setOptionB("");
+   case "blank-C" -> q.setOptionC(" \t ");
+   case "missing-D" -> q.setOptionD(null);
+   case "long-option" -> q.setOptionD("x".repeat(256));
+   case "null-answer" -> q.setCorrectAnswer(null);
+   case "lowercase-answer" -> q.setCorrectAnswer("a");
+   case "padded-answer" -> q.setCorrectAnswer(" A ");
+   default -> q.setCorrectAnswer("Z");
+  }
+  return g;
+ }
+ @Test void validInitialQuizKeepsExistingPublicationContract(){
+  var initial=initialModule();var saved=assessmentService.generateAssessment(initial.getId());em.flush();em.clear();
+  var persisted=quizzes.findById(saved.getId()).orElseThrow();assertEquals(1,persisted.getQuizVersion());assertEquals(AssessmentStatus.AVAILABLE,persisted.getStatus());assertNotNull(persisted.getApprovedAt());assertEquals(10,persisted.getQuestions().size());assertEquals(initial.getVersion(),persisted.getSourceModuleVersion());
+ }
  @Test void generatedDraftUsesPublishedLessonAndOnlyApprovalSwitchesCurrent(){
   var view=draft(null);verify(ai).generateAssessment(eq("Latest published guest care"),isNull(),eq("Latest knowledge"),isNull(),isNull());verify(index).getOrBuild(module);
   assertEquals(original.getId(),quizzes.findByModuleId(module.getId()).orElseThrow().getId());assertEquals(2,view.draft().version());assertNull(view.draft().approvedAt());
@@ -69,7 +127,7 @@ class QuizRevisionTest {
  }
  @Test void invalidGenerationAndUnrelatedProfessorCannotWrite(){
   var captured=service.prepare(module.getId(),professor);var invalid=generated();invalid.getQuestions().get(0).setCorrectAnswer("Z");
-  assertThrows(IllegalArgumentException.class,()->service.save(module.getId(),captured,invalid,professor,null));assertEquals(1,quizzes.count());
+  assertInvalid(()->service.save(module.getId(),captured,invalid,professor,null));assertEquals(1,quizzes.count());
   assertThrows(RuntimeException.class,()->service.prepare(module.getId(),user("Unrelated",Role.PROFESSOR)));
  }
  @Test void realAdminIsActorForGenerationAndApproval(){

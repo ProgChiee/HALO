@@ -82,7 +82,7 @@ public class AssessmentService {
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public GeneratedAssessment prepareAssessment(AiLearningModuleEntity module) {
-        return
+        var generated =
                 assessmentAiService.generateAssessment(
                         module.getLessonText(),
                         module.getGeneratedObjectives(),
@@ -90,7 +90,8 @@ public class AssessmentService {
                         module.getGeneratedExamples(),
                         module.getGeneratedSummary()
                 );
-
+        GeneratedAssessmentValidator.validate(generated);
+        return generated;
     }
 
     @Transactional
@@ -99,14 +100,7 @@ public class AssessmentService {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "MODULE_GENERATION_REQUIRED");
         if (assessmentRepository.findByModuleId(module.getId()).isPresent())
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "RESOURCE_CONFLICT");
-        if (generated == null ||
-                generated.getQuestions() == null ||
-                generated.getQuestions().isEmpty()) {
-
-            throw new RuntimeException(
-                    "AI did not generate any assessment questions"
-            );
-        }
+        GeneratedAssessmentValidator.validate(generated);
 
         AssessmentEntity assessment =
                 new AssessmentEntity();
@@ -300,7 +294,7 @@ public class AssessmentService {
 
         attempt.setAssessment(assessment);
         attempt.setStudent(student);
-        attempt.setStartedAt(LocalDateTime.now());
+        attempt.setStartedAt(StudyActivityTime.now());
         attempt.setSubmittedAt(null);
         attempt.setScore(0);
         attempt.setPassed(false);
@@ -383,7 +377,7 @@ public class AssessmentService {
 
         attempt.setScore(score);
         attempt.setPassed(passed);
-        attempt.setSubmittedAt(LocalDateTime.now());
+        attempt.setSubmittedAt(StudyActivityTime.now());
 
         if (passed) {
 
@@ -409,7 +403,7 @@ public class AssessmentService {
 
             if (!Boolean.TRUE.equals(progress.getCompleted())) {
             progress.setCompleted(true);
-            progress.setCompletedAt(LocalDateTime.now());
+            progress.setCompletedAt(StudyActivityTime.now());
 
             studentModuleProgressRepository.save(progress);
             

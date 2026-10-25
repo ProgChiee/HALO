@@ -25,17 +25,14 @@ public class ProfileService {
     }
 
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public StudentProfileResponse getStudentProfile(
             UserEntity user) {
 
         StudentProfileEntity profile =
                 studentProfileRepository
                         .findByUserId(user.getId())
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Student profile not found"
-                                )
-                        );
+                        .orElse(null);
 
         StudentProfileResponse response =
                 new StudentProfileResponse();
@@ -46,9 +43,11 @@ public class ProfileService {
         response.setRole(user.getRole());
         response.setStatus(user.getStatus());
 
-        response.setStudentId(profile.getStudentId());
-        response.setSection(profile.getSection());
-        response.setYearLevel(profile.getYearLevel());
+        if (profile != null) {
+            response.setStudentId(profile.getStudentId());
+            response.setSection(profile.getSection());
+            response.setYearLevel(profile.getYearLevel());
+        }
 
         return response;
     }

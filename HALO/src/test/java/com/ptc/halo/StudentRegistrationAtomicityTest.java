@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"},showSql=false)
-@Import(AuthService.class)
+@Import({AuthService.class, com.ptc.halo.service.LoginTokenIssuer.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class StudentRegistrationAtomicityTest {
  @Autowired AuthService auth;
@@ -54,5 +54,15 @@ class StudentRegistrationAtomicityTest {
   var duplicate=request("atomic-email","29AHRT-0889");
   assertTrue(assertThrows(RegistrationValidationException.class,()->auth.registerStudent(duplicate)).errors.containsKey("email"));
   assertFalse(profiles.existsByStudentId("29AHRT-0889"));
+ }
+ @Test void databaseConstraintFailureDuringProfileInsertRollsBackNewUser(){
+  var r=request("atomic-db-failure","29AHRT-0777");
+  org.mockito.Mockito.doAnswer(call->{
+   com.ptc.halo.entity.StudentProfileEntity profile=call.getArgument(0);
+   profile.setStudentId(null);
+   return profiles.saveAndFlush(profile);
+  }).when(profiles).save(org.mockito.ArgumentMatchers.any());
+  assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->auth.registerStudent(r));
+  assertFalse(users.existsByEmail(r.getEmail()));
  }
 }

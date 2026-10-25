@@ -16,16 +16,17 @@ import org.springframework.transaction.annotation.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"},showSql=false)
-@Import({AuthService.class,AuthAuditService.class,ActivityLogService.class,PasswordResetService.class})
+@DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect","halo.password-reset.pepper=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},showSql=false)
+@Import({AuthService.class, com.ptc.halo.service.LoginTokenIssuer.class,AuthAuditService.class,ActivityLogService.class,PasswordResetService.class,PasswordResetProtection.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AuthenticationAuditTest {
  @Autowired AuthService auth; @Autowired AuthAuditService audit; @Autowired PasswordResetService reset;
  @Autowired ActivityLogService activity; @Autowired ActivityLogRepository logs; @Autowired UserRepository users; @Autowired PasswordResetOtpRepository otps;
+ @MockBean PasswordResetThrottle throttle;
  @MockBean AuthenticationManager authentication; @MockBean JwtService jwt; @MockBean PasswordEncoder encoder; @MockBean EmailService mail;
  @SpyBean ActivityLogService writer;
  UserEntity student;
- @BeforeEach void setup(){reset(org.springframework.test.util.AopTestUtils.getUltimateTargetObject(writer),authentication,jwt,encoder,mail);logs.deleteAll();otps.deleteAll();users.deleteAll();student=new UserEntity();student.setName("Archie");student.setEmail("archie@example.test");student.setRole(Role.STUDENT);student.setStatus(Status.ACTIVE);student.setPassword("stored-hash-secret");student=users.saveAndFlush(student);when(jwt.generateToken(any())).thenReturn("jwt-secret");when(encoder.encode(any())).thenReturn("new-hash-secret");when(encoder.matches(eq("password-secret"),any())).thenReturn(true);}
+ @BeforeEach void setup(){reset(org.springframework.test.util.AopTestUtils.getUltimateTargetObject(writer),authentication,jwt,encoder,mail);logs.deleteAll();otps.deleteAll();users.deleteAll();student=new UserEntity();student.setName("Archie");student.setEmail("archie@example.test");student.setRole(Role.STUDENT);student.setStatus(Status.ACTIVE);student.setPassword("stored-hash-secret");student=users.saveAndFlush(student);when(authentication.authenticate(any())).thenReturn(UsernamePasswordAuthenticationToken.authenticated(new com.ptc.halo.security.CustomUserDetails(student), null, new com.ptc.halo.security.CustomUserDetails(student).getAuthorities()));when(throttle.databaseNow()).thenAnswer(call->java.time.LocalDateTime.now());when(jwt.generateToken(any())).thenReturn("jwt-secret");when(encoder.encode(any())).thenReturn("new-hash-secret");when(encoder.matches(eq("password-secret"),any())).thenReturn(true);}
  LoginRequest request(String email){var r=new LoginRequest();r.setEmail(email);r.setPassword("password-secret");return r;}
  @Test void successAndFailureAreSafeAndUnknownUsersAppearInAuthFilter(){
   assertEquals("jwt-secret",auth.login(request(student.getEmail())).getToken());
@@ -54,7 +55,8 @@ class AuthenticationAuditTest {
  }
  @Test void resetRecordsOnlyCommittedSafeEvents(){
   reset.sendOtp(student.getEmail());assertEquals(1,logs.count());assertEquals(AuthEvent.PASSWORD_RESET_REQUESTED,logs.findAll().get(0).getAuthEvent());
-  String otp=otps.findByUserId(student.getId()).orElseThrow().getOtp();
+  var delivery=org.mockito.ArgumentCaptor.forClass(String.class);verify(mail).sendPasswordResetOtp(eq(student.getEmail()),delivery.capture());
+  String otp=delivery.getValue();assertNotEquals(otp,otps.findByUserId(student.getId()).orElseThrow().getOtp());
   reset.resetPassword(student.getEmail(),otp,"new-password-secret");
   assertEquals(3,logs.count());assertTrue(otps.findByUserId(student.getId()).isEmpty());
   assertTrue(logs.findAll().stream().anyMatch(l->l.getAuthEvent()==AuthEvent.OTP_VERIFIED));assertTrue(logs.findAll().stream().anyMatch(l->l.getAuthEvent()==AuthEvent.PASSWORD_RESET_COMPLETED));
@@ -68,13 +70,13 @@ class AuthenticationAuditTest {
  }
  @Test void failedResetDoesNotClaimCompletion(){
   doThrow(new IllegalStateException("mail unavailable")).when(mail).sendPasswordResetOtp(anyString(),anyString());
-  assertThrows(IllegalStateException.class,()->reset.sendOtp(student.getEmail()));assertEquals(0,logs.count());
+  assertDoesNotThrow(()->reset.sendOtp(student.getEmail()));assertEquals(0,logs.count());
   assertThrows(PasswordResetException.class,()->reset.resetPassword(student.getEmail(),"000000","replacement-password"));assertEquals(0,logs.count());
  }
  @Test void logoutRevocationCommitsEvenWhenAuditStorageFails() {
   when(jwt.isCurrent(anyString(),any())).thenReturn(true);
   doThrow(new IllegalStateException("audit unavailable")).when(org.springframework.test.util.AopTestUtils.<ActivityLogService>getUltimateTargetObject(writer)).createAuthLog(any(),any(),any(),any());
-  var identity=new UsernamePasswordAuthenticationToken(student.getEmail(),null,java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STUDENT")));
+  var identity=TestIdentity.auth(student);
   auth.logout(identity,"Bearer test-only-token");
   assertEquals(1,users.findById(student.getId()).orElseThrow().getTokenVersion());assertEquals(0,logs.count());
  }

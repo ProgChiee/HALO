@@ -193,8 +193,7 @@ public class AdminController {
     private UserEntity getCurrentAdmin(
             Authentication authentication) {
 
-        return userRepository
-                .findByEmail(authentication.getName())
+        return com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                 .orElseThrow(() ->
                         new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                 );
@@ -204,8 +203,7 @@ public class AdminController {
             Authentication authentication) {
 
         UserEntity admin =
-                userRepository
-                        .findByEmail(authentication.getName())
+                com.ptc.halo.security.AuthenticatedAccount.find(userRepository, authentication)
                         .orElseThrow(() ->
                                 new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")
                         );

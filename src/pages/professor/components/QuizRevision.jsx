@@ -8,13 +8,20 @@ import styles from '../styles/LessonEditor.module.css';
 export default function QuizRevision({ moduleId }) {
  const { api, preview } = useProfessorWorkflow();
  const [state, setState] = useState(null), [review, setReview] = useState(null), [confirm, setConfirm] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
- const generation = useRef(0), locked = useRef(false);
+ const [reload, setReload] = useState(0);
+ const generation = useRef(0), locked = useRef(false), loadPending = useRef(true);
  useEffect(() => {
   const controller = new AbortController(); const token = ++generation.current;
-  if (!preview) api.getQuizRevision(moduleId, { signal: controller.signal }).then(value => { if (generation.current === token && !controller.signal.aborted) setState(value); }).catch(e => { if (!controller.signal.aborted) setError(professorErrorMessage(e)); });
+  loadPending.current = true;
+  if (!preview) api.getQuizRevision(moduleId, { signal: controller.signal }).then(value => { if (generation.current === token && !controller.signal.aborted) setState(value); }).catch(e => { if (generation.current === token && !controller.signal.aborted) setError(professorErrorMessage(e)); }).finally(() => { if (generation.current === token && !controller.signal.aborted) loadPending.current = false; });
   return () => { generation.current = token + 1; controller.abort(); };
- }, [api, moduleId, preview]);
+ }, [api, moduleId, preview, reload]);
  if (preview) return null;
+ function retryLoad() {
+  if (loadPending.current || locked.current) return;
+  // Lock immediately, before React renders, and reuse the existing abortable GET effect.
+  loadPending.current = true; setError(''); setReload(value => value + 1);
+ }
  async function run(action) {
   if (locked.current) return;
   const token = generation.current; locked.current = true; setBusy(true); setError('');
@@ -30,6 +37,7 @@ export default function QuizRevision({ moduleId }) {
   <p className={styles.panelSubtitle}>{state?.needsReview ? 'Lesson content has changed. Review or regenerate the quiz to ensure it matches the latest published lesson.' : 'New quiz versions remain private until you review and approve them. Previous attempts and scores are preserved.'}</p>
   {error && <p role="alert">{error}</p>}
   {!state && !error && <p role="status">Loading assessment...</p>}
+  {!state && (error || reload > 0) && <div className={styles.revisionActions}><Button variant="secondary" disabled={!error} onClick={retryLoad}>Retry</Button></div>}
   {state && <>
    {state.current && <p>Current quiz: Version {state.current.version}</p>}
    {state.draft && <p>Draft quiz: Version {state.draft.version} - not available to Students</p>}

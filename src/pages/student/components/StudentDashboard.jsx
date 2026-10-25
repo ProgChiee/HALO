@@ -75,7 +75,7 @@ export default function StudentDashboard() {
     { id: 'completedModules', icon: CheckCircle2, value: summary.completedModules, label: 'Modules completed' },
     { id: 'passedAssessments', icon: TrendingUp, value: summary.passedAssessments, label: 'Assessments passed' },
     { id: 'totalBadges', icon: Award, value: summary.totalBadges, label: 'Badges earned' },
-    { id: 'latestScore', icon: BookOpen, value: `${summary.latestAssessmentScore ?? 0}%`, label: 'Latest assessment score' },
+    { id: 'latestScore', icon: BookOpen, value: summary.latestAssessmentScore == null ? 'No assessment yet' : `${summary.latestAssessmentScore}%`, empty: summary.latestAssessmentScore == null, label: 'Latest assessment score' },
   ] : [];
 
   const nextSubject = subjects.find((s) => s.progressPercentage < 100);
@@ -105,7 +105,7 @@ export default function StudentDashboard() {
                   <div className={styles.statIcon}>
                     <Icon size={18} />
                   </div>
-                  <p className={styles.statValue}>{stat.value}</p>
+                  <p className={stat.empty ? styles.statEmptyValue : styles.statValue}>{stat.value}</p>
                   <p className={styles.statLabel}>{stat.label}</p>
                 </div>
               );

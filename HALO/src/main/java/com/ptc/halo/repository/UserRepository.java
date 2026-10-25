@@ -9,6 +9,23 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<UserEntity, Long> {
+    // HALO eligibility is the student's profile year matching a subject owned by
+    // the Professor. EXISTS keeps shared/multiple-subject students unique.
+    String PROFESSOR_STUDENT_SCOPE = """
+        u.role = com.ptc.halo.enums.Role.STUDENT
+        and exists (select profile.id from StudentProfileEntity profile
+            where profile.user.id=u.id and exists (select s.id from SubjectEntity s
+                where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel))
+        """;
+
+    @org.springframework.data.jpa.repository.Query("select u from UserEntity u where " + PROFESSOR_STUDENT_SCOPE + " order by u.id")
+    List<UserEntity> findStudentsInProfessorScope(@org.springframework.data.repository.query.Param("professorId") Long professorId);
+
+    @org.springframework.data.jpa.repository.Query("select u from UserEntity u where u.id=:studentId and " + PROFESSOR_STUDENT_SCOPE)
+    Optional<UserEntity> findStudentInProfessorScope(
+            @org.springframework.data.repository.query.Param("studentId") Long studentId,
+            @org.springframework.data.repository.query.Param("professorId") Long professorId);
+
     @org.springframework.data.jpa.repository.Query("select count(p) from StudentProfileEntity p where p.user.id=:id and p.yearLevel is not null and p.studentId is not null and trim(p.studentId)<>'' and p.section is not null and trim(p.section)<>''")
     long countCompleteStudentProfile(@org.springframework.data.repository.query.Param("id") Long id);
     java.util.List<UserEntity> findByEmailIn(java.util.Collection<String> emails);

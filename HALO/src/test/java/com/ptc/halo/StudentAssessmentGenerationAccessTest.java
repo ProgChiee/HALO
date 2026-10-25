@@ -32,9 +32,9 @@ class StudentAssessmentGenerationAccessTest {
 
     void token(String role) {
         when(jwt.isCurrent(eq("test-token"), any())).thenReturn(true);
-        when(jwt.extractUsername("test-token")).thenReturn("student@example.test");
-        when(details.loadUserByUsername("student@example.test")).thenReturn(
-                User.withUsername("student@example.test").password("unused").roles(role).build());
+        when(jwt.extractUserId("test-token")).thenReturn(1L);
+        when(details.loadUserById(1L)).thenReturn(
+                TestIdentity.details(1L, "student@example.test", role));
     }
 
     @Test void studentCannotGenerateForAnyModule() throws Exception {
@@ -85,8 +85,8 @@ class StudentAssessmentGenerationAccessTest {
 
     @Test void businessAuthAndUnexpectedFailuresKeepDistinctStatuses() throws Exception {
         token("STUDENT");
-        var student = new UserEntity();
-        when(users.findByEmail("student@example.test")).thenReturn(Optional.of(student));
+        var student = new UserEntity();student.setId(1L);student.setRole(com.ptc.halo.enums.Role.STUDENT);student.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+        when(users.findById(1L)).thenReturn(Optional.of(student));
         String[] codes = {"INVALID_ANSWER_SET", "ATTEMPT_NOT_FOUND", "ASSESSMENT_ALREADY_SUBMITTED", "ACCESS_DENIED", "AUTHENTICATION_REQUIRED"};
         int[] statuses = {400, 404, 409, 403, 401};
         for (int i = 0; i < codes.length; i++) {
@@ -104,8 +104,8 @@ class StudentAssessmentGenerationAccessTest {
 
     @Test void studentCanReadAndStartExistingAssessment() throws Exception {
         token("STUDENT");
-        var student = new UserEntity();
-        when(users.findByEmail("student@example.test")).thenReturn(Optional.of(student));
+        var student = new UserEntity();student.setId(1L);student.setRole(com.ptc.halo.enums.Role.STUDENT);student.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+        when(users.findById(1L)).thenReturn(Optional.of(student));
         var response = new AssessmentResponse();
         response.setTitle("Existing assessment");
         when(assessments.getAssessment(12L, student)).thenReturn(response);

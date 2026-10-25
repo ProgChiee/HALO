@@ -20,8 +20,8 @@ const click=async label=>act(async()=>button(label).click());
 test('published revision requires confirmation, save and review before publication',async()=>{
  const calls=[];const api={getRevision:async()=>null,startRevision:async()=>{calls.push('start');return initial;},saveRevision:async(id,data,files)=>{calls.push('save');assert.equal(id,41);assert.deepEqual(data.keepFiles,['old']);assert.equal(files.length,0);return{...initial,...data.materials,version:1};},reviewRevision:async(id,version)=>{calls.push('review');assert.equal(version,1);return{...initial,lessonText:'New text',version:2,state:'REVIEWED',generatedKnowledge:'New knowledge'};},publishRevision:async(id,version)=>{calls.push('publish');assert.equal(version,2);}};
  const ui=await mount(api);try{
-  await click('Revise Materials');assert.match(document.body.textContent,/Revise Published Lesson\?/);assert.equal(calls.length,0);await click('Cancel');assert.equal(calls.length,0);
-  await click('Revise Materials');await click('Create Revision');assert.equal(ui.host.querySelector('textarea').value,'Published text');assert.match(ui.host.textContent,/Students are still seeing/);assert.equal(button('Publish Revision').disabled,true);
+  await click('Revise Lesson');assert.match(document.body.textContent,/Revise Published Lesson\?/);assert.equal(calls.length,0);await click('Cancel');assert.equal(calls.length,0);
+  await click('Revise Lesson');await click('Create Revision');assert.equal(ui.host.querySelector('textarea').value,'Published text');assert.match(ui.host.textContent,/Students are still seeing/);assert.equal(button('Publish Revision').disabled,true);
   await act(async()=>{const input=ui.host.querySelector('textarea');Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(input,'New text');input.dispatchEvent(new Event('input',{bubbles:true}));});
   assert.equal(button('Review Changes').disabled,true);await click('Save Draft');await click('Review Changes');assert.match(ui.host.textContent,/New knowledge/);
   await click('Publish Revision');await act(async()=>[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Publish Revision').click());assert.equal(ui.published(),1);assert.deepEqual(calls,['start','save','review','publish']);
@@ -31,6 +31,6 @@ test('preview has no revision writes and failed review leaves draft editable',as
  let called=0;const hidden=await mount({getRevision:async()=>{called++;}},true);try{assert.equal(hidden.host.textContent,'');assert.equal(called,0);}finally{await hidden.close();}
  const ui=await mount({getRevision:async()=>initial,reviewRevision:async()=>{throw{response:{status:422,data:{code:'MATERIAL_NOT_RELEVANT'}}};},discardRevision:async()=>{called++;}});try{
   await click('Review Changes');assert.match(ui.host.textContent,/does not appear to match/);assert.equal(button('Publish Revision').disabled,true);assert.equal(ui.host.querySelector('textarea').value,'Published text');
-  await click('Discard Revision');await act(async()=>[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Discard Revision').click());assert.equal(called,1);assert.ok(button('Revise Materials'));
+  await click('Discard Revision');await act(async()=>[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Discard Revision').click());assert.equal(called,1);assert.ok(button('Revise Lesson'));
  }finally{await ui.close();}
 });

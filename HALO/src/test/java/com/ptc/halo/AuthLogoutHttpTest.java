@@ -22,8 +22,8 @@ class AuthLogoutHttpTest {
  @Test void logoutRequiresAuthentication() throws Exception {mvc.perform(post("/api/auth/logout")).andExpect(status().isUnauthorized());verifyNoInteractions(auth);}
  @Test void allRealRolesReportTheAuthenticatedActor() throws Exception {
   for(String role:java.util.List.of("ADMIN","SUPER_ADMIN","PROFESSOR","STUDENT")){
-   when(jwt.extractUsername("test-token")).thenReturn("actor@example.test");when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
-   when(details.loadUserByUsername("actor@example.test")).thenReturn(User.withUsername("actor@example.test").password("unused").roles(role).build());
+   when(jwt.extractUserId("test-token")).thenReturn(1L);when(jwt.isCurrent(eq("test-token"),any())).thenReturn(true);
+   when(details.loadUserById(1L)).thenReturn(User.withUsername("actor@example.test").password("unused").roles(role).build());
    mvc.perform(post("/api/auth/logout").header("Authorization","Bearer test-token").header("X-Acting-Session","ignored-target-context")).andExpect(status().isNoContent());
   }
   verify(auth,times(4)).logout(argThat(a->a.getName().equals("actor@example.test")),eq("Bearer test-token"));

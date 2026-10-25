@@ -9,6 +9,11 @@ import { apiErrorMessage } from '../src/utils/apiErrors.js';
 
 const secret = 'SECRET_TOKEN_PASSWORD_PERSONAL_DATA';
 const failure = { message: secret, config: { headers: { Authorization: secret }, data: { password: secret } }, response: { status: 403, data: { code: 'ACCESS_DENIED', message: secret, user: secret } } };
+test('invalid AI quiz uses an actionable fixed message without provider details', () => {
+  const message = professorErrorMessage({ response: { status: 502, data: { code: 'QUIZ_GENERATION_INVALID', message: secret } } });
+  assert.equal(message, 'The AI returned an incomplete or invalid quiz. Please retry quiz generation or lesson approval. No quiz was saved.');
+  assert.ok(!message.includes(secret));
+});
 test('diagnostics only contain fixed labels, numeric statuses and allowlisted codes', () => {
   const original = console.error, calls = [];
   console.error = (...args) => calls.push(args);

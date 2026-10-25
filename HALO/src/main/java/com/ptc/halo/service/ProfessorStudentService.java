@@ -46,7 +46,7 @@ public class ProfessorStudentService {
         requireProfessor(professor);
 
         List<UserEntity> students =
-                userRepository.findByRole(Role.STUDENT);
+                userRepository.findStudentsInProfessorScope(professor.getId());
 
         List<ProfessorStudentResponse> responses =
                 new ArrayList<>();
@@ -109,7 +109,7 @@ public class ProfessorStudentService {
     getStudentProgress(Long userId, UserEntity professor) {
         requireProfessor(professor);
 
-        UserEntity student = requireStudent(userId);
+        UserEntity student = requireStudent(userId, professor);
 
         StudentProfileEntity profile =
                 studentProfileRepository
@@ -177,7 +177,7 @@ public class ProfessorStudentService {
     getStudentSubjects(Long userId, UserEntity professor) {
         requireProfessor(professor);
 
-        UserEntity student = requireStudent(userId);
+        UserEntity student = requireStudent(userId, professor);
 
         return studentSubjectService
                 .getProfessorStudentSubjects(student, professor);
@@ -186,7 +186,7 @@ public class ProfessorStudentService {
     getStudentAssessmentHistory(Long userId, UserEntity professor) {
         requireProfessor(professor);
 
-        UserEntity student = requireStudent(userId);
+        UserEntity student = requireStudent(userId, professor);
 
 
         List<AssessmentAttemptEntity> attempts =
@@ -264,7 +264,7 @@ public class ProfessorStudentService {
     getStudentBadges(Long userId, UserEntity professor) {
         requireProfessor(professor);
 
-        UserEntity student = requireStudent(userId);
+        UserEntity student = requireStudent(userId, professor);
 
 
         List<StudentBadgeEntity> badges =
@@ -309,9 +309,11 @@ public class ProfessorStudentService {
 
         return responses;
     }
-    private UserEntity requireStudent(Long id) {
+    private UserEntity requireStudent(Long id, UserEntity professor) {
         if (id == null || id <= 0) throw notFound();
-        return userRepository.findById(id).filter(user -> user.getRole() == Role.STUDENT)
+        // Authorize before returning identity, badges, or any academic history.
+        // Use the same safe response for absent and out-of-scope accounts.
+        return userRepository.findStudentInProfessorScope(id, professor.getId())
                 .orElseThrow(this::notFound);
     }
     private ResponseStatusException notFound() {

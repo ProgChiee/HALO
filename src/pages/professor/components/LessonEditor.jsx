@@ -1,5 +1,8 @@
 import LessonRevision from './LessonRevision';
 import QuizRevision from './QuizRevision';
+import RevisionHistory from './RevisionHistory';
+import LessonWorkspaceTabs from './LessonWorkspaceTabs';
+import { GeneratedLessonSections, PublishedMaterials } from './LessonContent';
 import { youtubeVideoId } from '../../../utils/youtubeVideo';
 import { VideoPreview } from '../../../components/shared/VideoLearning';
 import { professorErrorMessage } from '../../../utils/professorErrors';
@@ -306,10 +309,11 @@ function RouteLessonEditor({ subjectId, weekId }) {
             Back
           </button>
           <div>
-            <p className={styles.eyebrow}>Subject #{subjectId} · Week #{weekId}</p>
-            <h1 className={styles.title}>Lesson Materials</h1>
+            <p className={styles.eyebrow}>Subject #{module?.subjectId ?? subjectId} · {module?.weekNumber != null ? `Week ${module.weekNumber}` : `Week record #${weekId}`}</p>
+            <h1 className={styles.title}>Lesson Management</h1>
           </div>
         </div>
+        {!loading && !loadError && <span className={`${styles.statusBadge} ${isPublished ? styles.statusApproved : styles.statusPending}`}>{isPublished ? 'Published' : lessonStatus === 'DECLINED' ? 'Declined' : 'Draft'}</span>}
       </header>
 
       <main className={styles.main}>
@@ -321,16 +325,18 @@ function RouteLessonEditor({ subjectId, weekId }) {
           </div>
         )}
         {!loading && !loadError && <>
-        <p role="status">
+        <p role="status" className={styles.workspaceNotice}>
           {workflow.preview ? "Read-only Professor Preview. Lesson materials and generated content cannot be changed." : isPublished
             ? 'Published: this lesson is available to eligible students. Published materials are read-only.'
             : 'Draft: Save Materials, Generate Lesson with AI, Review, then Approve & Publish.'}
           {hasUnsavedChanges && module ? ' Save your changes before generating or publishing.' : ''}
         </p>
-        {isPublished && !workflow.preview && <QuizRevision key={'quiz-' + module.id + '-' + reloadKey} moduleId={module.id} />}
+        <LessonWorkspaceTabs
+          assessment={isPublished && !workflow.preview ? <QuizRevision key={'quiz-' + module.id + '-' + reloadKey} moduleId={module.id} /> : <section className={styles.panelCard}><h2 className={styles.panelTitle}>Assessment</h2><p className={styles.panelSubtitle}>{workflow.preview ? 'Assessment management is not available in read-only Professor Preview.' : 'Publish the lesson before managing its assessment.'}</p></section>}
+          history={module && !workflow.preview ? <section className={styles.panelCard}><RevisionHistory key={module.id + '-' + reloadKey} moduleId={module.id} embedded /></section> : <section className={styles.panelCard}><h2 className={styles.panelTitle}>Revision History</h2><p className={styles.panelSubtitle}>{workflow.preview ? 'Revision history is not available in read-only Professor Preview.' : 'Published revision snapshots will appear here when available.'}</p></section>}>
         {isPublished && !workflow.preview && <LessonRevision key={module.id} moduleId={module.id} onPublished={() => { setLoading(true); setReloadKey(key => key + 1); }} />}
         {/* --- Step 1: Raw materials --- */}
-        <div className={styles.panelCard}>
+        {isPublished ? <PublishedMaterials module={module} /> : <div className={styles.panelCard}>
           <div className={styles.panelHeader}>
             <span className={styles.panelIcon}><FileText size={16} /></span>
             <div>
@@ -436,7 +442,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
               <Button onClick={handleSaveMaterials} isLoading={isSaving} disabled={workflow.preview || isBusy || (!!module && !hasUnsavedChanges)}>Save Materials</Button>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* --- Step 2: Generate + review --- */}
         {module && (
@@ -445,7 +451,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
               <span className={styles.panelIcon}><Sparkles size={16} /></span>
               <div>
                 <h2 className={styles.panelTitle}>AI-Generated Lesson</h2>
-                <p className={styles.panelSubtitle}>Review before approving — this is what students will see.</p>
+                <p className={styles.panelSubtitle}>{isPublished ? 'Published content available to eligible Students. Expand a section to read it.' : 'Review before approving — this is what students will see.'}</p>
               </div>
             </div>
 
@@ -459,7 +465,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
             )}
 
             {hasGeneratedContent && (
-              <div className={styles.aiReviewCard}>
+              <div>
                 <div className={styles.aiReviewHeader}>
                   <span className={styles.aiReviewTitle}><Sparkles size={14} /> Generated Content</span>
                   <span
@@ -473,22 +479,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
                   </span>
                 </div>
 
-                <div className={styles.field}>
-                  <label className={styles.label}>Objectives</label>
-                  <p className={styles.aiGeneratedText}>{module.generatedObjectives}</p>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Knowledge</label>
-                  <p className={styles.aiGeneratedText}>{module.generatedKnowledge}</p>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Examples</label>
-                  <p className={styles.aiGeneratedText}>{module.generatedExamples}</p>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Summary</label>
-                  <p className={styles.aiGeneratedText}>{module.generatedSummary}</p>
-                </div>
+                <GeneratedLessonSections lesson={module} />
 
                 {lessonStatus !== 'APPROVED' && (
                   <div className={styles.aiReviewActions}>
@@ -510,6 +501,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
             )}
           </div>
         )}
+        </LessonWorkspaceTabs>
         </>}
       </main>
     </PageShell>

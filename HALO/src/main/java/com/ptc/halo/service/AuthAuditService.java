@@ -17,13 +17,19 @@ public class AuthAuditService {
  private static final org.slf4j.Logger logger=org.slf4j.LoggerFactory.getLogger(AuthAuditService.class);
  public AuthAuditService(UserRepository users,ActivityLogService logs,PlatformTransactionManager manager){this.users=users;this.logs=logs;tx=new TransactionTemplate(manager);tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);tx.setTimeout(3);}
  public void record(AuthEvent event,String email){record(event,email,null);}
- private void record(AuthEvent event,String email,String key){
+ public void recordUser(AuthEvent event,Long userId){record(event,null,null,userId);}
+ private void record(AuthEvent event,String email,String key){record(event,email,key,null);}
+ private void record(AuthEvent event,String email,String key,Long userId){
   String identifier=safeIdentifier(email);
-  Runnable write=()->{try{tx.executeWithoutResult(status->{var user=identifier==null?null:users.findByEmail(identifier).orElse(null);logs.createAuthLog(user,event,identifier,key);});}
+  Runnable write=()->{try{tx.executeWithoutResult(status->{var user=userId!=null?users.findById(userId).orElse(null):identifier==null?null:users.findByEmail(identifier).orElse(null);logs.createAuthLog(user,event,userId!=null&&user!=null?safeIdentifier(user.getEmail()):identifier,key);});}
    catch(RuntimeException failure){logger.warn("Authentication audit unavailable; event={} exceptionType={}",event,failure.getClass().getSimpleName());}};
   if(TransactionSynchronizationManager.isActualTransactionActive()&&TransactionSynchronizationManager.isSynchronizationActive())
    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){@Override public void afterCommit(){write.run();}});
   else write.run();
+ }
+ public void logoutUser(Long userId,String bearer){
+  try{String key=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bearer.getBytes(StandardCharsets.UTF_8)));record(AuthEvent.LOGOUT,null,key,userId);}
+  catch(java.security.NoSuchAlgorithmException error){logger.warn("Authentication audit unavailable; event=LOGOUT");}
  }
  public void logout(String email,String bearer){
   // Only a one-way deduplication fingerprint is stored; never the bearer token itself.
