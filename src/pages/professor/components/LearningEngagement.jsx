@@ -3,6 +3,7 @@ import { useProfessorWorkflow } from '../../../context/professor/useProfessorWor
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import styles from '../styles/StudentProgress.module.css';
+import AssessmentAttemptHistory from './AssessmentAttemptHistory';
 
 export default function LearningEngagement({ view = 'CURRENT' }) {
   const [page, setPage] = useState(0);
@@ -11,6 +12,7 @@ export default function LearningEngagement({ view = 'CURRENT' }) {
 
 function ModuleActivity({ student, onClose, view, panelId }) {
   const [page, setPage] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const heading = useRef(null);
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -21,6 +23,8 @@ function ModuleActivity({ student, onClose, view, panelId }) {
     <button className={styles.compactButton} onClick={onClose}>Close module activity</button></div>
     <p className={styles.engagementHelp}>Lesson Review: counted when a Student returns to a lesson after 30 minutes.<br />Assessment Attempt: counted when a real assessment is started.</p>
     <ModuleActivityPage view={view} key={page} studentId={student.userId} page={page} setPage={setPage} />
+    <div className={styles.moduleHeader}><h4>Assessment attempt history</h4><button className={styles.compactButton} aria-expanded={historyOpen} aria-controls={`${panelId}-attempts`} onClick={() => setHistoryOpen(!historyOpen)}>{historyOpen ? 'Hide assessment history' : 'View assessment history'}</button></div>
+    {historyOpen && <section id={`${panelId}-attempts`} aria-label="Assessment attempt history"><AssessmentAttemptHistory studentId={student.userId} /></section>}
   </section>;
 }
 

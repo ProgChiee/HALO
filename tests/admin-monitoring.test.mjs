@@ -43,11 +43,11 @@ test('Admin monitoring pages preserve global metrics, server filters, retries, e
   await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(input,'missing');input.dispatchEvent(new Event('input',{bubbles:true}));});
   assert.equal(calls.at(-1).params.search,'missing');assert.equal(calls.at(-1).params.page,0);
   assert.match(host.textContent,/No activity matches/);
-  await click('Professor Activity');assert.equal(button('Professor Activity').getAttribute('aria-pressed'),'true');assert.equal(button('Activity Log').getAttribute('aria-pressed'),'false');assert.match(host.textContent,/50Active Professors/);assert.match(host.textContent,/100Total module activities/);
+  await click('Professor Activity');assert.equal(button('Professor Activity').getAttribute('aria-pressed'),'true');assert.equal(button('Activity Log').getAttribute('aria-pressed'),'false');assert.match(host.textContent,/50Active Professors/);assert.match(host.textContent,/100Total module activities/);assert.equal([...host.querySelectorAll('p')].filter(p=>/^Active professors$/i.test(p.textContent)).length,1);
   const signal=calls.at(-1).signal;await click('Next');assert.equal(calls.at(-1).params.page,1);assert.equal(signal.aborted,true);
   fail=true;await click('Previous');assert.match(host.textContent,/Couldn't load professor activity/);
   fail=false;await click('Retry');assert.match(host.textContent,/Active Professors/);
-  await click('Student Performance');assert.match(host.textContent,/87%Average latest score/);assert.match(host.textContent,/90Total passed assessments/);
+  await click('Student Performance');assert.match(host.textContent,/87%Average latest score/);assert.match(host.textContent,/90Passed assessment attempts/);
   assert.match(host.textContent,/No monitoring records/);
  }finally{await act(async()=>root.unmount());host.remove();}
  assert.equal(calls.at(-1).signal.aborted,true);
@@ -94,6 +94,25 @@ test('shared incomplete profile card renders safe academic details and hides whe
    if(role==='student') { assert.match(host.textContent,/YearNot set/);assert.match(host.textContent,/SectionNot set/); }
    await act(async()=>root.render(React.createElement(Card,{role,accounts:[]})));
    assert.equal(host.textContent,'');
+  }
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+test('average score distinguishes absent scores from genuine zero after loading and remount',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ let summary={},resolve;
+ api.defaults.adapter=config=>config.url.includes('students')?new Promise(done=>{resolve=()=>done({config,status:200,headers:{},data:{number:0,totalPages:1,totalElements:15,content:[],highlights:[],summary}});}):Promise.resolve({config,status:200,headers:{},data:{number:0,totalPages:0,totalElements:0,content:[]}});
+ const click=async label=>act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent.trim()===label).click());
+ const render=()=>root.render(React.createElement(MemoryRouter,{},React.createElement(AuthContext.Provider,{value:{role:'admin',user:{name:'Admin'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Monitoring)))));
+ try {
+  await act(async()=>render());
+  for(const [next,expected] of [[{scored:0,averageScore:null},'No scored attempts'],[{},'No scored attempts'],[{scored:1,averageScore:0},'0%'],[{scored:3,averageScore:63.3333},'63%'],[{scored:0,averageScore:null},'No scored attempts']]) {
+   summary={...next,passedAssessments:4};await click('Student Performance');
+   assert.match(host.textContent,/Loading/);await act(async()=>resolve());
+   const label=[...host.querySelectorAll('p')].find(p=>p.textContent==='Average latest score');
+   assert.equal(label.previousElementSibling.textContent,expected);
+   assert.match(host.textContent,/4Passed assessment attempts/);
+   await click('Activity Log');
   }
  }finally{await act(async()=>root.unmount());host.remove();}
 });

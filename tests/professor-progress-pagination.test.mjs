@@ -124,3 +124,35 @@ test('current and former filters reset pages and share population with read-only
   assert.equal(calls.at(-1).params.view,'CURRENT');
  }finally{await ui.close();api.defaults.adapter=original;}
 });
+
+test('read-only assessment history shows original versions, scores, dates, pagination and retry states', async()=>{
+ const adapter=api.defaults.adapter,calls=[];let mode='loading',resolveHistory;
+ const results=Array.from({length:11},(_,i)=>({attemptId:i+1,assessmentId:i===0?24:25,quizVersion:i===0?1:2,moduleId:43,subjectName:'Owned subject',weekNumber:2,assessmentTitle:'Quiz',score:i===0?0:i===1?null:90,passed:i===0?false:i===1?null:true,startedAt:'2026-10-26T09:00:00',submittedAt:'2026-10-26T09:10:00'}));
+ api.defaults.adapter=config=>{
+  calls.push(config);
+  const response=data=>({status:200,headers:{},config,data});
+  if(config.url.endsWith('/assessments')) {
+   if(mode==='loading') return new Promise(resolve=>{resolveHistory=()=>resolve(response(results));});
+   if(mode==='error') return Promise.reject({response:{status:403}});
+   return Promise.resolve(response(mode==='empty'?[]:results));
+  }
+  return Promise.resolve(response({...page(0,config.url.endsWith('/engagement')?[{userId:8,name:'Student A'}]:[]),last:true}));
+ };
+ const ui=await mount('LearningEngagement');
+ const click=async label=>act(async()=>[...ui.host.querySelectorAll('button')].find(b=>b.textContent===label).click());
+ try {
+  await click('View module activity');await click('View assessment history');
+  assert.match(ui.host.textContent,/Loading assessment history/);
+  await act(async()=>resolveHistory());
+  assert.match(ui.host.textContent,/Version 1/);assert.match(ui.host.textContent,/Version 2/);
+  assert.match(ui.host.textContent,/Assessment #24/);assert.match(ui.host.textContent,/0%/);
+  assert.match(ui.host.textContent,/Score unavailable/);assert.match(ui.host.textContent,/Not passed/);
+  assert.match(ui.host.textContent,/2026-10-26 09:10:00/);
+  await click('Next attempts');assert.match(ui.host.textContent,/Page 2 of 2/);
+  await click('Hide assessment history');mode='error';await click('View assessment history');
+  assert.ok(ui.host.querySelector('[role="alert"]'));mode='empty';await click('Retry assessment history');
+  assert.match(ui.host.textContent,/No completed assessment attempts/);
+  assert.ok(calls.every(c=>c.method==='get'));
+  assert.ok(calls.some(c=>c.url==='/professor/students/8/assessments'));
+ } finally {await ui.close();api.defaults.adapter=adapter;}
+});

@@ -210,6 +210,11 @@ public class ProfessorStudentService {
                     attempt.getId()
             );
 
+            // Read the assessment actually taken, never the module's current quiz.
+            response.setAssessmentId(attempt.getAssessment().getId());
+            response.setQuizVersion(attempt.getAssessment().getQuizVersion());
+            response.setModuleId(attempt.getAssessment().getModule().getId());
+
 
             response.setAssessmentTitle(
                     attempt.getAssessment()

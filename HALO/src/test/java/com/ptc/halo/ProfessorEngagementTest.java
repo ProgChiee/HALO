@@ -110,6 +110,39 @@ class ProfessorEngagementTest {
    assertEquals(days>=8?"Consistent":days>=4?"Moderate":"Low Activity",value.getMonthlyConsistency());
   }
  }
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.CsvSource({
+  "2026-05-31T15:59:59Z, 1, 1, 2",
+  "2026-05-31T16:00:00Z, 1, 1, 3",
+  "2026-06-01T16:00:00Z, 2, 2, 8"
+ })
+ void manilaBoundariesIgnoreServerTimezone(String instant,long week,long month,long reviews) {
+  // Sunday May 31 -> Monday June 1 crosses day, week and month together.
+  db.update("insert into lesson_study_days values(10,1,'2026-05-31',2),(10,1,'2026-06-01',3),(10,1,'2026-06-02',5)");
+  db.update("insert into mentor_sessions values(1,10,1),(2,10,1),(3,10,1)");
+  message(1,"STUDENT","Sunday","2026-05-31 23:59:59");
+  message(2,"STUDENT","Monday","2026-06-01 00:00:00");
+  message(3,"STUDENT","Tuesday","2026-06-02 00:00:00");
+  var original=java.util.TimeZone.getDefault();
+  try {
+   for(String zone:java.util.List.of("UTC","Asia/Manila")) {
+    java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone(zone));
+    service=new ProfessorEngagementService(new NamedParameterJdbcTemplate(db),
+      java.time.Clock.fixed(java.time.Instant.parse(instant),java.time.ZoneId.systemDefault()));
+    var result=service.get(professor,0,20);
+    assertEquals("Asia/Manila",result.timezone());assertEquals("MONDAY",result.weekStartsOn());
+    var row=result.content().get(0);
+    assertEquals(week,row.activeDaysWeek());assertEquals(month,row.activeDaysMonth());
+    assertEquals(week,row.mentorSessionsWeek());assertEquals(month,row.mentorSessionsMonth());
+    var modules=(java.util.List<ProfessorEngagementService.ModuleEngagement>)service.modules(professor,10L,0,20).get("content");
+    assertEquals(reviews,modules.get(0).reviewsMonth());assertEquals(10,modules.get(0).reviewCount());
+    db.update("update user_entity set status='ARCHIVED' where id=10");
+    assertEquals(row,service.get(professor,0,20,com.ptc.halo.enums.ProfessorStudentView.FORMER).content().get(0));
+    db.update("update user_entity set status='ACTIVE' where id=10");
+   }
+  } finally {java.util.TimeZone.setDefault(original);}
+  assertEquals(3,db.queryForObject("select count(*) from lesson_study_days",Integer.class));
+ }
  @Test void paginationAndRoleGuard(){
   db.update("update student_profile_entity set year_level='FIRST_YEAR' where user_id=11");
   attempt(10,1,"2026-10-06 00:00:00",null);attempt(11,1,"2026-10-06 00:00:00",null);

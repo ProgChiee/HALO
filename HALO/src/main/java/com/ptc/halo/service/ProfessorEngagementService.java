@@ -18,7 +18,10 @@ import java.util.*;
 @Transactional(readOnly=true)
 public class ProfessorEngagementService {
     private final NamedParameterJdbcTemplate jdbc;
-    public ProfessorEngagementService(NamedParameterJdbcTemplate jdbc) { this.jdbc=jdbc; }
+    private final Clock clock;
+    @org.springframework.beans.factory.annotation.Autowired
+    public ProfessorEngagementService(NamedParameterJdbcTemplate jdbc) { this(jdbc, Clock.systemUTC()); }
+    public ProfessorEngagementService(NamedParameterJdbcTemplate jdbc, Clock clock) { this.jdbc=jdbc; this.clock=clock; }
     private static final String SCOPE = """
         with scoped_modules as (
           select m.id,s.year_level from ai_learning_modules m join weeks w on w.id=m.week_id
@@ -43,7 +46,8 @@ public class ProfessorEngagementService {
         if(page<0 || size<1)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"INVALID_PAGINATION");
         size=Math.min(size,100);
         var args=new HashMap<String,Object>();args.put("professor",professor.getId());args.put("student",studentId);args.put("statuses",view.statusNames());args.put("limit",size);args.put("offset",(long)page*size);
-        args.put("month",LocalDate.now().withDayOfMonth(1));args.put("until",LocalDate.now().plusDays(1));
+        var today=StudyActivityTime.today(clock);
+        args.put("month",today.withDayOfMonth(1));args.put("until",today.plusDays(1));
         long eligible=jdbc.queryForObject(SCOPE+"select count(*) from scoped_students s join user_entity u on u.id=s.student_id where u.role='STUDENT' and u.status in (:statuses) and u.id=:student",args,Long.class);
         if(eligible==0)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"RESOURCE_NOT_FOUND");
         String from="""
@@ -61,9 +65,9 @@ public class ProfessorEngagementService {
         return Map.of("content",content,"number",page,"size",size,"totalElements",total,"totalPages",(total+size-1)/size,"first",page==0,"last",((long)page+1)*size>=total);
     }
     public record Page(List<Engagement> content,int number,int size,long totalElements,int totalPages,boolean first,boolean last,String timezone,String weekStartsOn) {}
-    public Page get(UserEntity professor,int page,int size) { return get(professor,page,size,LocalDate.now()); }
-    // Same server-local calendar used by HALO's LocalDateTime activity timestamps; ISO Monday weeks.
-    public Page get(UserEntity professor,int page,int size,ProfessorStudentView view) { return get(professor,page,size,LocalDate.now(),view); }
+    public Page get(UserEntity professor,int page,int size) { return get(professor,page,size,StudyActivityTime.today(clock)); }
+    // Persisted study dates/timestamps use Manila wall time; ISO Monday weeks.
+    public Page get(UserEntity professor,int page,int size,ProfessorStudentView view) { return get(professor,page,size,StudyActivityTime.today(clock),view); }
     public Page get(UserEntity professor,int page,int size,LocalDate today) { return get(professor,page,size,today,ProfessorStudentView.CURRENT); }
     public Page get(UserEntity professor,int page,int size,LocalDate today,ProfessorStudentView view) {
         if(professor==null || professor.getId()==null || professor.getRole()!=Role.PROFESSOR) throw new AccessDeniedException("Professor required");
@@ -103,6 +107,6 @@ public class ProfessorEngagementService {
         }
         var result=students.stream().map(s->{var m=metrics.getOrDefault(s.userId(),s);return new Engagement(s.userId(),s.name(),m.activeDaysWeek(),m.activeDaysMonth(),m.mentorSessionsWeek(),m.mentorSessionsMonth());}).toList();
         int pages=(int)((total+size-1)/size);
-        return new Page(result,page,size,total,pages,page==0,(long)(page+1)*size>=total,ZoneId.systemDefault().getId(),"MONDAY");
+        return new Page(result,page,size,total,pages,page==0,(long)(page+1)*size>=total,StudyActivityTime.ZONE.getId(),"MONDAY");
     }
 }

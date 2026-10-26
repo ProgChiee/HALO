@@ -5,6 +5,16 @@ import java.time.LocalDateTime;
 public class ProfessorStudentAssessmentResponse {
 
     private Long attemptId;
+    private Long assessmentId;
+    private Integer quizVersion;
+    private Long moduleId;
+
+    public Long getAssessmentId() { return assessmentId; }
+    public void setAssessmentId(Long assessmentId) { this.assessmentId = assessmentId; }
+    public Integer getQuizVersion() { return quizVersion; }
+    public void setQuizVersion(Integer quizVersion) { this.quizVersion = quizVersion; }
+    public Long getModuleId() { return moduleId; }
+    public void setModuleId(Long moduleId) { this.moduleId = moduleId; }
 
     private String subjectName;
 

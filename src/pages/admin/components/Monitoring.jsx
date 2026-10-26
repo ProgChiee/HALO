@@ -2,7 +2,7 @@ import IncompleteProfiles from './IncompleteProfiles';
 import { accountDisplay, accountTick } from '../../../utils/adminAccountDisplay';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState, useMemo, useCallback } from 'react';
-import { Activity, Search, Bot, MessageSquare, Users, TrendingUp, GraduationCap, AlertTriangle } from 'lucide-react';
+import { Activity, Search, MessageSquare, Users, TrendingUp, GraduationCap, AlertTriangle } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -271,7 +271,6 @@ function AiUsageTab() {
     );
   }
 
-  const activeCount = data.summary.active ?? 0;
   const totalActivities = data.summary.moduleActivities ?? 0;
   const avgActivities = data.totalElements > 0 ? Math.round(totalActivities / data.totalElements) : 0;
 
@@ -282,11 +281,6 @@ function AiUsageTab() {
           <div className={styles.statIcon}><Users size={18} /></div>
           <p className={styles.statValue}>{data.totalElements}</p>
           <p className={styles.statLabel}>Active Professors</p>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}><Bot size={18} /></div>
-          <p className={styles.statValue}>{activeCount}</p>
-          <p className={styles.statLabel}>Active professors</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><MessageSquare size={18} /></div>
@@ -415,7 +409,8 @@ function QuizPerformanceTab() {
     return CHART_COLORS.bar;
   }
 
-  const avgScoreOverall = Math.round(data.summary.averageScore ?? 0);
+  const avgScoreOverall = data.summary.scored > 0 && data.summary.averageScore != null
+    ? `${Math.round(data.summary.averageScore)}%` : 'No scored attempts';
   const totalPassedAssessments = data.summary.passedAssessments ?? 0;
 
   return (
@@ -423,13 +418,13 @@ function QuizPerformanceTab() {
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><GraduationCap size={18} /></div>
-          <p className={styles.statValue}>{avgScoreOverall}%</p>
+          <p className={styles.statValue}>{avgScoreOverall}</p>
           <p className={styles.statLabel}>Average latest score</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><TrendingUp size={18} /></div>
           <p className={styles.statValue}>{totalPassedAssessments}</p>
-          <p className={styles.statLabel}>Total passed assessments</p>
+          <p className={styles.statLabel}>Passed assessment attempts</p>
         </div>
         <div className={styles.statCard}>
           <div className={styles.statIcon}><Users size={18} /></div>
