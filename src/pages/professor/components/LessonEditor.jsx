@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import LessonRevision from './LessonRevision';
 import QuizRevision from './QuizRevision';
 import RevisionHistory from './RevisionHistory';
@@ -302,7 +303,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
 
   return (
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-      <header className={styles.topHeader}>
+      <Topbar>
         <div className={styles.topHeaderLeft}>
           <button className={styles.backBtn} onClick={() => navigate(workflow.basePath + '/subjects')}>
             <ArrowLeft size={16} />
@@ -314,7 +315,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
           </div>
         </div>
         {!loading && !loadError && <span className={`${styles.statusBadge} ${isPublished ? styles.statusApproved : styles.statusPending}`}>{isPublished ? 'Published' : lessonStatus === 'DECLINED' ? 'Declined' : 'Draft'}</span>}
-      </header>
+      </Topbar>
 
       <main className={styles.main}>
         {loading && <p role="status">Loading saved lesson...</p>}

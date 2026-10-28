@@ -1,212 +1,111 @@
+﻿import Topbar from '../../../components/shared/Topbar';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, ChevronDown, ChevronUp, CheckCircle2, Play, Lock, BookOpen } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronDown, ChevronUp, CheckCircle2, Play, Lock } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
 import { useSubjectWeeks } from '../../../hooks/useSubjectWeeks';
 import styles from '../styles/Subjects.module.css';
+import { yearLabels } from '../../../utils/registration';
 import AcademicProfileNotice from './AcademicProfileNotice';
 
-// ⚠️ Redesigned for the real backend
-// (StudentLearningProgressionController). Structural differences from the
-// old mock version:
-//
-// - No "topics" layer — the backend goes straight from Subject → Weeks.
-//   The old Subject → Topics → Weeks nesting doesn't exist here.
-// - getSubjectsData() gives the subject list with a completedWeeks/totalWeeks
-//   count; the per-week list (with unlocked/completed status) is fetched
-//   separately per subject via getSubjectWeeks(subjectId) — lazily, only
-//   when a subject is expanded, since fetching every subject's weeks
-//   upfront isn't necessary.
-// - No overall "topics done" pill or "current lesson" shortcut exists yet
-//   (see studentService.js notes), so those were removed from the header.
-
+// Keep old subject-specific bookmarks; the plain catalog now belongs to My Subjects.
 export default function Subjects() {
+  const workflow = useStudentWorkflow();
+  const [params] = useSearchParams();
+  const requestedSubject = params.get('subject');
+  if (requestedSubject === null) return <Navigate to={`${workflow.basePath}/subjects/my`} replace />;
+  return <SubjectLearning key={`${workflow.identity ?? workflow.basePath}:${requestedSubject}`} requestedSubject={requestedSubject} />;
+}
+
+function SubjectLearning({ requestedSubject }) {
   const workflow = useStudentWorkflow();
   const { getSubjectsData, getSubjectWeeks } = workflow.api;
   const navigate = useNavigate();
-
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [reload, setReload] = useState(0);
-  const [subjects, setSubjects] = useState([]);
-
-  const [activeYear, setActiveYear] = useState('All Years');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedSubjectId, setExpandedSubjectId] = useState(null);
+  const [subject, setSubject] = useState(null);
+  const [expanded, setExpanded] = useState(true);
   const { weeksBySubject, weeksLoading, weekErrors, loadWeeks } = useSubjectWeeks(getSubjectWeeks);
 
   useEffect(() => {
-    let isMounted = true;
-
+    const controller = new AbortController();
     async function loadData() {
       setIsLoading(true);
       setLoadError(false);
       try {
-        const data = await getSubjectsData();
-        if (isMounted) setSubjects(data);
-      } catch (err) {
-        logStudentError('load-subjects', err);
-        if (isMounted) setLoadError(err?.response?.data?.code === 'PROFILE_INCOMPLETE' ? 'PROFILE_INCOMPLETE' : true);
+        const data = await getSubjectsData({ signal: controller.signal });
+        if (controller.signal.aborted) return;
+        const selected = data.find(item => String(item.subjectId) === requestedSubject) ?? null;
+        setSubject(selected);
+        if (selected?.enrolled === true) loadWeeks(selected.subjectId);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          logStudentError('load-subjects', error);
+          setLoadError(error?.response?.data?.code === 'PROFILE_INCOMPLETE' ? 'PROFILE_INCOMPLETE' : true);
+        }
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     }
-
     loadData();
-    return () => { isMounted = false; };
-  }, [getSubjectsData, reload]);
+    return () => controller.abort();
+  }, [getSubjectsData, reload, requestedSubject, loadWeeks]);
 
-  async function toggleSubject(subjectId) {
-    if (expandedSubjectId === subjectId) {
-      setExpandedSubjectId(null);
-      return;
-    }
-
-    setExpandedSubjectId(subjectId);
-    if (!weeksBySubject[subjectId]) await loadWeeks(subjectId);
+  async function toggleSubject() {
+    setExpanded(value => !value);
+    if (!expanded && !weeksBySubject[subject.subjectId]) await loadWeeks(subject.subjectId);
   }
 
-  const yearOptions = useMemo(() => {
-    const years = Array.from(new Set(subjects.map((s) => s.yearLevel))).sort();
-    return ['All Years', ...years];
-  }, [subjects]);
+  const weeks = subject ? weeksBySubject[subject.subjectId] : null;
+  const isFullyCompleted = subject?.totalWeeks > 0 && subject.completedWeeks === subject.totalWeeks;
 
-  const filteredSubjects = useMemo(() => {
-    return subjects
-      .filter((s) => activeYear === 'All Years' || s.yearLevel === activeYear)
-      .filter((s) => s.subjectName.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [subjects, activeYear, searchQuery]);
-
-  if (isLoading) {
-    return (
-      <StudentPageShell>
-        <p className={styles.loadingText}>Loading subjects...</p>
-      </StudentPageShell>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <StudentPageShell>
-        {loadError === 'PROFILE_INCOMPLETE'
-          ? <main className={styles.main}><AcademicProfileNotice onRefresh={() => setReload(value => value + 1)} /></main>
-          : <p className={styles.loadingText}>Couldn't load subjects. Please refresh and try again.</p>}
-      </StudentPageShell>
-    );
-  }
-
-  return (
-    <StudentPageShell>
-      <main className={styles.main}>
-        <div className={styles.headerRow}>
-          <div>
-            <h1 className={styles.title}>Subjects</h1>
-            <p className={styles.subtitle}>Select a subject to see its weekly lessons.</p>
-          </div>
-
-          <div className={styles.yearTabs}>
-            {yearOptions.map((year) => (
-              <button
-                key={year}
-                className={`${styles.yearTab} ${activeYear === year ? styles.yearTabActive : ''}`}
-                onClick={() => setActiveYear(year)}
-              >
-                {year}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.searchWrapper}>
-          <Search size={18} className={styles.searchIcon} />
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Search subjects"
-            aria-label="Search subjects"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        <div className={styles.subjectCard}>
-          <div className={styles.topicsList}>
-            {filteredSubjects.map((subject) => {
-              const isExpanded = expandedSubjectId === subject.subjectId;
-              const weeks = weeksBySubject[subject.subjectId];
-              const isFullyCompleted = subject.totalWeeks > 0 && subject.completedWeeks === subject.totalWeeks;
-
-              return (
-                <div key={subject.subjectId} className={styles.topicWrapper}>
-                  <button
-                    type="button"
-                    aria-expanded={isExpanded}
-                    aria-controls={isExpanded ? `subject-weeks-${subject.subjectId}` : undefined}
-                    className={`${styles.topicRow} ${isFullyCompleted ? styles.topicRowCompleted : ''} ${isExpanded ? styles.topicRowExpanded : ''}`}
-                    onClick={() => toggleSubject(subject.subjectId)}
-                  >
-                    <span className={styles.topicIcon}>
-                      {isFullyCompleted ? <CheckCircle2 size={18} /> : <BookOpen size={18} />}
-                    </span>
-
-                    <span className={styles.topicInfo}>
-                      <span className={styles.topicTitle}>{subject.subjectName}</span>
-                      <span className={styles.topicMeta}>
-                        {subject.completedWeeks}/{subject.totalWeeks} weeks
-                        {isFullyCompleted && <span className={styles.completedLabel}> · Completed</span>}
-                      </span>
-                    </span>
-
-                    {isExpanded ? <ChevronUp size={18} className={styles.chevron} /> : <ChevronDown size={18} className={styles.chevron} />}
-                  </button>
-
-                  {isExpanded && (
-                    <div id={`subject-weeks-${subject.subjectId}`} className={styles.weeksPanel}>
-                      {weeksLoading[subject.subjectId] && !weeks && <p className={styles.loadingText}>Loading weeks...</p>}
-
-                      {weekErrors[subject.subjectId] && <p className={styles.loadingText}>Couldn't load weeks. Collapse and reopen to retry.</p>}
-                      {weeks?.map((week) => {
-                        const status = !week.lessonAvailable || !week.unlocked ? 'locked' : week.completed ? 'done' : 'now';
-                        const WeekIcon = status === 'done' ? CheckCircle2 : status === 'now' ? Play : Lock;
-
-                        return (
-                          <button
-                            key={week.weekId}
-                            type="button"
-                            disabled={status === 'locked'}
-                            className={`${styles.weekRow} ${styles[`weekRow_${status}`]} ${status === 'locked' ? styles.weekRowLocked : ''}`}
-                            onClick={() => {
-                              if (status !== 'locked') {
-                                navigate(`${workflow.basePath}/lesson/${subject.subjectId}/${week.weekId}`);
-                              }
-                            }}
-                          >
-                            <span className={`${styles.weekIcon} ${styles[`weekIcon_${status}`]}`}>
-                              <WeekIcon size={16} />
-                            </span>
-                            <span className={styles.weekLabel}>
-                              Week {week.weekNumber}: {week.title}
-                            </span>
-                            <span className={`${styles.weekBadge} ${styles[`weekBadge_${status}`]}`}>
-                              {!week.lessonAvailable ? 'Not published' : status === 'done' ? 'Done' : status === 'now' ? 'Available' : 'Locked'}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {filteredSubjects.length === 0 && (
-          <p className={styles.emptyState}>No subjects match your search.</p>
-        )}
-      </main>
-    </StudentPageShell>
-  );
+  return <StudentPageShell>
+    <Topbar title="Subjects" />
+    <main className={styles.main}>
+      <nav aria-label="Learning navigation"><Link className={styles.backLink} to={`${workflow.basePath}/subjects/my`}>Back to My Subjects</Link></nav>
+      {isLoading ? <p className={styles.loadingText} role="status">Loading subjects...</p>
+        : loadError === 'PROFILE_INCOMPLETE' ? <AcademicProfileNotice onRefresh={() => setReload(value => value + 1)} />
+        : loadError ? <p className={styles.loadingText}>Couldn't load subjects. Please refresh and try again.</p>
+        : !subject ? <p className={styles.emptyState}>This subject is not available to you. Return to My Subjects to choose another subject.</p>
+        : subject.enrolled !== true ? <section aria-label="Enrollment required"><p className={styles.subtitle}>Enroll in this subject to access learning activities.</p><Link className={styles.backLink} to={`${workflow.basePath}/subjects/browse`}>Browse Subjects</Link></section>
+        : <>
+          <p className={styles.subtitle}>Choose a weekly lesson for this subject.</p>
+          <section className={styles.topicWrapper}>
+            <button type="button" aria-expanded={expanded} aria-controls={expanded ? `subject-weeks-${subject.subjectId}` : undefined}
+              className={`${styles.topicRow} ${expanded ? styles.topicRowExpanded : ''}`} onClick={toggleSubject}>
+              <span className={styles.topicInfo}>
+                <span className={styles.topicTitle}>{subject.subjectName}</span>
+                <span className={styles.topicMeta}>
+                  {[subject.subjectCode, yearLabels[subject.yearLevel] ?? subject.yearLevel, subject.totalWeeks != null ? `${subject.totalWeeks} ${subject.totalWeeks === 1 ? 'week' : 'weeks'}` : null].filter(Boolean).map((value,index) => <span key={index}>{value}</span>)}
+                  {isFullyCompleted && <span className={styles.completedLabel}>Completed</span>}
+                </span>
+              </span>
+              {expanded ? <ChevronUp size={18} className={styles.chevron} /> : <ChevronDown size={18} className={styles.chevron} />}
+            </button>
+            {expanded && <div id={`subject-weeks-${subject.subjectId}`} className={styles.weeksPanel}>
+              <div className={styles.weeksPanelHeader}><h2>Weekly lessons</h2>{subject.progressPercentage != null && <span className={styles.topicMeta}>{subject.progressPercentage}% learning progress</span>}</div>
+              {weeks?.length === 0 && !weeksLoading[subject.subjectId] && !weekErrors[subject.subjectId] && <p className={styles.emptyState}>No weekly lessons are available yet.</p>}
+              {weeks?.length > 0 && !weeksLoading[subject.subjectId] && !weekErrors[subject.subjectId] && !weeks.some(week => week.lessonAvailable && week.unlocked) && <p className={styles.emptyState}>No lessons are currently available to open in this subject.</p>}
+              {weeksLoading[subject.subjectId] && !weeks && <p className={styles.loadingText}>Loading weeks...</p>}
+              {weekErrors[subject.subjectId] && <p className={styles.loadingText}>Couldn't load weeks. Collapse and reopen to retry.</p>}
+              {weeks?.map(week => {
+                const status = !week.lessonAvailable || !week.unlocked ? 'locked' : week.completed ? 'done' : 'now';
+                const WeekIcon = status === 'done' ? CheckCircle2 : status === 'now' ? Play : Lock;
+                return <button key={week.weekId} type="button" disabled={status === 'locked'}
+                  className={`${styles.weekRow} ${status === 'locked' ? styles.weekRowLocked : ''}`}
+                  onClick={() => { if (status !== 'locked') navigate(`${workflow.basePath}/lesson/${subject.subjectId}/${week.weekId}`); }}>
+                  <span className={`${styles.weekIcon} ${status === 'locked' ? styles.weekIcon_locked : ''}`}><WeekIcon size={16} /></span>
+                  <span className={styles.weekLabel}><span className={styles.weekNumber}>Week {week.weekNumber}</span><span>{week.title}</span></span>
+                  <span className={`${styles.weekBadge} ${styles[`weekBadge_${status}`]}`}>{!week.lessonAvailable ? 'Not published' : status === 'done' ? 'Completed' : status === 'now' ? 'Available' : 'Locked'}</span>
+                  {status !== 'locked' && <span className={styles.weekAction}>{status === 'done' ? 'Review lesson' : 'Open lesson'}</span>}
+                </button>;
+              })}
+            </div>}
+          </section>
+        </>}
+    </main>
+  </StudentPageShell>;
 }

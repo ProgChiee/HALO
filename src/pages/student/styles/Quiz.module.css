@@ -7,15 +7,7 @@
   background: var(--color-bg-content);
 }
 
-.contentArea {
-  flex: 1;
-  min-width: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
+.contentArea { composes: frame from "../../../components/shared/PageLayout.module.css"; }
 
 .topbar {
  composes: topbar from "../../../components/shared/Navigation.module.css";
@@ -310,3 +302,24 @@
 .resultsCard > .actionsRow { width: 100%; justify-content: center; }
 @media (max-width: 768px) { .introCard, .quizCard, .resultsCard { padding: var(--space-4); } }
 @media (max-width: 480px) { .actionsRow > button { width: 100%; } .optionRow { gap: var(--space-3); } }
+
+/* Compact, shared quiz workspace across Student and Admin Student modes. */
+.main { display: grid; gap: var(--space-4); }
+.introCard, .quizCard, .resultsCard { margin-top: 0; background: var(--color-surface); border-color: var(--color-border); }
+.introCard { align-items: flex-start; text-align: left; gap: var(--space-3); }
+.introTitle, .introMeta, .introDescription { margin: 0; }
+.introDescription { max-width: 65ch; line-height: 1.6; }
+.introCard > button { margin-top: var(--space-2); }
+.breadcrumb { min-width: 0; overflow-wrap: anywhere; }
+.questionText { line-height: 1.6; font-size: var(--text-lg); }
+.questionText:focus-visible, .resultsScore:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: var(--radius-sm); }
+.optionText { min-width: 0; overflow-wrap: anywhere; }
+.optionRow { min-height: 48px; line-height: 1.6; }
+.optionRowSelected { box-shadow: inset 3px 0 var(--color-primary); }
+.answerCount { margin: 0 auto 0 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+.resultsScore { margin: 0; font-size: var(--font-size-3xl); }
+.resultStatus { margin: var(--space-2) 0; color: var(--color-text-primary); font-size: var(--text-sm); font-weight: 600; }
+.resultsMessage { line-height: 1.6; }
+.reviewTitle { font-size: var(--text-lg); }
+.reviewItem { background: var(--color-bg-content); padding: var(--space-4); }
+@media (max-width: 480px) { .answerCount { flex-basis: 100%; } .introCard > button { width: 100%; } }

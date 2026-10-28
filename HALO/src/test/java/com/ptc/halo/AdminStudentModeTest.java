@@ -38,12 +38,15 @@ class AdminStudentModeTest {
  @Autowired StudentModuleProgressRepository progress;
  @Autowired StudentBadgeRepository badges;
  @MockBean AssessmentAiService ai;
+ @Autowired StudentSubjectEnrollmentRepository enrollments;
  @Autowired StudentProfileRepository profiles;
  @org.springframework.boot.test.mock.mockito.SpyBean ActivityLogService audit;
  @Autowired StudentDashboardService dashboard;
  @Autowired StudentSubjectService subjectService;
  @Autowired StudentProgressService progressService;
  @Autowired StudentLessonService lessonService;
+ @Autowired StudentLessonAccessService lessonAccess;
+ @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
  @Autowired LessonStudyService study;
  @Autowired LessonStudyDayRepository studyDays;
  @Autowired ProfileService profileService;
@@ -56,6 +59,7 @@ class AdminStudentModeTest {
  UserEntity admin; String actingId; org.springframework.security.core.Authentication auth;
  UserEntity student;AssessmentAttemptEntity attempt;AssessmentQuestionEntity q1,q2,foreign;
  @BeforeEach void setup(){
+  enrollments.deleteAll();
   reset((ActivityLogService)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit));studyDays.deleteAll();logs.deleteAll();actingSessions.deleteAll();messages.deleteAll();sessions.deleteAll();badges.deleteAll();progress.deleteAll();answers.deleteAll();attempts.deleteAll();questions.deleteAll();assessments.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();profiles.deleteAll();users.deleteAll();
   student=new UserEntity();student.setEmail("student@test.example");student.setName("Student");student.setRole(Role.STUDENT);student.setStatus(Status.ACTIVE);student=users.saveAndFlush(student);
   var subject=new SubjectEntity();subject.setYearLevel(YearLevel.FIRST_YEAR);subject.setSubjectCode("S");subject.setSubjectName("Subject");subject=subjects.saveAndFlush(subject);
@@ -64,6 +68,7 @@ class AdminStudentModeTest {
   var assessment=new AssessmentEntity();assessment.setModule(module);assessment.setTitle("Quiz");assessment.setPassingScore(70);assessment.setStatus(AssessmentStatus.AVAILABLE);assessment.setCreatedAt(LocalDateTime.now());assessment=assessments.saveAndFlush(assessment);
   q1=question(assessment,1,"A");q2=question(assessment,2,"B");
   var profile=new StudentProfileEntity();profile.setUser(student);profile.setSection("BSHM 1A");profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  enrollments.saveAndFlush(new StudentSubjectEnrollmentEntity(student,subject));
   attempt=service.startAttempt(module.getId(),student);
   admin=new UserEntity();admin.setEmail("admin@test.example");admin.setName("Admin");admin.setRole(Role.ADMIN);admin.setStatus(Status.ACTIVE);admin=users.saveAndFlush(admin);
   auth=authentication(admin);
@@ -225,5 +230,43 @@ class AdminStudentModeTest {
   when(builder.build().prompt().system(startsWith("Classify HALO"))).thenReturn(spec);
   when(spec.user(anyString())).thenReturn(spec);
   when(spec.call().content()).thenAnswer(inv->{assertFalse(active());return "{\"intent\":\"LESSON_QUESTION\"}";});
+ }
+
+ @Test void enrollmentIsRequiredForDirectLearningRequestsAndOldSessionIds() throws Exception {
+  prepareIndex();long moduleId=moduleId(),weekId=weeks.findAll().get(0).getId();
+  var chat=mentor.openSession(moduleId,student);
+  var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
+   new com.ptc.halo.controller.StudentAiLearningController(lessonService,lessonAccess),
+   new com.ptc.halo.controller.StudentMentorController(mentor,lessonAccess),
+   new com.ptc.halo.controller.StudentAssessmentController(service,users),
+   new com.ptc.halo.controller.LessonStudyController(study,lessonAccess,mode,audit))
+   .setControllerAdvice(new com.ptc.halo.controller.StudentLessonExceptionHandler()).build();
+  var caller=authentication(student);
+  mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/student/ai-learning-modules/week/"+weekId).principal(caller)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+  enrollments.deleteAll();var before=learningSnapshot();
+  var getPaths=List.of("/api/student/ai-learning-modules/week/"+weekId,"/api/student/mentor/session/"+chat.getSessionId(),"/api/student/mentor/message/"+chat.getSessionId()+"/request/"+UUID.randomUUID(),"/api/student/assessment/"+moduleId,"/api/student/assessment/status/"+moduleId,"/api/student/assessment/result/"+attempt.getId());
+  for(var path:getPaths)mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(path).principal(caller)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("ENROLLMENT_REQUIRED"));
+  var postPaths=List.of("/api/student/mentor/open/"+moduleId,"/api/student/mentor/message/"+chat.getSessionId(),"/api/student/assessment/start/"+moduleId,"/api/student/assessment/submit/"+attempt.getId(),"/api/student/ai-learning-modules/week/"+weekId+"/study");
+  for(var path:postPaths){
+   String body=path.contains("/submit/")?new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request(item(q1.getId(),"A"),item(q2.getId(),"B"))):"{\"message\":\"Explain the lesson\"}";
+   mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(path).principal(caller).contentType("application/json").content(body)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code").value("ENROLLMENT_REQUIRED"));
+  }
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->mode.openMentor(auth,actingId,moduleId)).getReason());
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->mode.execute(auth,actingId,s->service.submitAttempt(attempt.getId(),s.getTarget(),request(item(q1.getId(),"A"),item(q2.getId(),"B")),s))).getReason());
+  assertEquals(before,learningSnapshot());assertEquals(1,sessions.count());assertNull(attempts.findById(attempt.getId()).orElseThrow().getSubmittedAt());
+ }
+ List<?> learningSnapshot(){return List.of("assessment_attempts","student_answers","student_module_progress","mentor_sessions","mentor_messages","lesson_study_days","student_badges","activity_log_entity").stream().map(t->jdbc.queryForList("select * from "+t+" order by id")).toList();}
+ @Test void lossOfEnrollmentDuringMentorGenerationCannotCommitNewMessages(){
+  prepareIndex();var chat=mentor.openSession(moduleId(),student);var before=learningSnapshot();
+  respond(()->enrollments.deleteAll());
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->mentor.sendMessage(chat.getSessionId(),student,"Explain this lesson",UUID.randomUUID().toString())).getReason());
+  assertEquals(before,learningSnapshot());
+ }
+
+ @Test void enrollmentRestrictionDoesNotDeleteOrRegradeCompletedAssessmentHistory(){
+  var completed=service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"A"),item(q2.getId(),"B")));
+  assertEquals(100,completed.getScore());enrollments.deleteAll();var before=learningSnapshot();
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->service.getAttemptResult(completed.getId(),student)).getReason());
+  assertEquals(before,learningSnapshot());assertEquals(100,attempts.findById(completed.getId()).orElseThrow().getScore());assertEquals(2,answers.count());assertEquals(1,progress.count());
  }
 }

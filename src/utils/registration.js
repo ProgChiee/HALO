@@ -8,15 +8,25 @@ export const registrationHints = {
  password: 'At least 8 characters; maximum 72 UTF-8 bytes. Spaces count as characters.',
  confirmPassword: 'Enter the same password again.',
 };
+export const academicYearLevels = ['FIRST_YEAR', 'SECOND_YEAR'];
+export const yearLabels = { FIRST_YEAR: '1st Year', SECOND_YEAR: '2nd Year' };
+export function validateAcademicField(field, input) {
+ const value = typeof input === 'string' ? (field === 'section' ? input.trim().replace(/\s+/g, ' ') : field === 'yearLevel' ? input : input.trim()) : '';
+ const valid = field === 'studentId' ? /^[0-9]{2}AHRT-[0-9]{4}$/.test(value)
+   : field === 'section' ? Boolean(value && value.length <= 50 && /^[\p{L}\p{M}\p{N} .'-]+$/u.test(value))
+   : field === 'yearLevel' && academicYearLevels.includes(value);
+ return { value, error: valid ? '' : registrationHints[field] || 'Select a valid academic field.' };
+}
 export function validateRegistration(input) {
  const name=validateFullName(input.name);
  const value={...input,name:name.value,email:input.email.trim().toLowerCase(),studentId:input.studentId.trim(),section:input.section.trim().replace(/\s+/g,' ')};
  const errors={};
  if(name.error)errors.name=name.error;
  if(value.email.length>254 || !/^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@paterostechnologicalcollege\.edu\.ph$/.test(value.email))errors.email=registrationHints.email;
- if(!/^[0-9]{2}AHRT-[0-9]{4}$/.test(value.studentId))errors.studentId=registrationHints.studentId;
- if(!value.section || value.section.length>50 || !/^[\p{L}\p{M}\p{N} .'-]+$/u.test(value.section))errors.section=registrationHints.section;
- if(!['FIRST_YEAR','SECOND_YEAR'].includes(value.yearLevel))errors.yearLevel=registrationHints.yearLevel;
+ for (const field of ['studentId', 'section', 'yearLevel']) {
+  const checked = validateAcademicField(field, value[field]);
+  if (checked.error) errors[field] = checked.error;
+ }
  if(!value.password.trim() || value.password.length<8 || new TextEncoder().encode(value.password).length>72)errors.password=registrationHints.password;
  if(!value.confirmPassword || value.password!==value.confirmPassword)errors.confirmPassword='Passwords must match.';
  return {value,errors};

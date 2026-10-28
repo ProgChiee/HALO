@@ -14,13 +14,38 @@ public class ProfessorProfileController {
 
     private final ProfileService profileService;
     private final UserRepository userRepository;
+    private final com.ptc.halo.service.ProfessorIdProfileService idProfiles;
 
     public ProfessorProfileController(
             ProfileService profileService,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            com.ptc.halo.service.ProfessorIdProfileService idProfiles) {
 
         this.profileService = profileService;
         this.userRepository = userRepository;
+        this.idProfiles = idProfiles;
+    }
+
+    @PatchMapping("/profile/id")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('PROFESSOR')")
+    public ResponseEntity<ProfessorProfileResponse> updateId(Authentication authentication,
+            @jakarta.validation.Valid @RequestBody com.ptc.halo.dtoRequest.ProfessorIdUpdateRequest request,
+            @RequestHeader(value="X-Acting-Session",required=false) String actingSession) {
+        if(actingSession!=null) throw new org.springframework.security.access.AccessDeniedException("Acting profiles are read-only");
+        return ResponseEntity.ok(idProfiles.update(authentication,request));
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<?> duplicateId(org.springframework.dao.DataIntegrityViolationException error) {
+        return ResponseEntity.status(409).body(java.util.Map.of("code","PROFESSOR_ID_CONFLICT",
+                "message","This Professor ID is already in use. Enter a different Professor ID."));
+    }
+
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<?> profileError(org.springframework.web.server.ResponseStatusException error) {
+        if (java.util.Set.of("PROFESSOR_ID_CONFLICT", "PROFILE_INCOMPLETE", "INVALID_PROFESSOR_ID").contains(error.getReason() == null ? "" : error.getReason()))
+            return ResponseEntity.status(error.getStatusCode()).body(java.util.Map.of("code", error.getReason(), "message", "Please check your Professor ID and try again."));
+        return ProfessorErrorResponses.status(error);
     }
 
     @GetMapping("/profile")

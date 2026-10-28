@@ -7,6 +7,21 @@ import java.util.List;
 
 public interface WeekRepository
         extends JpaRepository<WeekEntity, Long> {
+    interface PublishedCurriculum {
+        Integer getWeekNumber();
+        String getTitle();
+    }
+    @org.springframework.data.jpa.repository.Query("""
+        select w.weekNumber as weekNumber, w.title as title
+        from WeekEntity w join AiLearningModuleEntity m on m.week = w
+        where w.subject.id = :subjectId
+          and m.status = com.ptc.halo.enums.LessonStatus.APPROVED
+          and m.aiGenerationStatus = com.ptc.halo.enums.AiGenerationStatus.COMPLETED
+        order by w.weekNumber, w.id
+        """)
+    List<PublishedCurriculum> findPublishedCurriculum(
+        @org.springframework.data.repository.query.Param("subjectId") Long subjectId);
+
     interface ModuleActivity {
         Long getModuleId();
         java.time.LocalDateTime getLastActivityAt();

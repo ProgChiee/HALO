@@ -6,7 +6,7 @@ export function validateProfessor({ name, email, professorId, password }, create
   if (email.trim().length > 254) return 'Email must be at most 254 characters.';
   if (!/^[^\s@]+@[^\s@]+$/.test(email.trim())) return 'Enter a valid email address.';
   // Browser email validation and backend @Email also validate address syntax.
-  if (professorId.trim().length > 255) return 'Professor ID must be at most 255 characters.';
+  if (validateProfessorId(professorId).error) return validateProfessorId(professorId).error;
   if (create && (password.length < 8 || new TextEncoder().encode(password).length > 72)) return 'Password must be at least 8 characters and at most 72 UTF-8 bytes.';
   return '';
 }
@@ -14,4 +14,9 @@ export function validateProfessor({ name, email, professorId, password }, create
 export function professorValidationError(error) {
   if (error?.response?.data?.code !== 'VALIDATION_FAILED') return adminErrorMessage(error);
   return 'Please check all required fields, email format, field lengths, and the password limit (8 characters minimum, 72 UTF-8 bytes maximum).';
+}
+
+export function validateProfessorId(value) {
+ const normalized = (value ?? '').trim();
+ return {value: normalized, error: !normalized ? 'Professor ID is required.' : normalized.length > 255 ? 'Professor ID must be at most 255 characters.' : ''};
 }

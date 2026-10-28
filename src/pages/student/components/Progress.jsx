@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
@@ -40,6 +41,7 @@ export default function Progress() {
   if (isLoading) {
     return (
       <StudentPageShell>
+      <Topbar title="Progress" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading your progress...</p>
         </div>
@@ -50,6 +52,7 @@ export default function Progress() {
   if (loadError) {
     return (
       <StudentPageShell>
+      <Topbar title="Progress" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Couldn't load your progress. Please refresh and try again.</p>
         </div>
@@ -65,12 +68,12 @@ export default function Progress() {
     <StudentPageShell>
 
       <div className={styles.contentArea}>
-        <header className={styles.topbar}>
+        <Topbar>
           <div className={styles.breadcrumb}>
             <CheckCircle2 size={16} />
             Progress
           </div>
-        </header>
+        </Topbar>
 
         <main className={styles.main}>
           <div className={styles.overviewRow}>
@@ -119,7 +122,7 @@ export default function Progress() {
 
           <div className={styles.sectionHeaderRow}>
             <h2 className={styles.sectionTitle}>Subject Progress</h2>
-            <Link to={workflow.basePath + '/subjects'} className={styles.viewAllLink}>View all →</Link>
+            <Link to={workflow.basePath + '/subjects/my'} className={styles.viewAllLink}>View all →</Link>
           </div>
           <div className={styles.rowsList}>
             {subjects.map((subject) => (

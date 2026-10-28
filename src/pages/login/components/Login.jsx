@@ -1,7 +1,7 @@
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../../context/login/useAuth';
 import { useToast } from '../../../context/notifications/useToast';
 import { login as loginService } from '../../../services/authService';
@@ -51,44 +51,49 @@ export default function Login() {
   }
 
   return (
-    <div className={styles.wrapper} style={{ '--bg-image': `url(${bgImage})` }}>
-      <div className={styles.card}>
+    <main className={styles.wrapper} style={{ '--bg-image': `url(${bgImage})` }}>
+      <section className={styles.card} aria-labelledby="login-title">
         <img src={logo} alt="HALO logo" className={styles.logo} />
       
 
         <div className={styles.formCard}>
-          <h2 className={styles.welcome}>Welcome back</h2>
-          <p className={styles.subtitle}>Sign in to continue your journey</p>
+          <h1 id="login-title" className={styles.welcome}>Welcome back</h1>
+          <p className={styles.subtitle}>Sign in to continue learning with HALO.</p>
 
           <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.inputWrapper}>
-              <Mail size={18} className={styles.inputIcon} />
+            <div className={styles.field}>
+              <label htmlFor="login-email" className={styles.label}>Email</label>
               <input
+                id="login-email" name="email" autoComplete="username" disabled={isLoading}
                 type="email"
                 className={styles.input}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email Address"
+                placeholder="Enter your email address"
               />
             </div>
 
-            <div className={styles.inputWrapper}>
-              <KeyRound size={18} className={styles.inputIcon} />
+            <div className={styles.field}>
+              <label htmlFor="login-password" className={styles.label}>Password</label>
+              <div className={styles.inputWrapper}>
               <input
+                id="login-password" name="password" autoComplete="current-password" disabled={isLoading}
                 type={showPassword ? 'text' : 'password'}
                 className={styles.input}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
+                placeholder="Enter your password"
               />
               <button
                 type="button"
                 className={styles.eyeToggle}
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-controls="login-password" aria-pressed={showPassword} disabled={isLoading}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
+              </div>
             </div>
 
             <div className={styles.rememberRow}>
@@ -107,9 +112,9 @@ export default function Login() {
               </Link>
             </div>
 
-            {error && <p className={styles.error}>{error}</p>}
+            {error && <p role="alert" className={styles.error}>{error}</p>}
 
-            <Button type="submit" isLoading={isLoading}>Login</Button>
+            <Button type="submit" isLoading={isLoading}>Sign In</Button>
 
             <p className={styles.signupText}>
               Don't have an account?{' '}
@@ -117,7 +122,7 @@ export default function Login() {
             </p>
           </form>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

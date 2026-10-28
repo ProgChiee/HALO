@@ -25,6 +25,7 @@ class StudentIncompleteProfileHttpTest {
     @Autowired MockMvc mvc;
     @MockBean UserRepository users;
     @MockBean StudentProfileRepository profiles;
+    @MockBean StudentAcademicProfileService academicProfiles;
     @MockBean ProfessorRepository professors;
     @MockBean SubjectRepository subjects;
     @MockBean WeekRepository weeks;
@@ -66,7 +67,7 @@ class StudentIncompleteProfileHttpTest {
         }
         verifyNoInteractions(profiles,subjects);
     }
-    @Test void studentHasNoAcademicSelfUpdateRoute() throws Exception {
+    @Test void legacyWholeProfilePutRemainsUnavailable() throws Exception {
         mvc.perform(put("/api/student/profile").header("Authorization","Bearer test-token")
                 .contentType("application/json").content("{\"yearLevel\":\"SECOND_YEAR\"}"))
                 .andExpect(status().isMethodNotAllowed());

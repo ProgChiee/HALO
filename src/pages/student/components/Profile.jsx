@@ -1,19 +1,16 @@
+import Topbar from '../../../components/shared/Topbar';
 import { useAuth } from '../../../context/login/useAuth';
 import ProfileName from '../../../components/shared/ProfileName';
 import ProfilePhoto from './ProfilePhoto';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
-import { User as UserIcon, KeyRound } from 'lucide-react';
+import { User as UserIcon } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
-import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import styles from '../styles/Profile.module.css';
 import AcademicProfileNotice from './AcademicProfileNotice';
-
-const YEAR_LEVEL_LABELS = {
-  FIRST_YEAR: '1st Year',
-  SECOND_YEAR: '2nd Year',
-};
+import AcademicProfileField from './AcademicProfileField';
+import { yearLabels } from '../../../utils/registration';
 
 export default function Profile() {
   const { user } = useAuth();
@@ -22,7 +19,6 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
@@ -47,6 +43,7 @@ export default function Profile() {
   if (isLoading) {
     return (
       <StudentPageShell>
+      <Topbar title="Profile" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading your profile...</p>
         </div>
@@ -57,6 +54,7 @@ export default function Profile() {
   if (loadError || !profile) {
     return (
       <StudentPageShell>
+      <Topbar title="Profile" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
         </div>
@@ -66,18 +64,18 @@ export default function Profile() {
 
   const displayName = workflow.acting ? profile.name : (user?.name ?? profile.name);
   const avatarInitial = displayName?.trim().charAt(0).toUpperCase() || '?';
-  const yearLevelLabel = YEAR_LEVEL_LABELS[profile.yearLevel] ?? profile.yearLevel ?? 'Not set';
+  const yearLevelLabel = yearLabels[profile.yearLevel] ?? profile.yearLevel ?? 'Not set';
 
   return (
     <StudentPageShell>
 
       <div className={styles.contentArea}>
-        <header className={styles.topbar}>
+        <Topbar>
           <div className={styles.breadcrumb}>
             <UserIcon size={16} />
             Profile
           </div>
-        </header>
+        </Topbar>
 
         <main className={styles.main}>
           {profile.profileIncomplete && <AcademicProfileNotice onRefresh={() => setReload(value => value + 1)} />}
@@ -98,38 +96,18 @@ export default function Profile() {
             <span className={styles.infoValue}>{profile.email}</span>
           </div>
 
-          <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Student ID</span>
-            <span className={styles.infoValue}>{profile.studentId?.trim() || 'Not set'}</span>
-          </div>
-
-          <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Section</span>
-            <span className={styles.infoValue}>{profile.section?.trim() || 'Not set'}</span>
-          </div>
-
-          <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Year Level</span>
-            <span className={styles.infoValue}>{yearLevelLabel}</span>
-          </div>
+          {[['studentId', 'Student ID'], ['section', 'Section'], ['yearLevel', 'Year Level']].map(([field, label]) => <div key={field} className={styles.infoCard}>
+            <AcademicProfileField key={`${workflow.identity ?? workflow.basePath}:${profile.userId}:${field}`} field={field} label={label}
+              value={profile[field]} readOnly={Boolean(workflow.acting || profile.profileIncomplete)}
+              onSaved={value => setProfile(current => ({ ...current, [field]: value }))} />
+          </div>)}
 
           </div>
 
-          {!workflow.acting && <h2 className={styles.sectionTitle}>Account</h2>}
 
-          {!workflow.acting && <button
-            className={styles.actionRow}
-            onClick={() => setShowChangePassword(true)}
-          >
-            <span className={styles.actionIcon}>
-              <KeyRound size={16} />
-            </span>
-            Change password
-          </button>}
         </main>
       </div>
 
-      {!workflow.acting && <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />}
     </StudentPageShell>
   );
 }

@@ -7,15 +7,7 @@
   background: var(--color-bg-content);
 }
 
-.contentArea {
-  flex: 1;
-  min-width: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
+.contentArea { composes: frame from "../../../components/shared/PageLayout.module.css"; }
 
 .topbar {
  composes: topbar from "../../../components/shared/Navigation.module.css";

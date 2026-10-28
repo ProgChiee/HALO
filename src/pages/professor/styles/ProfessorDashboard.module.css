@@ -1,4 +1,4 @@
-.contentArea { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; overflow-x: hidden; background: var(--color-bg-content); }
+.contentArea { composes: frame from "../../../components/shared/PageLayout.module.css"; }
 .topbar { composes: topbar from "../../../components/shared/Navigation.module.css"; padding: var(--space-md) var(--space-xl); }
 .breadcrumb { composes: breadcrumb from "../../../components/shared/Navigation.module.css"; }
 .main { composes: wide from "../../../components/shared/PageLayout.module.css"; padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-lg); }

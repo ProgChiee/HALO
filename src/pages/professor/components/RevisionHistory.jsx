@@ -51,7 +51,7 @@ function Details({ moduleId, revisionNumber, onClose }) {
   const descriptionId = useId();
   const load = useCallback(config => api.getRevisionHistoryVersion(moduleId, revisionNumber, config), [api, moduleId, revisionNumber]);
   const { data, isLoading, error, reload } = useRemoteData(load);
-  return <Dialog className={styles.dialog} labelledBy={headingId} describedBy={descriptionId} onClose={onClose} initialFocus="button">
+  return <Dialog closeOnEscape className={styles.dialog} labelledBy={headingId} describedBy={descriptionId} onClose={onClose} initialFocus="button">
     <div className={styles.header}>
       <h2 id={headingId}>{!isLoading && !error && data?.metadata ? title(data.metadata) : 'Revision details'}</h2>
       <Button variant="secondary" onClick={onClose}>Close details</Button>

@@ -16,7 +16,7 @@ class StudentIncompleteProfileTest {
     final WeekRepository weeks = mock(WeekRepository.class);
     final ProfileService profileService = new ProfileService(profiles, mock(ProfessorRepository.class));
     final StudentSubjectService subjectService = new StudentSubjectService(subjects, profiles, weeks,
-            mock(AiLearningModuleRepository.class), mock(StudentModuleProgressRepository.class));
+            mock(AiLearningModuleRepository.class), mock(StudentModuleProgressRepository.class), mock(StudentSubjectEnrollmentRepository.class));
     UserEntity student() {
         var user = new UserEntity(); user.setId(26L); user.setName("Student"); user.setEmail("student@example.test");
         user.setRole(Role.STUDENT); user.setStatus(Status.ACTIVE); return user;
@@ -46,7 +46,7 @@ class StudentIncompleteProfileTest {
         verify(subjects).findByYearLevel(YearLevel.FIRST_YEAR);
     }
     @Test void missingProfileCannotBypassDirectSubjectAccess() {
-        var access = new StudentLessonAccessService(mock(UserRepository.class), profiles);
+        var access = new StudentLessonAccessService(mock(UserRepository.class), profiles, mock(StudentSubjectEnrollmentRepository.class));
         var subject = new SubjectEntity(); subject.setYearLevel(YearLevel.FIRST_YEAR);
         assertEquals(403, assertThrows(ResponseStatusException.class,
                 () -> access.validateSubject(student(), subject)).getStatusCode().value());

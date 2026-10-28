@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { adminErrorMessage } from '../../../utils/adminErrors';
 import { LayoutGrid, Users, GraduationCap, BookOpen, FileText, UserCheck, UserX, Activity } from 'lucide-react';
@@ -28,12 +29,12 @@ export default function AdminDashboard() {
     <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
 
       <>
-        <header className={styles.topbar}>
+        <Topbar>
           <div className={styles.breadcrumb}>
             <LayoutGrid size={16} />
             Dashboard
           </div>
-        </header>
+        </Topbar>
 
         <main className={styles.main}>
           <h1 className={styles.greeting}>Admin Overview</h1>

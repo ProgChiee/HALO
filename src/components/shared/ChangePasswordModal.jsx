@@ -10,7 +10,7 @@ import { changePassword } from '../../services/authService';
 import styles from './ChangePasswordModal.module.css';
 
 /**
- * Shared "Change Password" modal — used by every role's Profile page
+ * Shared "Change Password" modal — used by every role's Settings page
  * (Student, Professor, Admin, Superadmin), so the form/validation/API
  * call only needs to exist in one place.
  *
@@ -18,7 +18,7 @@ import styles from './ChangePasswordModal.module.css';
  * const [showChangePassword, setShowChangePassword] = useState(false);
  * <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
  */
-export default function ChangePasswordModal({ isOpen, onClose, accessible = false }) {
+export default function ChangePasswordModal({ isOpen, onClose }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -39,7 +39,7 @@ export default function ChangePasswordModal({ isOpen, onClose, accessible = fals
     onClose();
   }
 
-  // Used by the X button and clicking the overlay — blocks closing while
+  // Used by explicit X/Cancel controls — blocks closing while
   // a request is in flight (matches the Cancel button's disabled state).
   // The success path inside handleSubmit calls resetAndClose() directly
   // instead, so a successful change always closes the modal even though
@@ -148,8 +148,5 @@ export default function ChangePasswordModal({ isOpen, onClose, accessible = fals
         </form>
     </>
   );
-  if (accessible) return <Dialog labelledBy="change-password-title" onClose={handleCloseAttempt} busy={isSaving} className={styles.modal}>{content}</Dialog>;
-  return <div className={styles.modalOverlay} onClick={handleCloseAttempt}>
-    <div className={styles.modal} onClick={event => event.stopPropagation()}>{content}</div>
-  </div>;
+  return <Dialog labelledBy="change-password-title" onClose={handleCloseAttempt} busy={isSaving} className={styles.modal}>{content}</Dialog>;
 }

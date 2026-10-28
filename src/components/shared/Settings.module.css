@@ -1,5 +1,5 @@
 .topbar { composes: topbar from './Navigation.module.css'; padding: var(--space-4) var(--space-6); }
-.main { composes: regular from './PageLayout.module.css'; padding: var(--space-6); width: 100%; }
+.main { composes: regular from './PageLayout.module.css'; display: grid; align-content: start; gap: var(--page-section-gap); padding: var(--space-6); width: 100%; }
 .main h1 { font-size: var(--font-size-3xl); margin-bottom: var(--space-6); }
 .card { composes: surface from './UIPrimitives.module.css'; padding: var(--space-5); max-width: 640px; }
 .card h2 { font-size: var(--font-size-xl); margin-bottom: var(--space-4); }
@@ -11,4 +11,8 @@
 .option:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .option input { accent-color: var(--color-primary); }
 .card p { font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: var(--space-4); }
+.securityRow { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-4); }
+.securityRow p { flex: 1 1 240px; margin: 0; }
+.securityRow button { flex-shrink: 0; }
+.card [role="alert"] { color: var(--color-warning-text); margin: 0 0 var(--space-4); }
 @media(max-width:600px) { .main { padding: var(--space-4); } .options { flex-direction: column; } }

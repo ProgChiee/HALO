@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice(assignableTypes = {StudentMentorController.class, StudentAiLearningController.class,
-        StudentLearningProgressionController.class, StudentAssessmentController.class})
+        StudentLearningProgressionController.class, StudentAssessmentController.class, StudentProfileController.class})
 public class StudentLessonExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(StudentLessonExceptionHandler.class);
 

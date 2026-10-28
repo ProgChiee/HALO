@@ -1,4 +1,4 @@
-.selector { padding: clamp(var(--space-4), 3vw, var(--space-10)); max-width: 1100px; min-width: 0; }
+.selector { composes: regular from "../../../components/shared/PageLayout.module.css"; }
 .selector input { display: block; width: min(100%, 32rem); box-sizing: border-box; margin: var(--space-2) 0 var(--space-6); padding: var(--space-3); }
 .banner { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4); background: var(--color-bg-card); border-bottom: 1px solid var(--color-border); overflow-wrap: anywhere; }
 .banner strong { min-width: 0; }

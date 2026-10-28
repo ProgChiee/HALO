@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState, useRef, useEffect } from 'react';
 import { Users, Plus, Trash2, X, Power } from 'lucide-react';
@@ -175,7 +176,7 @@ export default function Admins() {
 
   return (
     <PageShell responsive navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
-        <header className={styles.topbar}>
+        <Topbar>
           <div className={styles.breadcrumb}>
             <Users size={16} />
             Admins
@@ -184,52 +185,56 @@ export default function Admins() {
             <Plus size={16} style={{ marginRight: 6 }} />
             Add Admin
           </Button>
-        </header>
+        </Topbar>
 
         <main className={styles.main}>
           {isLoading ? (
-            <p className={styles.loadingText}>Loading admins...</p>
+            <div className={`${styles.tableCard} ${styles.stateCard}`} role="status"><p className={styles.loadingText}>Loading admins...</p></div>
           ) : loadError ? (
-            <div className={styles.tableCard} style={{ padding: 'var(--space-12)', textAlign: 'center' }}>
+            <div className={`${styles.tableCard} ${styles.stateCard}`} role="alert">
               <p className={styles.loadingText}>{apiErrorMessage(loadError, "Couldn't load admins. Please check your connection.")}</p>
               <button
                 onClick={loadAdmins}
-                style={{ marginTop: '12px', color: 'var(--color-accent-active)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' }}
+                className={styles.retryBtn}
               >
                 Retry
               </button>
             </div>
           ) : (
             <div className={styles.tableScroll} role="region" aria-label="Admin accounts" tabIndex={0}>
-            <div className={styles.tableCard}>
-              <div className={styles.tableHeaderRow}>
-                <span>Name</span>
-                <span>Email</span>
-                <span>Status</span>
-                <span>Actions</span>
+            <div className={styles.tableCard} role="table" aria-label="Administrator accounts">
+              <div className={styles.tableHeaderRow} role="row">
+                <span role="columnheader">Name</span>
+                <span role="columnheader">Email</span>
+                <span role="columnheader">Status</span>
+                <span role="columnheader">Actions</span>
               </div>
 
               {admins.map((admin) => (
-                <div key={admin.id} className={styles.tableRow}>
-                  <span className={styles.adminName}>{admin.name}</span>
-                  <span className={styles.adminEmail}>{admin.email}</span>
-                  <span className={`${styles.statusText} ${styles[`status_${admin.status?.toLowerCase()}`]}`}>
-                    {admin.status === 'ACTIVE' ? 'Active' : admin.status === 'BLOCKED' ? 'Blocked' : 'Inactive'}
+                <div key={admin.id} className={styles.tableRow} role="row">
+                  <span className={styles.adminName} role="rowheader" title={admin.name}>{admin.name}</span>
+                  <span className={styles.adminEmail} role="cell" title={admin.email}>{admin.email}</span>
+                  <span className={styles.statusCell} role="cell">
+                    <span className={`${styles.statusBadge} ${styles[`status_${admin.status?.toLowerCase()}`] || styles.status_unknown}`}>
+                      {STATUS_LABELS[admin.status] ?? admin.status ?? 'Not set'}
+                    </span>
                   </span>
-                  <div className={styles.actionsCell}>
+                  <div className={styles.actionsCell} role="cell">
                     <button
-                      className={`${styles.actionBtn} ${admin.status !== 'ACTIVE' ? styles.actionBtnOff : ''}`}
+                      className={`${styles.actionBtn} ${admin.status === 'ACTIVE' ? styles.deactivateAction : styles.activateAction}`}
                       onClick={event => openStatus(admin, event)}
                       disabled={updatingStatusId !== null || isSubmitting}
                       aria-label={admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                      title={`${admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} ${admin.name}`}
                     >
                       <Power size={15} />
                     </button>
                     <button
-                      className={styles.deleteBtn}
+                      className={`${styles.actionBtn} ${styles.deleteBtn}`}
                       onClick={event => { event.currentTarget.focus(); setDeleteError(''); protectedDelete.current = false; setProtectedHistory(false); setDeleteTarget(admin); }}
                       disabled={isSubmitting || updatingStatusId !== null || deleting}
                       aria-label={`Delete ${admin.name}`}
+                      title={`Delete ${admin.name}`}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -238,7 +243,7 @@ export default function Admins() {
               ))}
 
               {admins.length === 0 && (
-                <p className={styles.emptyState}>No admins yet. Click "Add Admin" to create one.</p>
+                <div role="row"><div role="cell" aria-colspan={4} className={styles.emptyState}>No admins yet. Click "Add Admin" to create one.</div></div>
               )}
             </div>
             </div>

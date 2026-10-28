@@ -1,4 +1,5 @@
 const reasons = {
+  ENROLLMENT_REQUIRED: 'Enroll in this subject to access learning activities. Browse Subjects to enroll.',
   PREVIEW_LIMIT_REACHED: 'This temporary preview has reached its limit. Exit and start a new preview to continue.',
   PREVIEW_STATE_CHANGED: 'The assessment changed during this preview. Exit and start a new preview.',
   PREVIEW_OPERATION_PENDING: 'Another preview action is still running. Wait a moment and try again.',

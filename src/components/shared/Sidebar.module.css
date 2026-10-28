@@ -194,3 +194,48 @@
 @media (max-width: 1024px) { .logo img { width: 96px; } }
 
 .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+.groupButton { width: 100%; background: transparent; text-align: left; cursor: pointer; font-family: inherit; }
+.chevron, .chevronOpen { margin-left: auto; }
+.chevronOpen { transform: rotate(180deg); }
+.submenu { padding-left: var(--space-5); }
+.navItem:focus-visible { outline: 2px solid var(--nav-text); outline-offset: 2px; }
+
+/* Student shell (including Preview/Support): leave other role sidebars unchanged. */
+.studentSidebar {
+  box-sizing: border-box;
+  padding-bottom: max(var(--space-4), env(safe-area-inset-bottom, 0px));
+}
+.studentSidebar .nav { gap: 2px; }
+.studentSidebar .navItem {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  box-sizing: border-box;
+  text-decoration: none;
+  transition: none;
+}
+.studentSidebar .nav .sectionLabel { margin: var(--space-4) 0 var(--space-1); }
+.studentSidebar .nav .sectionLabel:first-child { margin-top: 0; }
+.studentSidebar .submenu {
+  margin: var(--space-1) 0 var(--space-1) var(--space-5);
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--nav-border);
+}
+.studentSidebar .submenu .navItem { padding: var(--space-2); border-radius: var(--radius-sm); }
+.studentSidebar .submenu .navItem + .navItem { margin-top: 2px; }
+.studentSidebar .navItem:hover { background: var(--nav-hover); color: var(--nav-text); }
+.studentSidebar .navItemActive,
+.studentSidebar .navItemActive:hover { background: var(--nav-active); font-weight: var(--font-weight-semibold); border-left-color: var(--nav-text); }
+.studentSidebar .userFooter { margin-top: auto; padding-top: var(--space-3); gap: var(--space-2); }
+.studentSidebar .userFooter > div:nth-child(2) { flex: 1; min-width: 0; }
+.studentSidebar .userName { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.studentSidebar .userName, .studentSidebar .userStatus { margin: 0; }
+.studentSidebar .logoutBtn { width: 44px; height: 44px; }
+.studentSidebar .navItem:focus-visible,
+.studentSidebar .logoutBtn:focus-visible { outline: 2px solid var(--nav-text); outline-offset: 2px; }
+@media (min-width: 1025px) and (min-height: 400px) {
+  .studentSidebar { overflow: hidden; }
+  .studentSidebar .section { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--space-1) var(--space-1) var(--space-3); }
+}
+/* Extremely short windows retain whole-sidebar scrolling rather than clipping the footer. */
+@media (max-height: 399px) { .studentSidebar { overflow-y: auto; } }

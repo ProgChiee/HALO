@@ -28,7 +28,7 @@ async function mount(Page, api, acting = false) {
   const workflow = { api: { getProfilePhoto: async () => null, ...api }, acting, preview: acting, target: { name: 'Own Student' }, basePath: '/student', identity: 'student' };
   await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Own Student', role: 'student' }, logout() {} } },
     React.createElement(ToastContext.Provider, { value: { showToast() {} } },
-      React.createElement(Workflow.Provider, { value: workflow }, React.createElement(Router.MemoryRouter, null, React.createElement(Page)))))));
+      React.createElement(Workflow.Provider, { value: workflow }, React.createElement(Router.MemoryRouter, {initialEntries:[Page===Subjects?'/student/subjects?subject=1':'/student/profile']}, React.createElement(Page)))))));
   return { host, cleanup: async () => { await act(async () => root.unmount()); host.remove(); } };
 }
 const button = (host, label) => [...host.querySelectorAll('button')].find(b => b.textContent === label);
@@ -62,7 +62,7 @@ test('subjects explain incomplete profile, retry read-only request and retain lo
     await act(async () => button(view.host, 'Check again').click());
     assert.match(view.host.textContent, /Loading subjects/); assert.equal(button(view.host, 'Check again'), undefined);
     assert.equal(calls, 2);
-    await act(async () => finish([{ subjectId: 1, subjectName: 'Hospitality', yearLevel: 'FIRST_YEAR', totalWeeks: 0, completedWeeks: 0 }]));
+    await act(async () => finish([{ subjectId: 1, enrolled:true, subjectName: 'Hospitality', yearLevel: 'FIRST_YEAR', totalWeeks: 0, completedWeeks: 0 }]));
     assert.doesNotMatch(view.host.textContent, /Academic profile incomplete/); assert.match(view.host.textContent, /Hospitality/);
   } finally { await view.cleanup(); }
 });

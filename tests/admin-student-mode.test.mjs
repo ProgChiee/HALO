@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { createServer } from 'vite';
 import React, { act } from 'react';
-let dom,server,createRoot,Router,AuthContext,ToastContext,Mode,Selector,Dashboard,Profile,Subjects,api,services,sessionStore,Quiz,LessonChat,Progress,Badges;
+let dom,server,createRoot,Router,AuthContext,ToastContext,Mode,Selector,Dashboard,Profile,Subjects,api,services,sessionStore,Quiz,LessonChat,Progress,Badges,Enrollment;
 let width=1440;
 const id='350b29ca-a7d5-4a2d-a5d2-903db7e67e77';
 const id2='460b29ca-a7d5-4a2d-a5d2-903db7e67e77';
@@ -24,6 +24,7 @@ before(async()=>{
  const mode=await server.ssrLoadModule('/src/pages/admin/acting/StudentMode.jsx');Mode=mode.default;Selector=mode.StudentModeSelector;
  Dashboard=(await server.ssrLoadModule('/src/pages/student/components/StudentDashboard.jsx')).default;
  Profile=(await server.ssrLoadModule('/src/pages/student/components/Profile.jsx')).default;
+ Enrollment=(await server.ssrLoadModule('/src/pages/student/components/EnrollmentSubjects.jsx')).default;
  Subjects=(await server.ssrLoadModule('/src/pages/student/components/Subjects.jsx')).default;
  Quiz=(await server.ssrLoadModule('/src/pages/student/components/Quiz.jsx')).default;
  LessonChat=(await server.ssrLoadModule('/src/pages/student/components/LessonChat.jsx')).default;
@@ -42,7 +43,7 @@ async function mount(path, strict = false) {
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  function Location(){return React.createElement('output',{},Router.useLocation().pathname);}
  const modeRoutes=(path,preview)=>React.createElement(Router.Route,{path,element:React.createElement(Mode,{preview})},
-  ...[[undefined,Dashboard],['subjects',Subjects],['lesson/:topicId/:weekId',LessonChat],['quiz/:topicId/:weekId',Quiz],['progress',Progress],['badges',Badges],['profile',Profile]].map(([path,Component])=>React.createElement(Router.Route,{key:path||'index',path,index:path===undefined,element:React.createElement(Component)})));
+  ...[[undefined,Dashboard],['subjects',Subjects],['subjects/my',Enrollment],['lesson/:topicId/:weekId',LessonChat],['quiz/:topicId/:weekId',Quiz],['progress',Progress],['badges',Badges],['profile',Profile]].map(([path,Component])=>React.createElement(Router.Route,{key:path||'index',path,index:path===undefined,element:React.createElement(Component)})));
  await act(async()=>root.render(React.createElement(strict ? React.StrictMode : React.Fragment, {}, React.createElement(AuthContext.Provider,{value:{user:{id:1,name:'Admin'},role:'admin',isAuthenticated:true,logout(){throw Error('Unexpected logout');}}},
  React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{initialEntries:[path]},
  React.createElement(Router.Routes,{},
@@ -58,14 +59,14 @@ function adapter(calls,overrides=()=>undefined){return async config=>{
  if(config.url.startsWith('/admin/acting/sessions/'))return response(config,makeSession());
  if(config.method==='post'&&config.url==='/admin/preview/student/sessions')return response(config,makeSession());
  if(config.url.startsWith('/admin/preview/student/sessions/'))return response(config,makeSession());
- if(config.url.endsWith('/badges'))return response(config,[]);
+ if(config.url.endsWith('/badges')||config.url.endsWith('/badges/catalog'))return response(config,[]);
  if(config.url.includes('/ai-learning-modules/week/'))return response(config,{id:10,subjectId:1,weekId:37,weekNumber:1,status:'APPROVED',aiGenerationStatus:'COMPLETED',generatedKnowledge:'Lesson knowledge'});
  if(config.url.includes('/assessment/status/'))return response(config,{assessmentExists:true,assessmentAvailable:true,canTakeAssessment:true});
  if(config.url.endsWith('/assessment/10'))return response(config,{id:4,title:'Assessment',passingScore:70,questions:[{id:1,questionText:'Question?',optionA:'Answer',optionB:'Other'}]});
  if(config.url.includes('/assessment/start/'))return response(config,{attemptId:5,assessmentId:4});
  if(config.url.includes('/assessment/result/'))return response(config,{attemptId:5,score:100,passed:true,feedback:[]});
  if(config.url.includes('/mentor/open/'))return response(config,{sessionId:8,moduleId:10,messages:[{id:30,sender:'HALO',message:'Recent message'}],hasOlder:true,nextBeforeId:30});
- if(config.url.endsWith('/subjects'))return response(config,[]);
+ if(config.url.endsWith('/subjects')||config.url.endsWith('/subjects/my')||config.url.endsWith('/subjects/browse'))return response(config,[]);
  if(config.url.endsWith('/profile'))return response(config,{...target,status:'ACTIVE',studentId:'P7'});
  return response(config,{completedModules:3,passedAssessments:2,totalBadges:4});
 };}
@@ -76,7 +77,7 @@ test('selection enters acting routes, keeps Admin login and hides credentials',a
   assert.match(document.body.textContent,/SUPPORT MODE .* Acting as: Student A/);
   assert.equal(document.querySelector('output').textContent,'/admin/student-mode/'+id);
   const create=calls.find(c=>c.method==='post');assert.deepEqual(JSON.parse(create.data),{targetUserId:7,targetRole:'STUDENT'});
-  await click(document.querySelector('a[href$="/subjects"]'));assert.match(document.body.textContent,/Subjects/);
+  await click(button('Subjects'));await click(document.querySelector('a[href$="/subjects/my"]'));assert.match(document.body.textContent,/Subjects/);
   await click(document.querySelector('a[href$="/profile"]'));assert.equal(button('Change password'),undefined);assert.equal(document.querySelector('[role="dialog"]'),null);
   const work=calls.filter(c=>c.url.startsWith('/admin/acting/student/'));
   assert.ok(work.length>=3);assert.ok(work.every(c=>c.headers.get('X-Acting-Session')===id&&c.headers.get('Authorization')==='Bearer admin-test-token'));
@@ -87,11 +88,11 @@ test('selection enters acting routes, keeps Admin login and hides credentials',a
 });
 test('direct refresh restores session and responsive acting navigation at all widths',async()=>{
  for(width of [1440,768,390]){
-  const calls=[];api.defaults.adapter=adapter(calls);const cleanup=await mount('/admin/student-mode/'+id+'/subjects');
+  const calls=[];api.defaults.adapter=adapter(calls);const cleanup=await mount('/admin/student-mode/'+id+'/subjects/my');
   try{assert.equal(calls[0].url,'/admin/acting/sessions/'+id);assert.match(document.body.textContent,/Acting as: Student A/);
    const toggle=document.querySelector('[aria-label="Open navigation"]');if(width<=1024){assert.ok(toggle);await click(toggle);}
    assert.ok([...document.querySelectorAll('nav a')].every(a=>a.getAttribute('href').startsWith('/admin/student-mode/'+id)));
-   assert.equal(document.querySelector('nav a[aria-current="page"]').getAttribute('href'),'/admin/student-mode/'+id+'/subjects');
+   assert.equal(document.querySelector('nav a[aria-current="page"]').getAttribute('href'),'/admin/student-mode/'+id+'/subjects/my');
    if(width<=1024){await click(document.querySelector('[aria-label="Close navigation"]'));assert.equal(document.querySelector('[role="dialog"]'),null);}
   }finally{await cleanup();}
  }width=1440;
@@ -165,7 +166,7 @@ test('acting Mentor loads older messages and reconciles a lost POST with the sam
   assert.equal(document.body.textContent.split('Recent message').length-1,1);
   await inputText(document.querySelector('[aria-label="Message AI Mentor"]'),'Explain this lesson');
   await click(document.querySelector('[aria-label="Send message"]'));
-  assert.ok(document.body.textContent.includes("lesson.pdf (page 2)"));assert.ok(sentKey);
+  assert.ok(!document.body.textContent.includes("lesson.pdf (page 2)"));assert.match(document.body.textContent,/Saved answer\./);assert.ok(sentKey);
   assert.equal(calls.filter(c=>c.method==='post'&&c.url.includes('/mentor/message/')).length,1);
   assert.ok(calls.filter(c=>c.url.includes('/mentor/')).every(c=>c.headers.get('X-Acting-Session')===id));
  }finally{await cleanup();}
@@ -248,7 +249,7 @@ test('Preview quiz returns a labeled temporary result and reconciles lost respon
   }finally{await cleanup();}
  }
 });
-test('Preview Mentor retains pagination, citations and request-key reconciliation in the preview API',async()=>{
+test('Preview Mentor retains pagination and request-key reconciliation in the preview API',async()=>{
  const calls=[];let key;api.defaults.adapter=adapter(calls,c=>{
   if(c.url.includes('/mentor/session/'))return response(c,{sessionId:8,moduleId:10,messages:[{id:1,sender:'HALO',message:'Older temporary message'}],hasOlder:false});
   if(c.method==='post'&&c.url.includes('/mentor/message/')){key=JSON.parse(c.data).requestId;return Promise.reject(Object.assign(new Error('timeout'),{config:c,code:'ECONNABORTED'}));}
@@ -258,7 +259,7 @@ test('Preview Mentor retains pagination, citations and request-key reconciliatio
   assert.match(document.body.textContent,/Preview conversation/);assert.match(document.body.textContent,/will not be added/);
   await click(button('Load older messages'));assert.match(document.body.textContent,/Older temporary message/);
   await inputText(document.querySelector('[aria-label="Message AI Mentor"]'),'Question');await click(document.querySelector('[aria-label="Send message"]'));
-  assert.ok(document.body.textContent.includes('lesson.pdf (page 2)'));assert.ok(key);assert.equal(calls.filter(c=>c.method==='post'&&c.url.includes('/mentor/message/')).length,1);
+  assert.ok(!document.body.textContent.includes('lesson.pdf (page 2)'));assert.match(document.body.textContent,/Temporary reply\./);assert.ok(key);assert.equal(calls.filter(c=>c.method==='post'&&c.url.includes('/mentor/message/')).length,1);
   assert.ok(calls.every(c=>c.url.startsWith('/admin/preview/student/')));
  }finally{await cleanup();}
 });
@@ -357,4 +358,12 @@ test('incomplete Student entry displays actionable error and keeps Support confi
   assert.match(dialog.querySelector('[role="alert"]').textContent,/Academic details are required/);
   await click(button('Cancel'));assert.equal(document.querySelector('[role="dialog"]'),null);
  }finally{await cleanup();}
+});
+
+test('curriculum metadata reads retain exact Preview and Support API/session scope',async()=>{
+ for(const preview of [false,true]){
+  const calls=[];api.defaults.adapter=async config=>{calls.push(config);return response(config,{subjectId:15,weeks:[]});};
+  const scope=services.createActingStudentScope(id,assert.fail,preview);
+  try{await scope.api.getSubjectCurriculum(15);assert.equal(calls.length,1);assert.equal(calls[0].method,'get');assert.equal(calls[0].url,`/admin/${preview?'preview':'acting'}/student/subjects/15/curriculum`);assert.equal(calls[0].headers.get('X-Acting-Session'),id);}finally{scope.dispose();}
+ }
 });

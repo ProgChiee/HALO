@@ -96,3 +96,17 @@ test('invalid-code message allows retry and successful reset returns to Login', 
     await act(async () => view.submit()); assert.match(view.host.textContent, /Login page/);
   } finally { await view.close(); }
 });
+
+test('institutional email popup isolates the recovery form and closes only through explicit action or safe Escape',async()=>{
+ let requests=0;api.defaults.adapter=config=>{requests++;return Promise.resolve(response(config));};
+ const view=await mount();try{
+  await fill(view.host.querySelector('input'),'person@example.test');
+  const trigger=view.host.querySelector('[type="submit"]');trigger.focus();await act(async()=>view.submit());
+  const dialog=document.querySelector('[role=dialog]');assert.ok(dialog);assert.equal(dialog.getAttribute('aria-modal'),'true');assert.match(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent,/Institutional email/);
+  await act(async()=>dialog.parentElement.click());assert.ok(dialog.isConnected);assert.equal(requests,0);assert.ok(view.host.hasAttribute('inert'));assert.equal(document.activeElement.textContent,'Okay');
+  await act(async()=>dialog.querySelector('button').click());assert.equal(document.querySelector('[role=dialog]'),null);assert.equal(document.activeElement,trigger);
+  assert.equal(view.host.querySelector('input').value,'person@example.test');
+  await act(async()=>view.submit());await act(async()=>document.querySelector('[role=dialog]').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+  assert.equal(document.querySelector('[role=dialog]'),null);assert.equal(requests,0);
+ }finally{await view.close();}
+});

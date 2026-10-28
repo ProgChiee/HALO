@@ -7,15 +7,7 @@
   background: var(--color-bg-content);
 }
 
-.contentArea {
-  flex: 1;
-  min-width: 0;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
+.contentArea { composes: frame from "../../../components/shared/PageLayout.module.css"; }
 
 .topbar {
  composes: topbar from "../../../components/shared/Navigation.module.css";
@@ -92,7 +84,7 @@
   border: 1px solid var(--color-border-stat-card);
   border-radius: var(--radius-stat-card);
   padding: var(--space-lg);
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--page-section-gap, 24px);
 
   box-shadow: var(--shadow-sm);
 }
@@ -180,7 +172,7 @@
 @media (max-width: 480px) { .continueCard > button { width: 100%; } }
 
 
-.studySection { margin-bottom: var(--space-8); }
+.studySection { margin-bottom: var(--page-section-gap, 24px); }
 .studyActivityGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--space-4); }
 .activityCard { composes: surface from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-4); min-width: 0; }
 .activityLabel { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-muted); margin-bottom: var(--space-2); }
@@ -203,7 +195,7 @@
   color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
-.continueCard { padding: var(--space-4); margin-bottom: var(--space-8); }
+.continueCard { padding: var(--space-4); margin-bottom: var(--page-section-gap, 24px); }
 .continueIcon { background: var(--color-primary-soft); color: var(--color-primary); }
 .subjectRow { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: var(--space-2) var(--space-4); padding: var(--space-4); }
 .subjectBar { grid-column: 1 / -1; width: 100%; height: var(--space-2); appearance: none; border: 0; border-radius: var(--radius-pill); overflow: hidden; background: var(--color-primary-soft); }

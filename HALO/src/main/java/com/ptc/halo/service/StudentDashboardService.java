@@ -71,7 +71,7 @@ public class StudentDashboardService {
 
         Optional<AssessmentAttemptEntity> latestAttempt =
                 assessmentAttemptRepository
-                        .findTopByStudentIdAndSubmittedAtIsNotNullOrderBySubmittedAtDesc(
+                        .findTopByStudentIdAndSubmittedAtIsNotNullOrderBySubmittedAtDescIdDesc(
                                 student.getId()
                         );
 

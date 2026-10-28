@@ -28,6 +28,7 @@ const LessonEditor = lazy(() => import('../pages/professor/components/LessonEdit
 const StudentProgress = lazy(() => import('../pages/professor/components/StudentProgress'));
 const ProfessorProfile = lazy(() => import('../pages/professor/components/ProfessorProfile'));
 const StudentDashboard = lazy(() => import('../pages/student/components/StudentDashboard'));
+const EnrollmentSubjects = lazy(() => import('../pages/student/components/EnrollmentSubjects'));
 const Subjects = lazy(() => import('../pages/student/components/Subjects'));
 const LessonChat = lazy(() => import('../pages/student/components/LessonChat'));
 const Progress = lazy(() => import('../pages/student/components/Progress'));
@@ -95,22 +96,26 @@ export default function AppRoutes() {
       <Route path="/admin/student-mode/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><StudentMode /></ProtectedRoute>}>
         <Route index element={<StudentDashboard />} />
         <Route path="subjects" element={<Subjects />} />
+        <Route path="subjects/my" element={<EnrollmentSubjects />} />
+        <Route path="subjects/browse" element={<EnrollmentSubjects browse />} />
         <Route path="lesson/:topicId/:weekId" element={<LessonChatRoute />} />
         <Route path="quiz/:topicId/:weekId" element={<QuizRoute />} />
         <Route path="progress" element={<Progress />} />
         <Route path="badges" element={<Badges />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="*" element={<Navigate to="subjects" replace />} />
+        <Route path="*" element={<Navigate to="subjects/my" replace />} />
       </Route>
       <Route path="/admin/student-preview/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><StudentMode preview /></ProtectedRoute>}>
         <Route index element={<StudentDashboard />} />
         <Route path="subjects" element={<Subjects />} />
+        <Route path="subjects/my" element={<EnrollmentSubjects />} />
+        <Route path="subjects/browse" element={<EnrollmentSubjects browse />} />
         <Route path="lesson/:topicId/:weekId" element={<LessonChatRoute />} />
         <Route path="quiz/:topicId/:weekId" element={<QuizRoute />} />
         <Route path="progress" element={<Progress />} />
         <Route path="badges" element={<Badges />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="*" element={<Navigate to="subjects" replace />} />
+        <Route path="*" element={<Navigate to="subjects/my" replace />} />
       </Route>
       <Route path="/admin/professor-mode" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><ProfessorModeSelector /></ProtectedRoute>} />
       <Route path="/admin/professor-mode/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><ProfessorMode /></ProtectedRoute>}>
@@ -238,6 +243,8 @@ export default function AppRoutes() {
         }
       />
 
+      <Route path="/student/subjects/my" element={<ProtectedRoute allowedRoles={[ROLES.STUDENT]}><EnrollmentSubjects /></ProtectedRoute>} />
+      <Route path="/student/subjects/browse" element={<ProtectedRoute allowedRoles={[ROLES.STUDENT]}><EnrollmentSubjects browse /></ProtectedRoute>} />
       <Route
         path="/student/subjects"
         element={

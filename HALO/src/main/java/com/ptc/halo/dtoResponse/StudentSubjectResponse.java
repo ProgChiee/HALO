@@ -5,6 +5,9 @@ import com.ptc.halo.enums.YearLevel;
 public class StudentSubjectResponse {
 
     private Long subjectId;
+    private boolean enrolled;
+    public boolean isEnrolled() { return enrolled; }
+    public void setEnrolled(boolean enrolled) { this.enrolled = enrolled; }
 
     private String subjectCode;
 

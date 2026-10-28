@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect, useRef } from 'react';
@@ -30,6 +31,7 @@ function WeekQuiz({ subjectId, weekId }) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [enrollmentRequired, setEnrollmentRequired] = useState(false);
   const [loadRetry, setLoadRetry] = useState(0);
   const loadLock = useRef(true);
   const [moduleId, setModuleId] = useState(null);
@@ -46,6 +48,11 @@ function WeekQuiz({ subjectId, weekId }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const actionLock = useRef(false);
   const mounted = useRef(false);
+  const stageHeading = useRef(null);
+
+  useEffect(() => {
+    if (stage !== 'intro') stageHeading.current?.focus({ preventScroll: true });
+  }, [stage, currentIndex]);
 
   useEffect(() => {
     mounted.current = true;
@@ -61,6 +68,7 @@ function WeekQuiz({ subjectId, weekId }) {
       loadLock.current = true;
       setIsLoading(true);
       setLoadError(false);
+      setEnrollmentRequired(false);
       try {
         const module = await getWeekLesson(weekId, config);
         if (!isMounted) return;
@@ -81,7 +89,7 @@ function WeekQuiz({ subjectId, weekId }) {
         }
       } catch (err) {
         logStudentError('load-quiz', err);
-        if (isMounted) setLoadError(quizLoadError(err));
+        if (isMounted) { setEnrollmentRequired(err?.response?.data?.code === 'ENROLLMENT_REQUIRED'); setLoadError(quizLoadError(err)); }
       } finally {
         if (isMounted) { loadLock.current = false; setIsLoading(false); }
       }
@@ -102,6 +110,7 @@ function WeekQuiz({ subjectId, weekId }) {
   if (isLoading) {
     return (
       <StudentPageShell>
+      <Topbar title="Assessment" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText} role="status">Loading quiz...</p>
         </div>
@@ -112,12 +121,14 @@ function WeekQuiz({ subjectId, weekId }) {
   if (loadError) {
     return (
       <StudentPageShell>
+      <Topbar title="Assessment" />
         <div className={styles.contentArea}>
           <div className={styles.introCard}>
             <p className={styles.introDescription} role="alert">
               {loadError}
             </p>
             <Button onClick={retryLoad} disabled={isLoading}>Retry</Button>
+            {enrollmentRequired && <Button onClick={() => navigate(workflow.basePath + '/subjects/browse')}>Browse Subjects</Button>}
           </div>
         </div>
       </StudentPageShell>
@@ -126,9 +137,10 @@ function WeekQuiz({ subjectId, weekId }) {
 
   if (!assessment?.questions?.length) {
     return <StudentPageShell>
+      <Topbar title="Assessment" />
       <main className={styles.contentArea}>
         <p className={styles.loadingText}>This quiz is not available yet.</p>
-        <Button onClick={() => navigate(workflow.basePath + '/subjects')}>Back to Subjects</Button>
+        <Button onClick={() => navigate(workflow.basePath + '/subjects/my')}>Back to Subjects</Button>
       </main>
     </StudentPageShell>;
   }
@@ -236,21 +248,18 @@ function WeekQuiz({ subjectId, weekId }) {
     <StudentPageShell>
 
       <div className={styles.contentArea}>
-        <header className={styles.topbar}>
+        <Topbar>
           <div className={styles.breadcrumb}>
             <ClipboardCheck size={16} />
             {assessment.title}
           </div>
           <span className={styles.lessonTag}>Week {weekNumber}</span>
-        </header>
+        </Topbar>
 
         <main className={styles.main}>
           <QuizVersion version={assessment.quizVersion} currentVersion={assessment.currentQuizVersion} continuing={!workflow.preview && stage !== 'results' && status?.hasUnfinishedAttempt} />
           {stage === 'intro' && (
             <div className={styles.introCard}>
-              <span className={styles.introIcon}>
-                <ClipboardCheck size={28} />
-              </span>
               <h1 className={styles.introTitle}>{assessment.title}</h1>
               <p className={styles.introMeta}>
                 {assessment.questions.length} questions · Multiple choice · Pass with {assessment.passingScore}%
@@ -281,7 +290,7 @@ function WeekQuiz({ subjectId, weekId }) {
                 <span className={styles.progressText}>
                   Question {currentIndex + 1} of {assessment.questions.length}
                 </span>
-                <div className={styles.progressTrack}>
+                <div className={styles.progressTrack} role="progressbar" aria-label="Question position" aria-valuemin={1} aria-valuemax={assessment.questions.length} aria-valuenow={currentIndex + 1}>
                   <div
                     className={styles.progressFill}
                     style={{ width: `${((currentIndex + 1) / assessment.questions.length) * 100}%` }}
@@ -289,9 +298,9 @@ function WeekQuiz({ subjectId, weekId }) {
                 </div>
               </div>
 
-              <h2 className={styles.questionText}>{currentQuestion.questionText}</h2>
+              <h2 id="quiz-question" ref={stageHeading} tabIndex={-1} className={styles.questionText}>{currentQuestion.questionText}</h2>
 
-              <div className={styles.optionsList}>
+              <div className={styles.optionsList} role="group" aria-labelledby="quiz-question">
                 {OPTION_KEYS.map((letter) => {
                   const optionText = currentQuestion[`option${letter}`];
                   if (!optionText) return null;
@@ -299,18 +308,20 @@ function WeekQuiz({ subjectId, weekId }) {
                   return (
                     <button
                       key={letter}
+                      type="button"
                       className={`${styles.optionRow} ${isSelected ? styles.optionRowSelected : ''}`}
                       aria-pressed={isSelected}
                       disabled={isSubmitting} onClick={() => handleSelectOption(letter)}
                     >
                       <span className={styles.optionMarker}>{letter}</span>
-                      {optionText}
+                      <span className={styles.optionText}>{optionText}</span>
                     </button>
                   );
                 })}
               </div>
 
               <div className={styles.actionsRow}>
+                <p className={styles.answerCount} role="status">{Object.keys(selectedAnswers).length} of {assessment.questions.length} answered</p>
                 <Button
                   onClick={handleNext}
                   disabled={!hasAnsweredCurrent || isSubmitting}
@@ -327,8 +338,9 @@ function WeekQuiz({ subjectId, weekId }) {
               <span className={styles.resultsIcon}>
                 {result.passed ? <CheckCircle2 size={32} /> : <XCircle size={32} />}
               </span>
-              <h1 className={styles.resultsScore}>{workflow.preview ? 'Preview Score: ' : ''}{result.score}%</h1>
+              <h1 ref={stageHeading} tabIndex={-1} className={styles.resultsScore}>{workflow.preview ? 'Preview Score: ' : ''}{result.score}%</h1>
               {workflow.preview && <p role="status">This was a preview attempt. No Student progress or academic records were changed.</p>}
+              <p className={styles.resultStatus}>{result.passed ? 'Passed' : 'Not passed'}</p>
               <p className={styles.resultsMessage}>
                 {result.passed
                   ? "Great job! You've passed this quiz."

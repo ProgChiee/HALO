@@ -274,11 +274,11 @@ test('temporary-password account cannot render normal privileged content', async
   const { MemoryRouter } = await import('react-router-dom');
   const { AuthContext } = await server.ssrLoadModule('/src/context/login/useAuth.js');
   const { default: Guard } = await server.ssrLoadModule('/src/routes/ProtectedRoute.jsx');
-  for (const path of ['/superadmin', '/superadmin/profile']) {
+  for (const path of ['/superadmin', '/superadmin/profile', '/superadmin/settings']) {
     const html = renderToString(React.createElement(MemoryRouter, { initialEntries: [path] },
       React.createElement(AuthContext.Provider, { value: { role: 'superadmin', isAuthenticated: true, user: { mustChangePassword: true } } },
         React.createElement(Guard, { allowedRoles: ['superadmin'] }, 'protected-content'))));
-    assert.equal(html.includes('protected-content'), path.endsWith('/profile'));
+    assert.equal(html.includes('protected-content'), path.endsWith('/settings'));
   }
 });
 

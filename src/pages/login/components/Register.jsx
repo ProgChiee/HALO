@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, User, Mail, KeyRound, Eye, EyeOff, Hash, Users2 } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { register as registerService } from '../../../services/authService';
@@ -62,8 +62,8 @@ export default function Register() {
   }
 
   return (
-    <div className={styles.wrapper} style={{ '--bg-image': `url(${bgImage})` }}>
-      <div className={styles.card}>
+    <main className={styles.wrapper} style={{ '--bg-image': `url(${bgImage})` }}>
+      <section className={styles.card} aria-labelledby="register-title">
         <div className={styles.formCard}>
           <div className={styles.formHeader}>
         <button className={styles.backBtn} onClick={() => navigate(-1)}>
@@ -71,9 +71,9 @@ export default function Register() {
           Back
         </button>
 
-        <h1 className={styles.title}>Register account</h1>
+        <h1 id="register-title" className={styles.title}>Create your account</h1>
         <p className={styles.subtitle}>
-          Create your HALO account to start your learning journey.
+          Start learning with HALO.
         </p>
 
         </div>
@@ -82,11 +82,10 @@ export default function Register() {
             <div className={styles.field}>
               <label className={styles.label} htmlFor="register-name">Full name</label>
               <div className={styles.inputWrapper}>
-                <User size={18} className={styles.inputIcon} />
                 <input
                   type="text"
                   className={styles.input}
-                  id="register-name" aria-invalid={!!errors.name} aria-describedby="register-name-hint" disabled={isLoading}
+                  id="register-name" autoComplete="name" aria-invalid={!!errors.name} aria-describedby="register-name-hint" disabled={isLoading}
                   value={fullName}
                   onChange={(e) => { setFullName(e.target.value); clearField('name'); }}
                   placeholder="Your full name"
@@ -98,11 +97,10 @@ export default function Register() {
             <div className={styles.field}>
               <label className={styles.label} htmlFor="register-email">Email</label>
               <div className={styles.inputWrapper}>
-                <Mail size={18} className={styles.inputIcon} />
                 <input
                   type="email"
                   className={styles.input}
-                  id="register-email" aria-invalid={!!errors.email} aria-describedby="register-email-hint" disabled={isLoading}
+                  id="register-email" autoComplete="email" aria-invalid={!!errors.email} aria-describedby="register-email-hint" disabled={isLoading}
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); clearField('email'); }}
                   placeholder="Your@Paterostechnologicalcollege.edu.ph"
@@ -116,7 +114,6 @@ export default function Register() {
 <div className={styles.field}>
               <label className={styles.label} htmlFor="register-studentId">Student ID</label>
               <div className={styles.inputWrapper}>
-                <Hash size={18} className={styles.inputIcon} />
                 <input
                   type="text"
                   className={styles.input}
@@ -132,7 +129,6 @@ export default function Register() {
             <div className={styles.field}>
               <label className={styles.label} htmlFor="register-section">Section</label>
               <div className={styles.inputWrapper}>
-                <Users2 size={18} className={styles.inputIcon} />
                 <input
                   type="text"
                   className={styles.input}
@@ -162,11 +158,10 @@ export default function Register() {
 <div className={styles.field}>
               <label className={styles.label} htmlFor="register-password">Password</label>
               <div className={styles.inputWrapper}>
-                <KeyRound size={18} className={styles.inputIcon} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   className={styles.input}
-                  id="register-password" aria-invalid={!!errors.password} aria-describedby="register-password-hint" disabled={isLoading}
+                  id="register-password" autoComplete="new-password" aria-invalid={!!errors.password} aria-describedby="register-password-hint" disabled={isLoading}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
                   placeholder="Password"
@@ -175,6 +170,7 @@ export default function Register() {
                   type="button"
                   className={styles.eyeToggle}
                   onClick={() => setShowPassword((v) => !v)}
+                  aria-controls="register-password" aria-pressed={showPassword} disabled={isLoading}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -186,11 +182,10 @@ export default function Register() {
             <div className={styles.field}>
               <label className={styles.label} htmlFor="register-confirmPassword">Confirm password</label>
               <div className={styles.inputWrapper}>
-                <KeyRound size={18} className={styles.inputIcon} />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   className={styles.input}
-                  id="register-confirmPassword" aria-invalid={!!errors.confirmPassword} aria-describedby="register-confirmPassword-hint" disabled={isLoading}
+                  id="register-confirmPassword" autoComplete="new-password" aria-invalid={!!errors.confirmPassword} aria-describedby="register-confirmPassword-hint" disabled={isLoading}
                   value={confirmPassword}
                   onChange={(e) => { setConfirmPassword(e.target.value); clearField('confirmPassword'); }}
                   placeholder="Repeat your password"
@@ -199,6 +194,7 @@ export default function Register() {
                   type="button"
                   className={styles.eyeToggle}
                   onClick={() => setShowConfirmPassword((v) => !v)}
+                  aria-controls="register-confirmPassword" aria-pressed={showConfirmPassword} disabled={isLoading}
                   aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -210,16 +206,15 @@ export default function Register() {
             </fieldset>
             {error && <p role="alert" className={styles.error}>{error}</p>}
 
-            <Button type="submit" disabled={isLoading} isLoading={isLoading}>Create account</Button>
+            <Button type="submit" disabled={isLoading} isLoading={isLoading}>Create Account</Button>
 
             <p className={styles.signinText}>
               Already have an account?{' '}
-              <Link to="/login" className={styles.signinLink}>Log in</Link>
+              <Link to="/login" className={styles.signinLink}>Sign in</Link>
             </p>
           </form>
         </div>
-      </div>
-
-    </div>
+      </section>
+    </main>
   );
 }

@@ -15,9 +15,10 @@
 
 /* --- Tabs --- */
 .tabRow {
+  composes: wide from "../../../components/shared/PageLayout.module.css";
   display: flex;
   gap: var(--space-xs);
-  padding: var(--space-md) var(--space-xl) 0;
+  flex-wrap: wrap;
 }
 
 .tabBtn {

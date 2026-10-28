@@ -6,7 +6,7 @@ import styles from '../styles/StudentPageShell.module.css';
 
 export default function StudentPageShell({ children }) {
   const workflow = useStudentWorkflow();
-  const items = workflow.acting ? STUDENT_NAV_ITEMS.filter(item => !item.path.endsWith('/settings')).map(item => ({ ...item, path: item.path.replace('/student', workflow.basePath) })) : STUDENT_NAV_ITEMS;
+  const items = workflow.acting ? STUDENT_NAV_ITEMS.filter(item => !item.path.endsWith('/settings')).map(item => ({ ...item, path: item.path.replace('/student', workflow.basePath), children: item.children?.map(child => ({ ...child, path: child.path.replace('/student', workflow.basePath) })) })) : STUDENT_NAV_ITEMS;
   return <PageShell responsive roleBadge="Student" navItems={items} navigationLabel="HALO · Student" className={styles.shell}>
     {workflow.acting && <section className={`${modeStyles.banner} ${workflow.preview ? modeStyles.previewBanner : modeStyles.supportBanner}`} aria-label="Student acting mode">
       <strong>{workflow.preview ? 'PREVIEW MODE - Viewing as: ' : 'SUPPORT MODE - REAL STUDENT DATA - Acting as: '}{workflow.target.name || 'Student'}</strong>

@@ -16,33 +16,34 @@ before(async () => {
   ProtectedRoute = (await server.ssrLoadModule('/src/routes/ProtectedRoute.jsx')).default;
   ({ AuthContext } = await server.ssrLoadModule('/src/context/login/useAuth.js'));
   ({ ToastContext } = await server.ssrLoadModule('/src/context/notifications/useToast.js'));
-  Profile = (await server.ssrLoadModule('/src/pages/admin/components/AdminProfile.jsx')).default;
+  Profile = (await server.ssrLoadModule('/src/components/shared/Settings.jsx')).default;
   api = (await server.ssrLoadModule('/src/services/apiClient.js')).default;
 });
 after(async () => { await server.close(); dom.window.close(); });
-test('login destinations preserve normal Admin and forced role-specific profiles', () => {
+test('login destinations preserve normal Admin and forced role-specific settings', () => {
   assert.equal(ROLE_HOME.admin, '/admin');
-  assert.equal(getPasswordChangeRoute('admin'), '/admin/profile');
-  assert.equal(getPasswordChangeRoute('superadmin'), '/superadmin/profile');
+  assert.equal(getPasswordChangeRoute('admin'), '/admin/settings');
+  assert.equal(getPasswordChangeRoute('superadmin'), '/superadmin/settings');
 });
-test('guard redirects forced users to their own profile without loops or cross-role access', async () => {
+test('guard redirects forced users to their own settings without loops or cross-role access', async () => {
   for (const role of ['admin', 'superadmin']) {
     for (const forced of [false, true]) {
-      for (const initial of [`/${role}`, `/${role}/profile`]) {
+      for (const initial of [`/${role}`, `/${role}/profile`, `/${role}/settings`]) {
         const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
         const wrap = text => React.createElement(ProtectedRoute, { allowedRoles: [role] }, text);
         try {
           await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { role, user: { mustChangePassword: forced }, isAuthenticated: true } },
             React.createElement(Router.MemoryRouter, { initialEntries: [initial] }, React.createElement(Router.Routes, {},
               React.createElement(Router.Route, { path: `/${role}`, element: wrap('Business') }),
-              React.createElement(Router.Route, { path: `/${role}/profile`, element: wrap('Password profile') }))))));
-          assert.equal(host.textContent, forced || initial.endsWith('/profile') ? 'Password profile' : 'Business');
+              React.createElement(Router.Route, { path: `/${role}/profile`, element: wrap('Profile') }),
+              React.createElement(Router.Route, { path: `/${role}/settings`, element: wrap('Password settings') }))))));
+          assert.equal(host.textContent, forced || initial.endsWith('/settings') ? 'Password settings' : initial.endsWith('/profile') ? 'Profile' : 'Business');
         } finally { await act(async () => root.unmount()); host.remove(); }
       }
     }
   }
 });
-test('Admin profile automatically exposes password form and keeps close/reopen behavior', async () => {
+test('Admin Settings automatically exposes password form and keeps close/reopen behavior', async () => {
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const calls = [];
   let logoutCount = 0;
@@ -51,16 +52,18 @@ test('Admin profile automatically exposes password form and keeps close/reopen b
   api.defaults.adapter = async config => { calls.push(config.url); if (config.method === 'post') submitted = JSON.parse(config.data); return { status: 200, headers: {}, config, data: { name: 'Admin', email: 'admin@example.test', status: 'ACTIVE' } }; };
   try {
     await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { role: 'admin', user: { name: 'Admin', mustChangePassword: true }, logout() { logoutCount++; } } },
-      React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Profile), React.createElement(Location))))));
+      React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Profile, { role: 'admin' }), React.createElement(Location))))));
     assert.match(host.textContent, /Change your temporary password/);
     assert.ok(document.querySelector('#current-password'));
     assert.ok(document.querySelector('#new-password'));
-    assert.deepEqual(calls, ['/admin/profile']);
+    assert.deepEqual(calls, []);
     await act(async () => document.querySelector('button[aria-label="Close"]').click());
     assert.equal(document.querySelector('#current-password'), null);
     await act(async () => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Change password').click());
     const opener = [...host.querySelectorAll('button')].find(button => button.textContent.trim() === 'Change password');
     await act(async () => document.querySelector('[role="dialog"]').dispatchEvent(new dom.window.KeyboardEvent('keydown', {key:'Escape',bubbles:true})));
+    assert.ok(document.querySelector('[role="dialog"]'));
+    await act(async()=>document.querySelector('[role="dialog"] [aria-label="Close"]').click());
     await act(async () => { opener.focus(); opener.click(); });
     const dialog = document.querySelector('[role="dialog"]');
     assert.equal(dialog.getAttribute('aria-labelledby'), 'change-password-title');
@@ -70,6 +73,8 @@ test('Admin profile automatically exposes password form and keeps close/reopen b
       assert.ok(dialog.contains(document.activeElement));
     });
     await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', {key:'Escape',bubbles:true})));
+    assert.ok(document.querySelector('[role="dialog"]'));
+    await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.trim()==='Cancel' || b.getAttribute('aria-label')==='Close').click());
     assert.equal(document.querySelector('[role="dialog"]'),null);
     assert.equal(document.activeElement,opener);
     await act(async () => opener.click());

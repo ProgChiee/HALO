@@ -1,3 +1,4 @@
+import Dialog from '../../../components/shared/Dialog';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
@@ -279,15 +280,15 @@ export default function ForgotPassword() {
 
       {/* Institutional email popup */}
       {showEmailModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowEmailModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>Institutional email required</h3>
+        <Dialog closeOnEscape labelledBy="institutional-email-title" onClose={() => setShowEmailModal(false)} className={styles.modal} initialFocus="button">
+          <>
+            <h3 id="institutional-email-title" className={styles.modalTitle}>Institutional email required</h3>
             <p className={styles.modalText}>
               Please use your school email address (ending in {INSTITUTIONAL_DOMAIN}) to reset your password.
             </p>
             <Button onClick={() => setShowEmailModal(false)}>Okay</Button>
-          </div>
-        </div>
+          </>
+        </Dialog>
       )}
     </div>
   );

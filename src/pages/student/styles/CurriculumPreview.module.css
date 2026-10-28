@@ -1,0 +1,15 @@
+﻿.dialog { width: min(100%, 640px); padding: var(--space-6); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); color: var(--color-text-primary); box-shadow: var(--shadow-sm); }
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
+.header h2 { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: var(--text-lg); }
+.header button { flex-shrink: 0; }
+.dialog h3 { margin-bottom: var(--space-2); overflow-wrap: anywhere; }
+.dialog button { padding: var(--space-2) var(--space-4); min-height: 40px; border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-primary); background: var(--color-surface); font: inherit; cursor: pointer; }
+.meta { color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; }
+.metadata { display: flex; flex-wrap: wrap; gap: 0; margin: 0; }
+.metadata span { min-width: 0; overflow-wrap: anywhere; }
+.metadata span + span::before { content: "\2022"; padding-inline: var(--space-2); }
+.accessNote { margin: var(--space-4) 0 0; }
+.weeks { list-style: none; padding: 0; display: grid; gap: var(--space-3); }
+.weeks li { padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.weeks p { margin: var(--space-1) 0 0; overflow-wrap: anywhere; line-height: 1.5; }
+@media(max-width:640px) { .dialog { padding: var(--space-4); } }

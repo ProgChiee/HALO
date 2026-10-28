@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { LayoutGrid, Users, UsersRound, UserCheck, UserX, GraduationCap, Activity } from 'lucide-react';
@@ -42,12 +43,12 @@ export function DashboardSections({ statistics, logs }) {
 
   return (
     <PageShell responsive navItems={SUPERADMIN_NAV_ITEMS} sectionLabel="Superadmin" roleBadge="Superadmin">
-      <header className={styles.topbar}>
+      <Topbar>
         <div className={styles.breadcrumb}>
           <LayoutGrid size={16} />
           Dashboard
         </div>
-      </header>
+      </Topbar>
 
       <main className={styles.main}>
         <h1 className={styles.greeting}>Platform Overview</h1>

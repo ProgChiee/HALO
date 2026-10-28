@@ -24,5 +24,5 @@ export const ROLE_HOME = {
 };
 
 export function getPasswordChangeRoute(role) {
-  return ({ [ROLES.ADMIN]: '/admin/profile', [ROLES.SUPERADMIN]: '/superadmin/profile' })[role] ?? '/unauthorized';
+  return ({ [ROLES.ADMIN]: '/admin/settings', [ROLES.SUPERADMIN]: '/superadmin/settings' })[role] ?? '/unauthorized';
 }

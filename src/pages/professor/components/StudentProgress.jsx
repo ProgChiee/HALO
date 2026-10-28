@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useCallback, useState } from 'react';
 import { TrendingUp, CheckCircle2, Award, Users } from 'lucide-react';
@@ -25,6 +26,7 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
   if (isLoading) {
     return (
       <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+      <Topbar title="Student Progress" />
         <p className={styles.loadingText}>Loading student progress...</p>
       </PageShell>
     );
@@ -33,6 +35,7 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
   if (loadError) {
     return (
       <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+      <Topbar title="Student Progress" />
         <p className={styles.loadingText}>{professorErrorMessage(loadError, "Couldn't load student progress. Please try again.")}</p>
         <button onClick={reload}>Retry</button>
         {page > 0 && <button onClick={() => onPageChange(page - 1)}>Previous page</button>}
@@ -47,12 +50,12 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
 
   return (
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-      <header className={styles.topbar}>
+      <Topbar>
         <div className={styles.breadcrumb}>
           <TrendingUp size={16} />
           Student Progress
         </div>
-      </header>
+      </Topbar>
 
       <main className={styles.main}>
         <div className={styles.viewControls} role="group" aria-label="Student population">

@@ -1,24 +1,17 @@
+import ProfessorIdField from './ProfessorIdField';
+import Topbar from '../../../components/shared/Topbar';
 import { useAuth } from '../../../context/login/useAuth';
 import ProfileName from '../../../components/shared/ProfileName';
 import ProfilePhoto from '../../../components/shared/ProfilePhoto';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useEffect } from 'react';
-import { User as UserIcon, KeyRound } from 'lucide-react';
+import { User as UserIcon } from 'lucide-react';
 import PageShell from './ProfessorPageShell';
-import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/ProfessorProfile.module.css';
-
-// ✅ Wired to the real backend — ProfessorProfileResponse has
-// { userId, name, email, role, status, professorId }. No avatarInitial,
-// title, or dateJoined fields exist — those were mock-only.
-//
-// The "Edit Professor ID" feature was removed — only GET /professor/profile
-// exists on the backend so far, no update route yet (updateProfessorProfile()
-// in professorService.js is still flagged as unavailable).
 
 export default function ProfessorProfile() {
   const { user } = useAuth();
@@ -28,7 +21,6 @@ export default function ProfessorProfile() {
   const [loadError, setLoadError] = useState(null);
   const [retry, setRetry] = useState(0);
   const [profile, setProfile] = useState(null);
-  const [showChangePassword, setShowChangePassword] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -50,6 +42,7 @@ export default function ProfessorProfile() {
   if (isLoading) {
     return (
       <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+      <Topbar title="Profile" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading profile...</p>
         </div>
@@ -60,6 +53,7 @@ export default function ProfessorProfile() {
   if (loadError || !profile) {
     return (
       <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
+      <Topbar title="Profile" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>{professorErrorMessage(loadError, "Couldn't load your profile. Please try again.")}</p>
           <button onClick={() => { setIsLoading(true); setLoadError(null); setRetry(value => value + 1); }}>Retry</button>
@@ -75,12 +69,12 @@ export default function ProfessorProfile() {
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
 
       <div className={styles.contentArea}>
-        <header className={styles.topbar}>
+        <Topbar>
           <div className={styles.breadcrumb}>
             <UserIcon size={16} />
             Profile
           </div>
-        </header>
+        </Topbar>
 
         <main className={styles.main}>
           <div className={styles.profileHeader}>
@@ -97,8 +91,7 @@ export default function ProfessorProfile() {
           </div>
 
           <div className={styles.infoCard}>
-            <span className={styles.infoLabel}>Professor ID</span>
-            <span className={styles.infoValue}>{profile.professorId}</span>
+            <ProfessorIdField key={workflow.identity ?? workflow.basePath} value={profile.professorId} readOnly={workflow.acting} onSaved={professorId => setProfile(current => ({ ...current, professorId }))} />
           </div>
 
           <div className={styles.infoCard}>
@@ -106,21 +99,10 @@ export default function ProfessorProfile() {
             <span className={styles.infoValue}>{STATUS_LABELS[profile.status] ?? profile.status}</span>
           </div>
 
-          {!workflow.acting && <><h2 className={styles.sectionTitle}>Account</h2>
 
-          <button
-            className={styles.actionRow}
-            onClick={() => setShowChangePassword(true)}
-          >
-            <span className={styles.actionIcon}>
-              <KeyRound size={16} />
-            </span>
-            Change password
-          </button></>}
         </main>
       </div>
 
-      {!workflow.acting && <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />}
     </PageShell>
   );
 }

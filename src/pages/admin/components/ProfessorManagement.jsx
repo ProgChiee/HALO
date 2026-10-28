@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { archiveProfessor, restoreProfessor } from '../../../services/admin/adminService';
 import AccountLifecycle, { AccountStateFilters } from '../../../components/shared/AccountLifecycle';
 import Dialog from '../../../components/shared/Dialog';
@@ -204,12 +205,12 @@ export default function ProfessorManagement() {
       sectionLabel={isSuperAdmin ? 'Superadmin' : 'Admin'}
       roleBadge={isSuperAdmin ? 'Superadmin' : 'Admin'}
     >
-      <header className={styles.topbar}>
+      <Topbar>
         <div className={styles.breadcrumb}>
           <GraduationCap size={16} />
           Professor Management
         </div>
-      </header>
+      </Topbar>
 
       <main className={styles.main}>
         <AccountStateFilters value={accountState} onChange={setAccountState} />
@@ -363,7 +364,7 @@ export default function ProfessorManagement() {
       )}
 
       {viewingProfessor && (
-        <Dialog labelledBy="professor-view-title" onClose={closeModal} busy={isSubmitting} className={styles.modal}>
+        <Dialog closeOnEscape labelledBy="professor-view-title" onClose={closeModal} busy={isSubmitting} className={styles.modal}>
             <div className={styles.modalHeader}>
               <div className={styles.profileHeaderRow}>
                 <div className={styles.profileAvatar}>

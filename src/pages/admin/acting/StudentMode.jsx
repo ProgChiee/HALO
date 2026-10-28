@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { adminErrorMessage } from '../../../utils/adminErrors';
 import { Search } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -47,8 +48,9 @@ export function StudentModeSelector() {
     }
   }
   return <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+    <Topbar title="Student Mode" />
     <main className={styles.selector}>
-      <h1 className={styles.pageTitle}>Student Mode</h1><p className={styles.subtitle}>Select a Student to preview their learning experience safely. Support Mode is available separately for real, audited actions.</p>
+      <p className={styles.subtitle}>Select a Student to preview their learning experience safely. Support Mode is available separately for real, audited actions.</p>
       {location.state?.actingNotice && <p role="status">Student Mode ended. Select an active account to start a new session.</p>}
       <div className={styles.searchArea}>
       <label htmlFor="student-mode-search">Search Students</label>
@@ -98,10 +100,12 @@ export default function StudentModeRoute({ preview = false }) {
 function RestoreStudentMode({ id, preview }) {
   const loader = useCallback(config => (preview ? validateStudentPreview : validateStudentSession)(id, config), [id, preview]);
   const result = useRemoteData(loader);
-  if (result.isLoading) return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin"><p role="status">Restoring Student Mode...</p></PageShell>;
+  if (result.isLoading) return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin">
+      <Topbar title="Student Mode" /><p role="status">Restoring Student Mode...</p></PageShell>;
   if (result.error) {
     if ([400, 403, 404, 409].includes(result.error.response?.status)) return <Navigate to={selectionPath} replace state={{ actingNotice: true }} />;
-    return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin"><div className={styles.selector} role="alert">
+    return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin">
+      <Topbar title="Student Mode" /><div className={styles.selector} role="alert">
       Could not validate Student Mode. <button onClick={result.reload}>Retry</button><Link to="/admin">Back to Admin</Link>
     </div></PageShell>;
   }
@@ -136,6 +140,7 @@ function ActiveStudentMode({ session, preview }) {
   const value = { acting: true, preview, identity: `${preview ? "preview" : "support"}:${session.id}`, api: scope.api, target: session.target,
     basePath: (preview ? '/admin/student-preview' : selectionPath) + '/' + session.id, leave, leaving, exitError };
   return <StudentWorkflowContext.Provider value={value}>
-    {leaving ? <StudentPageShell responsive navItems={STUDENT_NAV_ITEMS} roleBadge="Student"><p role="status">Ending Student Mode...</p></StudentPageShell> : <Outlet />}
+    {leaving ? <StudentPageShell responsive navItems={STUDENT_NAV_ITEMS} roleBadge="Student">
+      <Topbar title="Student Mode" /><p role="status">Ending Student Mode...</p></StudentPageShell> : <Outlet />}
   </StudentWorkflowContext.Provider>;
 }

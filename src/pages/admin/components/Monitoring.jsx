@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import IncompleteProfiles from './IncompleteProfiles';
 import { accountDisplay, accountTick } from '../../../utils/adminAccountDisplay';
 import { apiErrorMessage } from '../../../utils/apiErrors';
@@ -81,13 +82,13 @@ export default function Monitoring() {
       sectionLabel={isSuperAdmin ? 'Superadmin' : 'Admin'}
       roleBadge={isSuperAdmin ? 'Superadmin' : 'Admin'}
     >
-      <header className={styles.topbar}>
+      <Topbar>
         <div className={styles.breadcrumb}>
           <Activity size={16} />
           Monitoring
           <span className={styles.breadcrumbSub}>System &amp; AI Activity Overview</span>
         </div>
-      </header>
+      </Topbar>
 
       <div className={`${styles.tabRow} ${isSuperAdmin ? styles.superAdminTabs : ''}`}>
         {tabs.map((tab) => (

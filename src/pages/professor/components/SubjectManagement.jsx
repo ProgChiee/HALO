@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import Dialog from '../../../components/shared/Dialog';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
@@ -257,7 +258,7 @@ export default function SubjectManagement() {
 
   return (
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-      <header className={styles.topbar}>
+      <Topbar>
         <div className={styles.breadcrumb}>
           <BookOpen size={16} />
           Subjects
@@ -266,7 +267,7 @@ export default function SubjectManagement() {
           <Plus size={16} style={{ marginRight: 6 }} />
           Create Subject
         </Button>
-      </header>
+      </Topbar>
 
       <main className={styles.main}>
         {isLoading ? (

@@ -69,4 +69,12 @@ class AdminStudentModeHttpTest {
   mvc.perform(get(path+"/subjects").header("Authorization","Bearer test-token").header("X-Acting-Session",id))
    .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("INTERNAL_SERVER_ERROR"));
  }
+
+ @Test void catalogUsesSessionGuardAndExposesNoAwardMutation() throws Exception {
+  token("ADMIN");when(badges.getCatalog()).thenReturn(java.util.List.of(new com.ptc.halo.dtoResponse.BadgeDefinitionResponse(com.ptc.halo.enums.BadgeType.FIRST_STEP,"First Step","Completed your first learning module.")));
+  when(mode.execute(any(),eq(id),any())).thenAnswer(invocation->((AdminStudentModeService.Work<?>)invocation.getArgument(2)).apply(mock(com.ptc.halo.entity.AdminActingSessionEntity.class)));
+  mvc.perform(get(path+"/badges/catalog").header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isOk()).andExpect(jsonPath("$[0].badgeType").value("FIRST_STEP"));
+  verify(badges).getCatalog();
+  mvc.perform(get(path+"/badges/catalog").header("Authorization","Bearer test-token")).andExpect(status().isBadRequest());
+ }
 }

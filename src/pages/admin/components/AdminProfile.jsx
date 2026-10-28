@@ -1,10 +1,10 @@
+import Topbar from '../../../components/shared/Topbar';
 import ProfileName from '../../../components/shared/ProfileName';
 import ProfilePhoto from '../../../components/shared/ProfilePhoto';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../../context/login/useAuth';
-import { User as UserIcon, KeyRound } from 'lucide-react';
+import { User as UserIcon } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
-import ChangePasswordModal from '../../../components/shared/ChangePasswordModal';
 import { ADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { getAdminProfile } from '../../../services/admin/adminService';
 import { STATUS_LABELS } from '../../../utils/backendContract';
@@ -22,7 +22,6 @@ export default function AdminProfile() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profile, setProfile] = useState(null);
-  const [showChangePassword, setShowChangePassword] = useState(user?.mustChangePassword === true);
 
   useEffect(() => {
     let isMounted = true;
@@ -43,6 +42,7 @@ export default function AdminProfile() {
   if (isLoading) {
     return (
       <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+      <Topbar title="Profile" />
         <p className={styles.loadingText}>Loading profile...</p>
       </PageShell>
     );
@@ -51,6 +51,7 @@ export default function AdminProfile() {
   if (loadError || !profile) {
     return (
       <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+      <Topbar title="Profile" />
         <p className={styles.loadingText}>Couldn't load your profile. Please refresh and try again.</p>
       </PageShell>
     );
@@ -61,15 +62,14 @@ export default function AdminProfile() {
 
   return (
     <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
-      <header className={styles.topbar}>
+      <Topbar>
         <div className={styles.breadcrumb}>
           <UserIcon size={16} />
           Profile
         </div>
-      </header>
+      </Topbar>
 
       <main className={styles.main}>
-        {user?.mustChangePassword && <p role="alert">Change your temporary password before using Admin features.</p>}
         <div className={styles.profileHeader}>
           <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={Boolean(user?.mustChangePassword)} getProfilePhoto={user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{displayName}</p><p className={styles.subMeta}>Admin</p></div>} />
         </div>
@@ -88,20 +88,9 @@ export default function AdminProfile() {
           <span className={styles.infoValue}>{STATUS_LABELS[profile.status] ?? profile.status}</span>
         </div>
 
-        <h2 className={styles.sectionTitle}>Account</h2>
 
-        <button
-          className={styles.actionRow}
-          onClick={() => setShowChangePassword(true)}
-        >
-          <span className={styles.actionIcon}>
-            <KeyRound size={16} />
-          </span>
-          Change password
-        </button>
       </main>
 
-      <ChangePasswordModal accessible isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
     </PageShell>
   );
 }

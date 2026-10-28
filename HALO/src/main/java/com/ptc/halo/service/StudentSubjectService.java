@@ -20,6 +20,7 @@ import java.util.List;
 public class StudentSubjectService {
 
     private final SubjectRepository subjectRepository;
+    private final com.ptc.halo.repository.StudentSubjectEnrollmentRepository enrollments;
 
     private final StudentProfileRepository
             studentProfileRepository;
@@ -37,7 +38,8 @@ public class StudentSubjectService {
             StudentProfileRepository studentProfileRepository,
             WeekRepository weekRepository,
             AiLearningModuleRepository aiLearningModuleRepository,
-            StudentModuleProgressRepository studentModuleProgressRepository) {
+            StudentModuleProgressRepository studentModuleProgressRepository, com.ptc.halo.repository.StudentSubjectEnrollmentRepository enrollments) {
+        this.enrollments = enrollments;
 
         this.subjectRepository =
                 subjectRepository;
@@ -89,6 +91,7 @@ public class StudentSubjectService {
 
     private List<StudentSubjectResponse> summarizeSubjects(UserEntity student, List<SubjectEntity> subjects) {
         if (subjects.isEmpty()) return List.of();
+        var enrolledIds = new java.util.HashSet<>(enrollments.subjectIds(student.getId()));
         var rows = weekRepository.findStudentWeekRows(subjects.stream().map(SubjectEntity::getId).toList(), student.getId());
         var bySubject = rows.stream().collect(java.util.stream.Collectors.groupingBy(WeekRepository.StudentWeekRow::getSubjectId));
         List<StudentSubjectResponse> responses = new ArrayList<>();
@@ -115,6 +118,7 @@ public class StudentSubjectService {
             response.setEligibleModuleCount(eligibleModuleCount);
 
 
+            response.setEnrolled(enrolledIds.contains(subject.getId()));
             response.setSubjectId(
                     subject.getId()
             );

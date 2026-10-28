@@ -1,162 +1,19 @@
-.wrapper {
-  composes: background from "./AuthPresentation.module.css";
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-lg);
-
-  
-}
-
-.card {
-  composes: surface from "./AuthPresentation.module.css";
-  width: 100%;
-  max-width: 420px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.logo {
-  display: block;
-  width: 320px;
-  max-width: 100%;
-  height: auto;
-  margin-inline: auto;
-  margin-bottom: var(--space-6);
-}
-
-.tagline {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-xl);
-}
-
-.formCard {
-  width: 100%;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  padding: 0;
-}
-
-.welcome {
-  font-size: var(--font-size-3xl);
-  margin-bottom: var(--space-xs);
-
-  font-weight: var(--font-weight-bold);
-
-  line-height: var(--line-height-tight);
-}
-
-.subtitle {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-lg);
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.inputWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.inputIcon {
-  position: absolute;
-  left: var(--space-md);
-  color: var(--color-text-muted);
-  pointer-events: none;
-}
-
-.input {
-  composes: control from "../../../components/shared/UIPrimitives.module.css";
-  width: 100%;
-  padding: var(--space-3) var(--space-md) var(--space-3) var(--space-input-icon);
-}
-
-.input::placeholder {
-  color: var(--color-text-muted);
-}
-
-.input:focus {
-  border-color: var(--color-accent-active);
-}
-
-.eyeToggle {
-  position: absolute;
-  right: var(--space-md);
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-}
-
-.forgotLink {
-  color: var(--color-accent-active);
-  font-size: var(--text-sm);
-}
-
-.error {
-  color: var(--color-error);
-  font-size: var(--text-sm);
-}
-
-.rememberRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: calc(var(--space-xs) * -1);
-}
-
-.checkboxLabel {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.checkbox {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--color-accent-active);
-}
-
-.signupText {
-  text-align: center;
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-.signupLink {
-  color: var(--color-accent-active);
-  font-weight: var(--font-weight-semibold);
-}
-/* Focused auth presentation; keep existing fields and reset stages intact. */
-.card { min-width: 0; padding: var(--space-6); }
-.title, .welcome { font-size: var(--font-size-2xl); overflow-wrap: anywhere; }
-.subtitle, .tagline { overflow-wrap: anywhere; }
-.inputWrapper, .field { min-width: 0; }
-.input { min-width: 0; padding-right: var(--space-input-icon); }
-.eyeToggle { width: var(--space-8); height: var(--space-8); justify-content: center; right: var(--space-2); border-radius: var(--radius-sm); }
-.eyeToggle:hover { background: var(--color-primary-soft); }
-.error { composes: error from "../../../components/shared/UIPrimitives.module.css"; overflow-wrap: anywhere; }
-@media (max-width: 480px) { .wrapper { padding: var(--space-4); } }
-
-.rememberRow { gap: var(--space-3); flex-wrap: wrap; }
-
-.tagline { text-align: center; margin-bottom: var(--space-6); }
-
-.input { background: var(--color-surface); }
-@media (max-width: 480px) { .card { padding: var(--space-5); } }
-
-@media (max-width: 480px) { .logo { width: 280px; margin-bottom: var(--space-5); } }
+.wrapper { composes: page from './AuthForm.module.css'; }
+.card { composes: card from './AuthForm.module.css'; max-width: 440px; }
+.logo { display: block; width: 184px; max-width: 65%; height: auto; margin: 0 auto var(--space-6); }
+.formCard { width: 100%; min-width: 0; }
+.welcome { composes: heading from './AuthForm.module.css'; }
+.subtitle { composes: subtitle from './AuthForm.module.css'; }
+.form { composes: form from './AuthForm.module.css'; display: flex; flex-direction: column; gap: var(--space-5); }
+.field { composes: field from './AuthForm.module.css'; }
+.label { composes: label from './AuthForm.module.css'; }
+.inputWrapper { composes: inputWrapper from './AuthForm.module.css'; }
+.input { composes: input from './AuthForm.module.css'; }
+.eyeToggle { composes: eyeToggle from './AuthForm.module.css'; }
+.rememberRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.checkboxLabel { display: flex; align-items: center; gap: var(--space-2); min-height: 24px; font-size: var(--text-sm); color: var(--color-text-secondary); cursor: pointer; }
+.checkbox { width: 16px; height: 16px; margin: 0; accent-color: var(--color-primary); }
+.forgotLink { composes: link from './AuthForm.module.css'; font-size: var(--text-sm); }
+.signupText { composes: footer from './AuthForm.module.css'; }
+.signupLink { composes: link from './AuthForm.module.css'; }
+.error { composes: error from './AuthForm.module.css'; }

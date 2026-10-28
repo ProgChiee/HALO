@@ -1,3 +1,5 @@
+import { mentorAnswerText } from '../../../utils/mentorAnswerText';
+import Topbar from '../../../components/shared/Topbar';
 import VideoLearning from '../../../components/shared/VideoLearning';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { useState, useRef, useEffect } from 'react';
@@ -26,6 +28,7 @@ function ModuleLessonChat({ topicId, weekId }) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [enrollmentRequired, setEnrollmentRequired] = useState(false);
   const [mentorLoading, setMentorLoading] = useState(false);
   const [lesson, setLesson] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -82,6 +85,7 @@ function ModuleLessonChat({ topicId, weekId }) {
         })));
       },
       onError: (error, stage) => {
+        setEnrollmentRequired(error?.response?.data?.code === 'ENROLLMENT_REQUIRED');
         setLoadError(lessonErrorMessage(error, stage));
         setIsLoading(false);
         setMentorLoading(false);
@@ -92,12 +96,13 @@ function ModuleLessonChat({ topicId, weekId }) {
 
   useEffect(() => {
     if (prepending.current) { prepending.current = false; return; }
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
   }, [messages, isAiTyping]);
 
   if (isLoading) {
     return (
       <StudentPageShell>
+      <Topbar title="AI Mentor" />
         <div className={styles.contentArea}>
           <p className={styles.loadingText}>Loading lesson...</p>
         </div>
@@ -112,6 +117,7 @@ function ModuleLessonChat({ topicId, weekId }) {
     olderLock.current = false;
     setIsLoading(true);
     setLoadError('');
+    setEnrollmentRequired(false);
     setMentorLoading(false);
     setIsAiTyping(false);
     setLesson(null);
@@ -123,11 +129,12 @@ function ModuleLessonChat({ topicId, weekId }) {
   if (loadError && !lesson) {
     return (
       <StudentPageShell>
+      <Topbar title="AI Mentor" />
         <div className={styles.contentArea}>
           <main className={styles.notFound}>
             <p role="alert">{loadError}</p>
             <Button onClick={retryLesson}>Retry</Button>
-            <Button onClick={() => navigate(workflow.basePath + '/subjects')}>Back to Subjects</Button>
+            <Button onClick={() => navigate(workflow.basePath + (enrollmentRequired ? '/subjects/browse' : '/subjects/my'))}>{enrollmentRequired ? 'Browse Subjects' : 'Back to Subjects'}</Button>
           </main>
         </div>
       </StudentPageShell>
@@ -220,7 +227,7 @@ function ModuleLessonChat({ topicId, weekId }) {
 
       <div className={styles.contentArea}>
         {workflow.preview && <p role="note">Preview conversation - Messages are temporary and will not be added to the Student's real Mentor history.</p>}
-        <header className={styles.topHeader}>
+        <Topbar>
           <div className={styles.mentorIdentity}>
             <span className={styles.mentorAvatar}>
               <Bot size={18} />
@@ -235,7 +242,7 @@ function ModuleLessonChat({ topicId, weekId }) {
           <div className={styles.breadcrumb}>
             <span className={styles.breadcrumbActive}>Week {lesson?.weekNumber}</span>
           </div>
-        </header>
+        </Topbar>
 
         <div className={styles.tabsRow}>
           <p className={styles.tabsSubtitle}>Ask about this module's uploaded materials</p>
@@ -244,7 +251,7 @@ function ModuleLessonChat({ topicId, weekId }) {
           </div>
         </div>
 
-        <main className={styles.chatArea}>
+        <main className={styles.chatArea} aria-label="Lesson and AI Mentor conversation" tabIndex={0}>
           {lesson && (
             <section className={styles.bubble} aria-label="Published lesson">
               <h2>Published Lesson</h2>
@@ -269,6 +276,7 @@ function ModuleLessonChat({ topicId, weekId }) {
           )}
           {beforeId && <Button onClick={loadOlder} disabled={olderLoading}>{olderLoading ? 'Loading older messages...' : 'Load older messages'}</Button>}
           {olderError && <p role="alert">{olderError}</p>}
+          <div role="log" aria-label="AI Mentor messages" aria-live="polite" aria-relevant="additions" className={styles.conversation}>
           {messages.map((msg) => (
             <div
               key={msg.id}
@@ -276,14 +284,14 @@ function ModuleLessonChat({ topicId, weekId }) {
             >
               <p className={styles.messageSender}>{msg.sender === 'ai' ? 'AI Mentor' : 'You'}</p>
               <div style={{ whiteSpace: 'pre-wrap' }} className={`${styles.bubble} ${msg.sender === 'user' ? styles.bubbleUser : styles.bubbleAi}`}>
-                {msg.text}
+                {msg.sender === 'ai' ? mentorAnswerText(msg.text) : msg.text}
               </div>
 
               {msg.sender === 'ai' && ttsSupported && (
                 <button
                   type="button"
                   className={`${styles.speakBtn} ${speakingId === msg.id ? styles.speakBtnActive : ''}`}
-                  onClick={() => speak(msg.id, msg.text)}
+                  onClick={() => speak(msg.id, mentorAnswerText(msg.text))}
                   aria-label={speakingId === msg.id ? 'Stop reading message aloud' : 'Read message aloud'}
                 >
                   {speakingId === msg.id ? <VolumeX size={14} /> : <Volume2 size={14} />}
@@ -296,7 +304,7 @@ function ModuleLessonChat({ topicId, weekId }) {
           {isAiTyping && (
             <div className={styles.messageBlock}>
               <p className={styles.messageSender}>AI Mentor</p>
-              <div className={`${styles.bubble} ${styles.bubbleAi} ${styles.bubbleTyping}`}>
+              <div role="status" aria-label="AI Mentor is responding" className={`${styles.bubble} ${styles.bubbleAi} ${styles.bubbleTyping}`}>
                 <span className={styles.typingDot} />
                 <span className={styles.typingDot} />
                 <span className={styles.typingDot} />
@@ -304,11 +312,12 @@ function ModuleLessonChat({ topicId, weekId }) {
             </div>
           )}
 
+          </div>
           <div ref={messagesEndRef} />
         </main>
 
         {draftError && <p id="mentor-draft-error" role="alert">{draftError}</p>}
-        <form className={styles.inputRow} onSubmit={handleSend}>
+        <form aria-label="Message composer" className={styles.inputRow} onSubmit={handleSend}>
           <input
             type="text"
             className={styles.chatInput}

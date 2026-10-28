@@ -495,6 +495,9 @@ public class AssessmentService {
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "ACCESS_DENIED");
         }
 
+        // Detailed review includes protected quiz content; ownership alone is insufficient.
+        progressionService.validateModuleAccess(attempt.getAssessment().getModule().getId(), student);
+
         if (attempt.getSubmittedAt() == null) {
 
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "ASSESSMENT_NOT_SUBMITTED");

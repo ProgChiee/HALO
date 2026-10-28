@@ -27,7 +27,8 @@ test('shared logout confirms for all roles and acting paths; Cancel/Escape resto
    let dialog=document.querySelector('[role="dialog"]');assert.match(dialog.textContent,/Log out of HALO\?/);assert.equal(document.activeElement.textContent,'Cancel');
    await act(async()=>dialog.querySelector('button').click());assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(document.activeElement,opener);
    await act(async()=>opener.click());dialog=document.querySelector('[role="dialog"]');
-   await act(async()=>dialog.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(calls,0);assert.equal(document.activeElement,opener);
+   await act(async()=>dialog.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(calls,0);assert.ok(document.querySelector('[role="dialog"]'));
+   await act(async()=>dialog.querySelector('button').click());assert.equal(document.activeElement,opener);
    await act(async()=>opener.click());dialog=document.querySelector('[role="dialog"]');const confirm=dialog.querySelectorAll('button')[1];
    await act(async()=>{confirm.click();confirm.click();});assert.equal(calls,1);assert.equal(confirm.disabled,true);
    await act(async()=>dialog.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.ok(document.querySelector('[role="dialog"]'));

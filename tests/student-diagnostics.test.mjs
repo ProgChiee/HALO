@@ -34,14 +34,14 @@ before(async () => {
 });
 after(async () => { await server?.close(); dom?.window.close(); });
 
-test('Student Profile uses the labeled Dialog with focus handling and Escape dismissal', async () => {
-  const Profile = (await server.ssrLoadModule('/src/pages/student/components/Profile.jsx')).default;
+test('Student Settings uses the labeled Dialog with focus handling and safe Escape behavior', async () => {
+  const Profile = (await server.ssrLoadModule('/src/components/shared/Settings.jsx')).default;
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const adapter = api.defaults.adapter;
   api.defaults.adapter = async config => ({ status: 200, headers: {}, config, data: { name: 'Student', email: 'student@example.test', yearLevel: 'FIRST_YEAR' } });
   try {
     await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, logout() {} } },
-      React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Profile))))));
+      React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Profile, { role: 'student' }))))));
     const opener = [...host.querySelectorAll('button')].find(button => /change password/i.test(button.textContent));
     opener.focus();
     await act(async () => opener.click());
@@ -53,6 +53,8 @@ test('Student Profile uses the labeled Dialog with focus handling and Escape dis
     await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
     assert.equal(document.activeElement.id, 'new-password');
     await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    assert.ok(document.querySelector('[role="dialog"]'));
+    await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.trim()==='Cancel' || b.getAttribute('aria-label')==='Close').click());
     assert.equal(document.querySelector('[role="dialog"]'), null);
     assert.equal(document.activeElement, opener);
     assert.equal(host.hasAttribute('inert'), false);
@@ -63,26 +65,27 @@ test('Student Profile uses the labeled Dialog with focus handling and Escape dis
   } finally { await act(async () => root.unmount()); host.remove(); api.defaults.adapter = adapter; }
 });
 
-test('Subjects exposes search label and current expansion state with an existing controlled region', async () => {
+test('Selected subject exposes current expansion state and accessible back navigation', async () => {
   const Subjects = (await server.ssrLoadModule('/src/pages/student/components/Subjects.jsx')).default;
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const adapter = api.defaults.adapter;
   api.defaults.adapter = async config => ({ status: 200, headers: {}, config, data: config.url.endsWith('/subjects')
-    ? [{ subjectId: 7, subjectName: 'Hospitality', totalWeeks: 1, completedWeeks: 0 }] : [] });
+    ? [{ subjectId: 7, subjectName: 'Hospitality', enrolled: true, totalWeeks: 1, completedWeeks: 0 }] : [] });
   try {
-    await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, logout() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Subjects)))));
-    assert.ok(host.querySelector('input[aria-label="Search subjects"]'));
-    const toggle = host.querySelector('button[aria-expanded]');
-    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
-    assert.equal(toggle.getAttribute('aria-controls'), null);
-    toggle.focus();
-    await act(async () => toggle.click());
+    await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, logout() {} } }, React.createElement(Router.MemoryRouter, {initialEntries:['/student/subjects?subject=7']}, React.createElement(Subjects)))));
+    assert.equal(host.querySelector('input[aria-label="Search subjects"]'),null);
+    assert.ok(host.querySelector('[aria-label="Learning navigation"] a[href="/student/subjects/my"]'));
+    const toggle = host.querySelector('main button[aria-expanded]');
     assert.equal(toggle.getAttribute('aria-expanded'), 'true');
     assert.ok(document.getElementById(toggle.getAttribute('aria-controls')));
-    assert.equal(document.activeElement, toggle);
+    toggle.focus();
     await act(async () => toggle.click());
     assert.equal(toggle.getAttribute('aria-expanded'), 'false');
     assert.equal(document.getElementById('subject-weeks-7'), null);
+    assert.equal(document.activeElement, toggle);
+    await act(async () => toggle.click());
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+    assert.ok(document.getElementById(toggle.getAttribute('aria-controls')));
     assert.equal(document.activeElement, toggle);
   } finally { await act(async () => root.unmount()); host.remove(); api.defaults.adapter = adapter; }
 });
@@ -97,7 +100,7 @@ test('dashboard and profile retain error UI while logging only sanitized diagnos
     api.defaults.adapter = async config => { throw { ...failure, config: { ...config, headers: { Authorization: secret }, data: secret } }; };
     try {
       await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, logout() {} } },
-        React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Component))))));
+        React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {initialEntries:[name==='Subjects'?'/student/subjects?subject=1':'/']}, React.createElement(Component))))));
       assert.match(host.textContent, name === 'Quiz' ? /do not have access to this quiz/i : /couldn't load|could not load|unable to load|failed to load/i);
       assert.ok(calls.some(call => call[0] === '[HALO Student]' && call[1].status === 403));
       assert.ok(!JSON.stringify(calls).includes(secret));
@@ -113,7 +116,7 @@ test('Progress uses eligible module counts instead of week totals and handles ze
   for (const count of [2, 0]) {
     const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
     const adapter = api.defaults.adapter;
-    api.defaults.adapter = async config => ({ status: 200, headers: {}, config, data: [{ subjectId: 1, subjectName: 'Subject', totalWeeks: 8, eligibleModuleCount: count, completedWeeks: count ? 1 : 0, progressPercentage: count ? 50 : 0 }] });
+    api.defaults.adapter = async config => ({ status: 200, headers: {}, config, data: [{ subjectId: 1, subjectName: 'Subject', enrolled: true, totalWeeks: 8, eligibleModuleCount: count, completedWeeks: count ? 1 : 0, progressPercentage: count ? 50 : 0 }] });
     try {
       await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, logout() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Component)))));
       const label = text => [...host.querySelectorAll('p')].find(node => node.textContent === text);
@@ -167,7 +170,7 @@ test('Student dashboard sections load and retry independently', async () => {
       const section = config.url.endsWith('/dashboard') ? 'stats' : config.url.endsWith('/subjects') ? 'subjects' : 'continue';
       if (fail && section === failing) throw { response: { status: 500, data: { code: 'INTERNAL_SERVER_ERROR' } } };
       const data = section === 'stats' ? { completedModules: 7, passedAssessments: 2, totalBadges: 3, latestAssessmentScore: 80 }
-        : section === 'subjects' ? [{ subjectId: 1, subjectName: 'Hospitality', progressPercentage: 0, completedWeeks: 0, totalWeeks: 1 }]
+        : section === 'subjects' ? [{ subjectId: 1, subjectName: 'Hospitality', enrolled: true, progressPercentage: 0, completedWeeks: 0, totalWeeks: 1 }]
         : [{ weekId: 1, weekNumber: 1, title: 'Published topic', moduleId: 10, lessonAvailable: true, unlocked: true, completed: false }];
       return { status: 200, headers: {}, config, data };
     };
@@ -194,7 +197,7 @@ test('slow Continue does not block stats and its request is aborted on unmount',
   let finish, signal;
   api.defaults.adapter = async config => {
     if (config.url.endsWith('/weeks')) { signal = config.signal; await new Promise(resolve => { finish = resolve; }); }
-    const data = config.url.endsWith('/dashboard') ? { completedModules: 1 } : config.url.endsWith('/subjects') ? [{ subjectId: 1, subjectName: 'Subject', progressPercentage: 0 }] : [];
+    const data = config.url.endsWith('/dashboard') ? { completedModules: 1 } : config.url.endsWith('/subjects') ? [{ subjectId: 1, subjectName: 'Subject', enrolled: true, progressPercentage: 0 }] : [];
     return { status: 200, headers: {}, config, data };
   };
   try {
@@ -215,8 +218,8 @@ test('Continue label and navigation use the selected lesson Subject', async () =
       let data;
       if (config.url.endsWith('/dashboard')) data = { completedModules: 0, passedAssessments: 0, totalBadges: 0 };
       else if (config.url.endsWith('/subjects')) data = [
-        ...(includeUnavailableFirst ? [{ subjectId: 1, subjectName: 'Unavailable Subject', progressPercentage: 0 }] : []),
-        { subjectId: 2, subjectName: 'Actual Subject', progressPercentage: 0 },
+        ...(includeUnavailableFirst ? [{ subjectId: 1, subjectName: 'Unavailable Subject', enrolled: true, progressPercentage: 0 }] : []),
+        { subjectId: 2, subjectName: 'Actual Subject', enrolled: true, progressPercentage: 0 },
       ];
       else if (config.url.includes('/subjects/1/')) data = [{ weekId: 11, lessonAvailable: false, unlocked: true, completed: false }];
       else data = [{ weekId: 22, weekNumber: 2, title: 'Actual Lesson', moduleId: 222, lessonAvailable: true, unlocked: true, completed: false }];
@@ -254,12 +257,16 @@ test('Quiz recovers uncertain and already-submitted results without another POST
     if(mode==='unsubmitted') throw {response:{status:409,data:{code:'ASSESSMENT_NOT_SUBMITTED'}}};
     if(mode==='unmount') await new Promise(resolve=>{finish=resolve;});
     data={attemptId:20,score:100,passed:true,feedback:[]};
-   } else data={title:'Quiz',passingScore:70,questions:[{id:1,questionText:'Question',optionA:'Answer',optionB:'Alternative'}]};
+   } else data={title:'Quiz',passingScore:70,questions:[{id:1,questionText:'Question',optionA:'Answer',optionB:'Alternative'},{id:2,questionText:'Second question',optionA:'Long answer '.repeat(30),optionB:'Other answer'}]};
    return {status:200,headers:{},config,data};
   };
   try {
    await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast:(...args)=>toasts.push(args)}},React.createElement(Router.MemoryRouter,{initialEntries:['/student/quiz/1/1']},React.createElement(Router.Routes,{},React.createElement(Router.Route,{path:'/student/quiz/:topicId/:weekId',element:React.createElement(Component)})))))));
    await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Start quiz').click());
+   assert.equal(document.activeElement,host.querySelector('#quiz-question'));
+   assert.equal(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'),'1');
+   assert.match(host.textContent,/0 of 2 answered/);
+   assert.ok([...host.querySelectorAll('button')].find(b=>b.textContent==='Next question').disabled);
    const options = [...host.querySelectorAll('button[aria-pressed]')];
    assert.equal(options.length, 2);
    assert.ok(options.every(option => option.getAttribute('aria-pressed') === 'false'));
@@ -269,7 +276,13 @@ test('Quiz recovers uncertain and already-submitted results without another POST
    await act(async () => options[0].click());
    assert.equal(options[0].getAttribute('aria-pressed'), 'true');
    assert.equal(options[1].getAttribute('aria-pressed'), 'false');
-   await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Submit quiz').click());
+   await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Next question').click());
+   assert.equal(host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'),'2');
+   assert.equal(document.activeElement,host.querySelector('#quiz-question'));
+   assert.match(host.textContent,/1 of 2 answered/);
+   await act(async()=>host.querySelector('button[aria-pressed]').click());
+   assert.match(host.textContent,/2 of 2 answered/);
+   await act(async()=>{const submit=[...host.querySelectorAll('button')].find(b=>b.textContent==='Submit quiz');submit.click();submit.click();});
    assert.equal(calls.filter(url=>url.includes('/submit/')).length,1);
    if(mode==='unmount') {
     assert.ok([...host.querySelectorAll('button')].every(b=>!b.textContent.includes('Submit quiz')||b.disabled));
@@ -448,4 +461,19 @@ test('shared photo editor clears old target state and ignores a late photo respo
   await act(async()=>resolveOld(new Blob(['old photo'],{type:'image/png'})));
   assert.equal(host.querySelector('img'),null);assert.equal(host.textContent,'B');assert.equal(host.querySelector('input'),null);
  }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+test('direct lesson and quiz enrollment denials show Browse Subjects without learning actions',async()=>{
+ for(const [name,path] of [['LessonChat','lesson'],['Quiz','quiz']]){
+  const Component=(await server.ssrLoadModule(`/src/pages/student/components/${name}.jsx`)).default;
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const previous=api.defaults.adapter;const calls=[];
+  api.defaults.adapter=async config=>{calls.push(config.url);throw {response:{status:403,data:{code:'ENROLLMENT_REQUIRED'}}};};
+  function Location(){return React.createElement('output',null,Router.useLocation().pathname);}
+  try{
+   await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{initialEntries:[`/student/${path}/1/1`]},React.createElement(Router.Routes,null,React.createElement(Router.Route,{path:`/student/${path}/:topicId/:weekId`,element:React.createElement(Component)}),React.createElement(Router.Route,{path:'/student/subjects/browse',element:React.createElement('p',null,'Browse eligible subjects')})),React.createElement(Location))))));
+   assert.match(host.textContent,/Enroll in this subject to access learning activities/);assert.equal(calls.length,1);
+   assert.equal(host.querySelector('[aria-label="Message AI Mentor"]'),null);assert.equal(host.querySelector('button[aria-pressed]'),null);
+   await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Browse Subjects').click());assert.equal(host.querySelector('output').textContent,'/student/subjects/browse');
+  }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=previous;}
+ }
 });

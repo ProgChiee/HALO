@@ -9,11 +9,11 @@ import java.util.Map;
 import java.util.Set;
 
 // Same Student validation/auth/error semantics, scoped only to the explicit acting routes.
-@RestControllerAdvice(assignableTypes={AdminStudentModeController.class,AdminStudentPreviewController.class})
+@RestControllerAdvice(assignableTypes={AdminStudentModeController.class,AdminStudentPreviewController.class,StudentEnrollmentController.class})
 public class AdminStudentModeExceptionHandler extends StudentLessonExceptionHandler {
     private static final Set<String> SAFE_CODES=Set.of(
         "PREVIEW_LIMIT_REACHED","PREVIEW_STATE_CHANGED","PREVIEW_OPERATION_PENDING","RESOURCE_NOT_FOUND","MODULE_NOT_FOUND","SESSION_NOT_FOUND","SESSION_NOT_OWNED","EXCHANGE_NOT_FOUND",
-        "AUTHENTICATION_REQUIRED","INVALID_ROLE","ACCOUNT_INACTIVE","STUDENT_NOT_ENROLLED",
+        "AUTHENTICATION_REQUIRED","INVALID_ROLE","ACCOUNT_INACTIVE","STUDENT_NOT_ENROLLED","ENROLLMENT_REQUIRED",
         "LESSON_NOT_APPROVED","LESSON_NOT_GENERATED","WEEK_LOCKED","SUBJECT_NOT_FOUND","WEEK_NOT_FOUND","MODULE_WEEK_NOT_FOUND","PREVIOUS_WEEK_INCOMPLETE",
         "ASSESSMENT_NOT_FOUND","ASSESSMENT_NOT_AVAILABLE","ASSESSMENT_ALREADY_PASSED","ASSESSMENT_ALREADY_SUBMITTED",
         "ATTEMPT_NOT_FOUND","ATTEMPT_NOT_SUBMITTED","ASSESSMENT_NOT_SUBMITTED","ACCESS_DENIED","INVALID_ANSWER_SET","ANSWERS_ALREADY_RECORDED",

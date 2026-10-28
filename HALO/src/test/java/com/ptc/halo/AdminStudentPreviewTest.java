@@ -40,6 +40,7 @@ class AdminStudentPreviewTest {
  @Autowired StudentModuleProgressRepository progress;
  @Autowired StudentBadgeRepository badges;
  @MockBean AssessmentAiService ai;
+ @Autowired StudentSubjectEnrollmentRepository enrollments;
  @Autowired StudentProfileRepository profiles;
  @org.springframework.boot.test.mock.mockito.SpyBean ActivityLogService audit;
  @Autowired StudentDashboardService dashboard;
@@ -57,6 +58,7 @@ class AdminStudentPreviewTest {
  UserEntity admin; String actingId; org.springframework.security.core.Authentication auth;
  UserEntity student;AssessmentAttemptEntity attempt;AssessmentQuestionEntity q1,q2,foreign;
  @BeforeEach void setup(){
+  enrollments.deleteAll();
   reset((ActivityLogService)org.springframework.test.util.AopTestUtils.getUltimateTargetObject(audit));logs.deleteAll();actingSessions.deleteAll();messages.deleteAll();sessions.deleteAll();badges.deleteAll();progress.deleteAll();answers.deleteAll();attempts.deleteAll();questions.deleteAll();assessments.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();profiles.deleteAll();users.deleteAll();
   student=new UserEntity();student.setEmail("student@test.example");student.setName("Student");student.setRole(Role.STUDENT);student.setStatus(Status.ACTIVE);student=users.saveAndFlush(student);
   var subject=new SubjectEntity();subject.setYearLevel(YearLevel.FIRST_YEAR);subject.setSubjectCode("S");subject.setSubjectName("Subject");subject=subjects.saveAndFlush(subject);
@@ -65,6 +67,7 @@ class AdminStudentPreviewTest {
   var assessment=new AssessmentEntity();assessment.setModule(module);assessment.setTitle("Quiz");assessment.setPassingScore(70);assessment.setStatus(AssessmentStatus.AVAILABLE);assessment.setCreatedAt(LocalDateTime.now());assessment=assessments.saveAndFlush(assessment);
   q1=question(assessment,1,"A");q2=question(assessment,2,"B");
   var profile=new StudentProfileEntity();profile.setUser(student);profile.setSection("BSHM 1A");profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  enrollments.saveAndFlush(new StudentSubjectEnrollmentEntity(student,subject));
 
   admin=new UserEntity();admin.setEmail("admin@test.example");admin.setName("Admin");admin.setRole(Role.ADMIN);admin.setStatus(Status.ACTIVE);admin=users.saveAndFlush(admin);
   auth=authentication(admin);
@@ -240,5 +243,16 @@ class AdminStudentPreviewTest {
   when(builder.build().prompt().system(startsWith("Classify HALO"))).thenReturn(spec);
   when(spec.user(anyString())).thenReturn(spec);
   when(spec.call().content()).thenAnswer(inv->{assertFalse(active());return "{\"intent\":\"LESSON_QUESTION\"}";});
+ }
+
+ @Test void previewCannotBypassTargetStudentEnrollmentWithExistingTemporaryIds(){
+  prepareIndex();var chat=preview.open(auth,actingId,moduleId());var quiz=preview.start(auth,actingId,moduleId());
+  enrollments.deleteAll();
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->preview.open(auth,actingId,moduleId())).getReason());
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->preview.conversation(auth,actingId,chat.getSessionId(),null)).getReason());
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->preview.send(auth,actingId,chat.getSessionId(),"Question",UUID.randomUUID().toString())).getReason());
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->preview.start(auth,actingId,moduleId())).getReason());
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->preview.submit(auth,actingId,quiz.getAttemptId(),request(item(q1.getId(),"A"),item(q2.getId(),"B")))).getReason());
+  noHistory();
  }
 }

@@ -38,10 +38,12 @@ class MentorExternalTransactionTest {
  @Autowired StudentModuleProgressRepository progress;
  @Autowired StudentBadgeRepository badges;
  @MockBean AssessmentAiService ai;
+ @Autowired StudentSubjectEnrollmentRepository enrollments;
  @Autowired StudentProfileRepository profiles;
  @MockBean ActivityLogService audit;
  UserEntity student;AssessmentAttemptEntity attempt;AssessmentQuestionEntity q1,q2,foreign;
  @BeforeEach void setup(){
+  enrollments.deleteAll();
   reset(audit);messages.deleteAll();sessions.deleteAll();badges.deleteAll();progress.deleteAll();answers.deleteAll();attempts.deleteAll();questions.deleteAll();assessments.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();profiles.deleteAll();users.deleteAll();
   student=new UserEntity();student.setEmail("student@test.example");student.setName("Student");student.setRole(Role.STUDENT);student.setStatus(Status.ACTIVE);student=users.saveAndFlush(student);
   var subject=new SubjectEntity();subject.setYearLevel(YearLevel.FIRST_YEAR);subject.setSubjectCode("S");subject.setSubjectName("Subject");subject=subjects.saveAndFlush(subject);
@@ -50,6 +52,7 @@ class MentorExternalTransactionTest {
   var assessment=new AssessmentEntity();assessment.setModule(module);assessment.setTitle("Quiz");assessment.setPassingScore(70);assessment.setStatus(AssessmentStatus.AVAILABLE);assessment.setCreatedAt(LocalDateTime.now());assessment=assessments.saveAndFlush(assessment);
   q1=question(assessment,1,"A");q2=question(assessment,2,"B");
   var profile=new StudentProfileEntity();profile.setUser(student);profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  enrollments.saveAndFlush(new StudentSubjectEnrollmentEntity(student,subject));
   attempt=service.startAttempt(module.getId(),student);
  }
  AssessmentQuestionEntity question(AssessmentEntity assessment,int number,String correct){

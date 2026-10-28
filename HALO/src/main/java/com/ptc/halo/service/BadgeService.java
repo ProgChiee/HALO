@@ -61,12 +61,10 @@ public class BadgeService {
                         org.springframework.http.HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND"));
         checkProgressBadges(student, acting);
         if (studentModuleProgressRepository.countEligibleCompletedModules(student.getId()) > 0) {
-            awardBadge(student, acting, BadgeType.MODULE_FINISHER, "Module Finisher",
-                    "Fully completed an available learning module.");
+            awardBadge(student, acting, BadgeType.MODULE_FINISHER);
         }
         if (studentModuleProgressRepository.countMasteredEligibleSubjects(student.getId()) > 0) {
-            awardBadge(student, acting, BadgeType.SUBJECT_MASTER, "Subject Master",
-                    "Completed every published, available module in one subject.");
+            awardBadge(student, acting, BadgeType.SUBJECT_MASTER);
         }
 
         checkAssessmentBadges(
@@ -96,9 +94,7 @@ public class BadgeService {
 
             awardBadge(
                     student, acting,
-                    BadgeType.FIRST_STEP,
-                    "First Step",
-                    "Completed your first learning module."
+                    BadgeType.FIRST_STEP
             );
         }
 
@@ -107,9 +103,7 @@ public class BadgeService {
 
             awardBadge(
                     student, acting,
-                    BadgeType.GETTING_STARTED,
-                    "Getting Started",
-                    "Completed 3 learning modules."
+                    BadgeType.GETTING_STARTED
             );
         }
 
@@ -118,9 +112,7 @@ public class BadgeService {
 
             awardBadge(
                     student, acting,
-                    BadgeType.KNOWLEDGE_SEEKER,
-                    "Knowledge Seeker",
-                    "Completed 5 learning modules."
+                    BadgeType.KNOWLEDGE_SEEKER
             );
         }
 
@@ -129,9 +121,7 @@ public class BadgeService {
 
             awardBadge(
                     student, acting,
-                    BadgeType.DEDICATED_LEARNER,
-                    "Dedicated Learner",
-                    "Completed 10 learning modules."
+                    BadgeType.DEDICATED_LEARNER
             );
         }
     }
@@ -152,9 +142,7 @@ public class BadgeService {
 
             awardBadge(
                     student, acting,
-                    BadgeType.PERFECT_SCORE,
-                    "Perfect Score",
-                    "Earned a perfect score on an assessment."
+                    BadgeType.PERFECT_SCORE
             );
         }
 
@@ -186,9 +174,7 @@ public class BadgeService {
 
                 awardBadge(
                         student, acting,
-                        BadgeType.FIRST_TRY,
-                        "First Try",
-                        "Passed an assessment on the first attempt."
+                        BadgeType.FIRST_TRY
                 );
             }
         }
@@ -219,9 +205,7 @@ public class BadgeService {
 
                 awardBadge(
                         student, acting,
-                        BadgeType.NEVER_GIVE_UP,
-                        "Never Give Up",
-                        "Passed an assessment after a previous failed attempt."
+                        BadgeType.NEVER_GIVE_UP
                 );
             }
         }
@@ -246,9 +230,7 @@ public class BadgeService {
 
             awardBadge(
                     student, acting,
-                    BadgeType.ASSESSMENT_ACE,
-                    "Assessment Ace",
-                    "Passed 5 assessments."
+                    BadgeType.ASSESSMENT_ACE
             );
         }
     }
@@ -301,9 +283,7 @@ public class BadgeService {
 
             awardBadge(
                     student, acting,
-                    BadgeType.COMEBACK_STRONGER,
-                    "Comeback Stronger",
-                    "Improved your assessment score by at least 20 points."
+                    BadgeType.COMEBACK_STRONGER
             );
         }
     }
@@ -324,9 +304,7 @@ public class BadgeService {
 
             awardBadge(
                     student, acting,
-                    BadgeType.HALO_ACHIEVER,
-                    "HALO Achiever",
-                    "Earned 10 distinct ordinary HALO badges."
+                    BadgeType.HALO_ACHIEVER
             );
         }
     }
@@ -338,9 +316,7 @@ public class BadgeService {
 
     private void awardBadge(
             UserEntity student, com.ptc.halo.entity.AdminActingSessionEntity acting,
-            BadgeType badgeType,
-            String badgeName,
-            String description) {
+            BadgeType badgeType) {
 
         boolean alreadyEarned =
                 studentBadgeRepository
@@ -365,11 +341,11 @@ public class BadgeService {
         );
 
         badge.setBadgeName(
-                badgeName
+                badgeType.getBadgeName()
         );
 
         badge.setDescription(
-                description
+                badgeType.getDescription()
         );
 
         badge.setEarnedAt(
@@ -383,6 +359,11 @@ public class BadgeService {
                 student, acting,
                 ActivityType.BADGE,
                 "Earned badge: " + badge.getBadgeName());
+    }
+    // Metadata only: no award checks, persistence, or Student-specific information.
+    public List<com.ptc.halo.dtoResponse.BadgeDefinitionResponse> getCatalog() {
+        return java.util.Arrays.stream(BadgeType.values()).map(type ->
+                new com.ptc.halo.dtoResponse.BadgeDefinitionResponse(type, type.getBadgeName(), type.getDescription())).toList();
     }
     public List<StudentBadgeResponse> getStudentBadges(
             UserEntity student) {

@@ -36,10 +36,12 @@ class StudentSubjectBulkTest {
  @Autowired StudentModuleProgressRepository progress;
  @Autowired StudentBadgeRepository badges;
  @MockBean AssessmentAiService ai;
+ @Autowired StudentSubjectEnrollmentRepository enrollments;
  @Autowired StudentProfileRepository profiles;
  @MockBean ActivityLogService audit;
  UserEntity student;AssessmentAttemptEntity attempt;AssessmentQuestionEntity q1,q2,foreign;
  @BeforeEach void setup(){
+  enrollments.deleteAll();
   reset(audit);badges.deleteAll();progress.deleteAll();answers.deleteAll();attempts.deleteAll();questions.deleteAll();assessments.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();profiles.deleteAll();users.deleteAll();
   student=new UserEntity();student.setEmail("student@test.example");student.setName("Student");student.setRole(Role.STUDENT);student.setStatus(Status.ACTIVE);student=users.saveAndFlush(student);
   var subject=new SubjectEntity();subject.setYearLevel(YearLevel.FIRST_YEAR);subject.setSubjectCode("S");subject.setSubjectName("Subject");subject=subjects.saveAndFlush(subject);
@@ -48,6 +50,7 @@ class StudentSubjectBulkTest {
   var assessment=new AssessmentEntity();assessment.setModule(module);assessment.setTitle("Quiz");assessment.setPassingScore(70);assessment.setStatus(AssessmentStatus.AVAILABLE);assessment.setCreatedAt(LocalDateTime.now());assessment=assessments.saveAndFlush(assessment);
   q1=question(assessment,1,"A");q2=question(assessment,2,"B");
   var profile=new StudentProfileEntity();profile.setUser(student);profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  enrollments.saveAndFlush(new StudentSubjectEnrollmentEntity(student,subject));
   attempt=service.startAttempt(module.getId(),student);
  }
  AssessmentQuestionEntity question(AssessmentEntity assessment,int number,String correct){
@@ -71,7 +74,7 @@ class StudentSubjectBulkTest {
   assertEquals(summaryQueries,stats.getPrepareStatementCount());assertTrue(summaryQueries<=5);
   assertEquals(12,result.get(0).getTotalWeeks());assertEquals(1,result.get(0).getCompletedWeeks());assertEquals(8,result.get(0).getProgressPercentage());
   stats.clear();var access=progression.getWeekAccess(subjectId,student);
-  assertEquals(accessQueries,stats.getPrepareStatementCount());assertTrue(accessQueries<=5);
+  assertEquals(accessQueries,stats.getPrepareStatementCount());assertTrue(accessQueries<=6, "Includes one explicit enrollment authorization query; remains constant per subject");
   assertTrue(access.get(0).getUnlocked());assertTrue(access.get(1).getUnlocked());assertFalse(access.get(2).getUnlocked());
  }
  @Test void unpublishedAndIncompleteGenerationStayHiddenAndDoNotUnlockNextWeek(){
@@ -100,6 +103,7 @@ class StudentSubjectBulkTest {
   Long subjectId=subjects.findAll().get(0).getId();complete(modules.findAll().get(0));
   var other=new UserEntity();other.setName("Other");other.setEmail("other@example.test");other.setRole(Role.STUDENT);other.setStatus(Status.ACTIVE);other=users.saveAndFlush(other);
   var profile=new StudentProfileEntity();profile.setUser(other);profile.setStudentId("other");profile.setYearLevel(YearLevel.FIRST_YEAR);profile=profiles.saveAndFlush(profile);
+  enrollments.saveAndFlush(new StudentSubjectEnrollmentEntity(other,subjects.findAll().get(0)));
   assertEquals(0,summaries.getStudentSubjects(other).get(0).getCompletedWeeks());assertFalse(progression.getWeekAccess(subjectId,other).get(0).getCompleted());
   profile.setYearLevel(YearLevel.SECOND_YEAR);profiles.saveAndFlush(profile);
   assertTrue(summaries.getStudentSubjects(other).isEmpty());

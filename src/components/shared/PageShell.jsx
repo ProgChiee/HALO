@@ -36,13 +36,13 @@ function ResponsiveLayout({ compact, sidebarProps, children, className, navigati
       </div>}
       {children}
     </div>
-    {open && compact && <Dialog labelledBy={titleId} onClose={() => setOpen(false)} className={styles.drawer} initialFocus="button">
+    {open && compact && <Dialog closeOnEscape labelledBy={titleId} onClose={() => setOpen(false)} className={styles.drawer} initialFocus="button">
       <div className={styles.drawerHeader}>
         <h2 id={titleId}>Navigation</h2>
         <button type="button" className={styles.menuButton} aria-label="Close navigation" onClick={() => setOpen(false)}><X size={22} /></button>
       </div>
       <div id={navigationId} onClick={event => {
-        if (event.target.closest('a, button')) setOpen(false);
+        if (event.target.closest('a, button') && !event.target.closest('[data-navigation-group]')) setOpen(false);
       }}><Sidebar {...sidebarProps} /></div>
     </Dialog>}
   </div>;

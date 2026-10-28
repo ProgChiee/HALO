@@ -46,4 +46,10 @@ public class StudentBadgeController {
                 )
         );
     }
+
+    @GetMapping("/catalog")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('STUDENT')")
+    public List<com.ptc.halo.dtoResponse.BadgeDefinitionResponse> catalog() {
+        return badgeService.getCatalog();
+    }
 }

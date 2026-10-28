@@ -53,6 +53,10 @@ public class AdminStudentPreviewController {
     public Object badges(@RequestHeader("X-Acting-Session") UUID actingSessionId, Authentication authentication) {
         return mode.read(authentication,actingSessionId.toString(),s -> badges.getStudentBadges(s));
     }
+    @GetMapping("/badges/catalog")
+    public Object badgeCatalog(@RequestHeader("X-Acting-Session") UUID actingSessionId, Authentication authentication) {
+        return mode.read(authentication,actingSessionId.toString(),s -> badges.getCatalog());
+    }
     @GetMapping("/profile")
     public Object profile(@RequestHeader("X-Acting-Session") UUID actingSessionId, Authentication authentication) {
         return mode.read(authentication,actingSessionId.toString(),s -> profiles.getStudentProfile(s));

@@ -16,7 +16,7 @@ export const STUDENT_NAV_ITEMS = [
   // Without it, "/student" would also match (and highlight) on "/student/subjects",
   // "/student/progress", etc. since NavLink does prefix matching by default.
   { label: 'Dashboard', icon: LayoutGrid, path: '/student', end: true, section: 'Main' },
-  { label: 'Subjects', icon: BookOpen, path: '/student/subjects', section: 'Main' },
+  { label: 'Subjects', icon: BookOpen, path: '/student/subjects', children: [{ label: 'My Subjects', path: '/student/subjects/my' }, { label: 'Browse Subjects', path: '/student/subjects/browse' }], section: 'Main' },
   { label: 'Progress', icon: TrendingUp, path: '/student/progress', section: 'Main' },
   { label: 'Badge', icon: Award, path: '/student/badges', section: 'Main' },
   { label: 'Profile', icon: UserIcon, path: '/student/profile', section: 'Account' },

@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { Search, Eye, LogIn } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -47,8 +48,9 @@ export function ProfessorModeSelector() {
     }
   }
   return <PageShell responsive navItems={ADMIN_NAV_ITEMS} sectionLabel="Admin" roleBadge="Admin">
+    <Topbar title="Professor Mode" />
     <main className={styles.selector}>
-      <h1 className={styles.pageTitle}>Professor Mode</h1><p className={styles.subtitle}>Select an active Professor to preview safely or act on their account with audited changes.</p>
+      <p className={styles.subtitle}>Select an active Professor to preview safely or act on their account with audited changes.</p>
       {location.state?.actingNotice && <p role="status">Professor Mode ended. Select an active account to start a new session.</p>}
       <div className={styles.searchArea}><label htmlFor="professor-mode-search">Search Professors</label>
       <div className={styles.searchField}><Search size={18} aria-hidden="true" />
@@ -86,10 +88,12 @@ export default function ProfessorModeRoute({ preview = false }) {
 function RestoreProfessorMode({ id, preview }) {
   const loader = useCallback(config => (preview ? validateProfessorPreview : validateProfessorSession)(id, config), [id, preview]);
   const result = useRemoteData(loader);
-  if (result.isLoading) return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin"><p role="status">Restoring Professor Mode...</p></PageShell>;
+  if (result.isLoading) return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin">
+      <Topbar title="Professor Mode" /><p role="status">Restoring Professor Mode...</p></PageShell>;
   if (result.error) {
     if ([400, 403, 404, 409].includes(result.error.response?.status)) return <Navigate to={selectionPath} replace state={{ actingNotice: true }} />;
-    return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin"><div className={styles.selector} role="alert">
+    return <PageShell responsive navItems={ADMIN_NAV_ITEMS} roleBadge="Admin">
+      <Topbar title="Professor Mode" /><div className={styles.selector} role="alert">
       Could not validate Professor Mode. <button onClick={result.reload}>Retry</button><Link to="/admin">Back to Admin</Link>
     </div></PageShell>;
   }

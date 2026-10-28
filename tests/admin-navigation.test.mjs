@@ -163,7 +163,7 @@ test('all role and acting menus share logo-first sections without changing desti
     ['Superadmin', menus.SUPERADMIN_NAV_ITEMS], ['Admin', menus.ADMIN_NAV_ITEMS],
     ['Professor', menus.PROFESSOR_NAV_ITEMS], ['Student', menus.STUDENT_NAV_ITEMS],
     ['Professor', menus.PROFESSOR_NAV_ITEMS.map(item => ({ ...item, path: item.path.replace('/professor', '/admin/professor-mode/test-session') }))],
-    ['Student', menus.STUDENT_NAV_ITEMS.map(item => ({ ...item, path: item.path.replace('/student', '/admin/student-mode/test-session') }))],
+    ['Student', menus.STUDENT_NAV_ITEMS.map(item => ({ ...item, path: item.path.replace('/student', '/admin/student-mode/test-session'), children: item.children?.map(child => ({ ...child, path: child.path.replace('/student', '/admin/student-mode/test-session') })) }))],
   ];
   for (width of [1440, 768, 390]) {
     for (const [roleBadge, navItems] of cases) {
@@ -174,7 +174,7 @@ test('all role and acting menus share logo-first sections without changing desti
         const aside = document.querySelector('aside');
         assert.equal(aside.firstElementChild.querySelector('img').alt, 'HALO');
         assert.equal(aside.children[1].textContent, roleBadge === 'Superadmin' ? 'Super Admin' : roleBadge);
-        assert.deepEqual([...aside.querySelectorAll('nav a')].map(a => a.getAttribute('href')), navItems.map(item => item.path));
+        assert.deepEqual([...aside.querySelectorAll('nav a')].map(a => a.getAttribute('href')), navItems.flatMap(item => item.children ? item.children.map(child => child.path) : [item.path]));
         assert.equal(aside.querySelector('nav a').textContent.trim(), 'Dashboard');
         assert.equal(aside.querySelector('nav a[aria-current="page"]').getAttribute('href'), navItems[0].path);
         const sections = [...aside.querySelectorAll('nav p')].map(p => p.textContent);

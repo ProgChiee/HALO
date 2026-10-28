@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import AccountLifecycle, { AccountStateFilters } from '../../../components/shared/AccountLifecycle';
 import Dialog from '../../../components/shared/Dialog';
 import { accountText, accountDisplay, accountInitial } from '../../../utils/adminAccountDisplay';
@@ -63,12 +64,12 @@ export default function StudentManagement() {
       sectionLabel={isSuperAdmin ? 'Superadmin' : 'Admin'}
       roleBadge={isSuperAdmin ? 'Superadmin' : 'Admin'}
     >
-      <header className={styles.topbar}>
+      <Topbar>
         <div className={styles.breadcrumb}>
           <Users size={16} />
           Student Management
         </div>
-      </header>
+      </Topbar>
 
       <main className={styles.main}>
         <AccountStateFilters value={accountState} onChange={setAccountState} />
@@ -144,7 +145,7 @@ export default function StudentManagement() {
       </main>
 
       {viewingStudent && (
-        <Dialog labelledBy="student-details-title" onClose={() => setViewingStudent(null)} className={styles.modal} initialFocus="button">
+        <Dialog closeOnEscape labelledBy="student-details-title" onClose={() => setViewingStudent(null)} className={styles.modal} initialFocus="button">
             <div className={styles.modalHeader}>
               <div className={styles.profileHeaderRow}>
                 <div className={styles.profileAvatar}>{accountInitial(viewingStudent.name)}</div>

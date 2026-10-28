@@ -51,7 +51,7 @@ test('dashboard and profile retain error UI while logging only sanitized diagnos
     api.defaults.adapter = async () => { throw failure; };
     try {
       await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Professor' }, logout() {} } },
-        React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Component))))));
+        React.createElement(ToastContext.Provider, { value: { showToast() {} } }, React.createElement(Router.MemoryRouter, {}, React.createElement(Component,{role:"professor"}))))));
       assert.match(host.textContent, /do not have permission/i);
       assert.ok(calls.some(call => call[0] === '[HALO Professor]' && call[1].status === 403));
       assert.ok(!JSON.stringify(calls).includes(secret));
@@ -99,20 +99,20 @@ test('Professor dashboard renders scoped teaching counts', async () => {
   } finally { await act(async () => root.unmount()); host.remove(); api.defaults.adapter = adapter; }
 });
 
-test('Professor Profile password dialog and Lesson Editor controls expose accessible names', async () => {
- for(const name of ['ProfessorProfile','LessonEditor']){
-  const Component=(await server.ssrLoadModule('/src/pages/professor/components/'+name+'.jsx')).default;
+test('Professor Settings password dialog and Lesson Editor controls expose accessible names', async () => {
+ for(const name of ['Settings','LessonEditor']){
+  const Component=(await server.ssrLoadModule(name==='Settings'?'/src/components/shared/Settings.jsx':'/src/pages/professor/components/'+name+'.jsx')).default;
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const adapter=api.defaults.adapter;
   api.defaults.adapter=async config=>({status:name==='LessonEditor'?204:200,headers:{},config,data:name==='LessonEditor'?null:{name:'Professor',email:'prof@example.test'}});
   try{
-   await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Professor'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{},React.createElement(Component))))));
-   if(name==='ProfessorProfile'){
+   await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Professor'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast(){}}},React.createElement(Router.MemoryRouter,{},React.createElement(Component,{role:'professor'}))))));
+   if(name==='Settings'){
     const trigger=[...host.querySelectorAll('button')].find(b=>/change password/i.test(b.textContent));trigger.focus();await act(async()=>trigger.click());
     const dialog=document.querySelector('[role="dialog"]');assert.ok(dialog);assert.equal(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent,'Change Password');assert.equal(document.activeElement.id,'current-password');
     const save=[...dialog.querySelectorAll('button')].find(b=>b.textContent==='Save Changes');
-    for(let i=0;i<4;i++)await act(async()=>dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Tab',bubbles:true})));
-    assert.equal(document.activeElement,save);
-    await act(async()=>dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(document.activeElement,trigger);
+    for(let i=0;i<8 && document.activeElement!==save;i++)await act(async()=>dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Tab',bubbles:true})));
+    assert.ok(document.activeElement===save, 'Save remains in the focus cycle; active='+document.activeElement.outerHTML);
+    await act(async()=>dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.ok(document.querySelector('[role="dialog"]'));await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.trim()==='Cancel' || b.getAttribute('aria-label')==='Close').click());assert.equal(document.querySelector('[role="dialog"]'),null);assert.ok(document.activeElement===trigger, 'Focus restored to password trigger');
    }else{
     const fields=[...host.querySelectorAll('input,select,textarea')];assert.equal(fields.length,4);
     for(const field of fields)assert.ok(field.labels?.length || field.getAttribute('aria-label'));

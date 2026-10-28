@@ -4,6 +4,12 @@
 .wide { max-width: 1440px; }
 .focused { max-width: 880px; }
 .profile { max-width: 720px; }
+/* One spacing contract, overriding the old per-page main padding. */
+.regular.regular, .wide.wide, .focused.focused, .profile.profile {
+  padding: 0 var(--page-gutter, 24px) var(--page-gutter, 24px);
+  row-gap: var(--page-section-gap, 24px);
+}
+.frame { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-4); align-items: stretch; }
 .metrics > * { min-width: 0; }
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: var(--space-6); align-items: start; }

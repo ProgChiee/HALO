@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import StudyCalendar from './StudyCalendar';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
@@ -54,7 +55,7 @@ export default function StudentDashboard() {
     if (subjectsStatus !== 'ready') return;
     const controller = new AbortController();
 
-    const candidates = subjects;
+    const candidates = subjects.filter(subject => subject.enrolled === true);
     Promise.allSettled(candidates.map(subject => getSubjectWeeks(subject.subjectId, { signal: controller.signal })))
       .then(results => {
         if (controller.signal.aborted) return;
@@ -85,12 +86,12 @@ export default function StudentDashboard() {
     <StudentPageShell>
 
       <div className={styles.contentArea}>
-        <header className={styles.topbar}>
+        <Topbar>
           <div className={styles.breadcrumb}>
             <LayoutGrid size={16} />
             Dashboard
           </div>
-        </header>
+        </Topbar>
 
         <main className={styles.main}>
           <h1 className={styles.greeting}>Welcome back, {firstName}! 👋</h1>
@@ -161,7 +162,7 @@ export default function StudentDashboard() {
                   onClick={() =>
                     nextLesson
                       ? navigate(`${workflow.basePath}/lesson/${nextLesson.subject.subjectId}/${nextLesson.week.weekId}`)
-                      : navigate(workflow.basePath + '/subjects')
+                      : navigate(workflow.basePath + '/subjects/my')
                   }
                 >
                   Continue
@@ -179,14 +180,14 @@ export default function StudentDashboard() {
           {subjectsStatus === 'loading' && <p role="status">Loading subjects...</p>}
           {subjectsStatus === 'error' && <div role="alert"><p>Couldn't load your subjects.</p><Button onClick={() => { setSubjectsStatus('loading'); setContinueStatus('loading'); setNextLesson(null); setSubjectsRetry(value => value + 1); }}>Retry subjects</Button></div>}
           {subjectsStatus === 'ready' && <div className={styles.subjectsList}>
-            {subjects.map((subject) => (
+            {subjects.filter(subject => subject.enrolled === true).map((subject) => (
               <div key={subject.subjectId} className={styles.subjectRow}>
                 <span className={styles.subjectName}>{subject.subjectName}</span>
                 <span className={styles.subjectProgress}>Progress: {subject.progressPercentage}%</span>
                 <progress className={styles.subjectBar} max="100" value={subject.progressPercentage} aria-label={`${subject.subjectName} progress`} />
               </div>
             ))}
-            {subjects.length === 0 && (
+            {!subjects.some(subject => subject.enrolled === true) && (
               <p className={styles.emptyState}>No subjects enrolled yet.</p>
             )}
           </div>}

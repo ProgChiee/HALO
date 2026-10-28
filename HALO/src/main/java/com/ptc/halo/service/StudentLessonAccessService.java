@@ -12,10 +12,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class StudentLessonAccessService {
     private final UserRepository users;
     private final StudentProfileRepository profiles;
+    private final StudentSubjectEnrollmentRepository enrollments;
 
-    public StudentLessonAccessService(UserRepository users, StudentProfileRepository profiles) {
+    public StudentLessonAccessService(UserRepository users, StudentProfileRepository profiles, StudentSubjectEnrollmentRepository enrollments) {
         this.users = users;
         this.profiles = profiles;
+        this.enrollments = enrollments;
     }
 
     public UserEntity requireStudent(Authentication authentication) {
@@ -38,9 +40,12 @@ public class StudentLessonAccessService {
         validateStudent(student);
         StudentProfileEntity profile = profiles.findByUserId(student.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "STUDENT_NOT_ENROLLED"));
-        // Existing enrollment model: subjects are assigned by student year level.
+        // Academic eligibility and explicit enrollment are independent requirements.
         if (profile.getYearLevel() == null || profile.getYearLevel() != subject.getYearLevel()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "STUDENT_NOT_ENROLLED");
+        }
+        if (!enrollments.existsByStudent_IdAndSubject_Id(student.getId(), subject.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ENROLLMENT_REQUIRED");
         }
     }
 

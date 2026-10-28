@@ -1,3 +1,4 @@
+import Topbar from '../../../components/shared/Topbar';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { LayoutGrid, Users, BookOpen, FileText, CheckCircle2, ClipboardCheck, Award, ArrowRight, Clock3, CircleAlert } from 'lucide-react';
@@ -39,7 +40,7 @@ export default function ProfessorDashboard() {
  const performance = data?.performance ?? [], attention = data?.attention ?? [], recent = data?.recentActivity ?? [];
  return <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
   <div className={styles.contentArea}>
-   <header className={styles.topbar}><div className={styles.breadcrumb}><LayoutGrid size={16} /> Dashboard</div></header>
+   <Topbar><div className={styles.breadcrumb}><LayoutGrid size={16} /> Dashboard</div></Topbar>
    <main className={styles.main}>
     <header className={styles.pageHeader}><div><h1 className={styles.greeting}>Teaching Overview</h1><p className={styles.subtext}>Welcome back, {firstName}. Your teaching, at a glance.</p></div><Link className={styles.manageLink} to={subjects}>My Subjects <ArrowRight size={16} /></Link></header>
     {isLoading ? <p className={styles.loadingText} role="status">Loading your teaching overview...</p> : loadError || !data ? <section className={styles.panel}><p role="alert">{professorErrorMessage(loadError, "Couldn't load the dashboard. Please try again.")}</p><Button variant="secondary" onClick={() => { setIsLoading(true); setLoadError(null); setRetry(n => n + 1); }}>Retry</Button></section> : <>

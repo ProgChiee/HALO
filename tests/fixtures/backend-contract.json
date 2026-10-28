@@ -2,6 +2,66 @@
   "source": "HALO.zip / HALO/src/main/java/com/ptc/halo; professor GET-by-week verified against updated local AiLearningModuleController.java on 2026-09-29; progress-summaries verified against local ProfessorStudentController.java on 2026-10-04; acting session endpoints verified against local AdminActingController.java on 2026-10-09; Student preview endpoints verified against local AdminStudentPreviewController.java on 2026-10-10",
   "endpoints": [
     {
+      "method": "GET",
+      "path": "/api/student/subjects/my",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/subjects/browse",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/student/subjects/my",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/student/subjects/browse",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/student/subjects/my",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/student/subjects/browse",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/student/subjects/{subjectId}/enrollment",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/professor/profile/id",
+      "controller": "ProfessorProfileController.java"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/student/profile/academic",
+      "controller": "StudentProfileController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/badges/catalog",
+      "controller": "StudentBadgeController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/student/badges/catalog",
+      "controller": "AdminStudentPreviewController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/student/badges/catalog",
+      "controller": "AdminStudentModeController.java"
+    },
+    {
       "method": "POST",
       "path": "/api/admin/create-professor",
       "controller": "AdminController.java"
@@ -621,6 +681,21 @@
     {
       "method": "PATCH",
       "path": "/api/profile"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/subjects/{subjectId}/curriculum",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/student/subjects/{subjectId}/curriculum",
+      "controller": "StudentEnrollmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/student/subjects/{subjectId}/curriculum",
+      "controller": "StudentEnrollmentController.java"
     }
   ],
   "dtos": {
@@ -1018,7 +1093,8 @@
       "yearLevel": "YearLevel",
       "totalWeeks": "Integer",
       "completedWeeks": "Integer",
-      "progressPercentage": "Integer"
+      "progressPercentage": "Integer",
+      "enrolled": "boolean"
     },
     "StudentWeekAccessResponse": {
       "weekId": "Long",

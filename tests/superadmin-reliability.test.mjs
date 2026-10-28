@@ -95,7 +95,7 @@ test('failed/ambiguous create keeps values and modal, unlocks dismissal, and nev
   await click(button('Add Admin')); assert.equal(form().querySelector('input').value, '');
   assert.equal(document.body.textContent.includes('took too long'), false);
   await act(async () => form().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  assert.equal(form(), null);
+  assert.ok(form());await click(button('Cancel'));assert.equal(form(), null);
 });
 
 test('old create completion cannot affect a newly mounted modal or send its success toast', async () => {
@@ -150,7 +150,7 @@ test('Admin status confirmation names the account, focuses Cancel, and supports 
   assert.equal(document.activeElement,opener);
   await click(opener);
   await act(async()=>document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
-  assert.equal(document.querySelector('[role="dialog"]'),null); assert.equal(calls.length,1);
+  assert.ok(document.querySelector('[role="dialog"]'));await click(button('Cancel'));assert.equal(document.querySelector('[role="dialog"]'),null); assert.equal(calls.length,1);
 });
 
 test('activation confirms exact target, prevents duplicate requests, and keeps failures open for retry', async () => {
@@ -244,7 +244,7 @@ async function resize(width) {
 }
 const key = async (element, key, shiftKey = false) => act(async () => element.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true, cancelable: true })));
 
-test('Super Admin shell switches at 1440/1024/768/480/375; drawer closes by backdrop, Escape and navigation', async () => {
+test('Super Admin shell switches at 1440/1024/768/480/375; drawer ignores backdrop and closes by Escape and navigation', async () => {
   await mountAdmins(); await act(async () => calls[0].resolve([]));
   assert.ok(host.querySelector('aside')); assert.equal(button('Open navigation'), undefined);
   for (const width of [1024, 768, 480, 375]) {
@@ -256,7 +256,7 @@ test('Super Admin shell switches at 1440/1024/768/480/375; drawer closes by back
     assert.ok(drawer.querySelector('aside')); assert.equal(opener.getAttribute('aria-expanded'), 'true');
     assert.equal(host.hasAttribute('inert'), true); assert.equal(document.body.style.overflow, 'hidden');
     await click(drawer.parentElement);
-    assert.equal(document.querySelector('[role=dialog]'), null); assert.equal(document.activeElement === opener, true);
+    assert.ok(document.querySelector('[role=dialog]'));await click(drawer.querySelector('[aria-label="Close navigation"]'));assert.equal(document.activeElement,opener);
     await click(opener); await key(document.activeElement, 'Escape');
     assert.equal(document.querySelector('[role=dialog]'), null);
     await click(opener); await click(document.querySelector('[role=dialog] a'));
@@ -284,11 +284,12 @@ test('Add Admin dialog has labels, initial focus, focus trap, inert background a
   assert.equal(document.activeElement.id, 'admin-name');
   for (const input of dialog.querySelectorAll('input')) assert.ok(dialog.querySelector('label[for="' + input.id + '"]'));
   const close = dialog.querySelector('[aria-label=Close]'); const last = dialog.querySelector('[type=submit]');
-  close.focus(); await key(close, 'Tab', true); assert.equal(document.activeElement === last, true);
+  close.focus(); await key(close, 'Tab', true); assert.ok(document.activeElement === last, 'Reverse Tab from close: '+document.activeElement.outerHTML);
   await key(last, 'Tab'); assert.equal(document.activeElement === close, true);
   opener.focus(); assert.ok(dialog.contains(document.activeElement));
   assert.equal(host.hasAttribute('inert'), true);
   await key(document.activeElement, 'Escape');
+  assert.ok(document.querySelector('[role=dialog]'));await click(document.querySelector('[role=dialog] [aria-label=Close]'));
   assert.equal(document.querySelector('[role=dialog]'), null);
   assert.equal(document.activeElement === opener, true); assert.equal(host.hasAttribute('inert'), false);
   assert.equal(document.body.style.overflow, '');
@@ -314,8 +315,12 @@ test('Admin rows/header have four matching grid columns inside an overflow regio
   assert.equal(card.children[0].children.length, 4); assert.equal(card.children[1].children.length, 4);
   const css = await readFile(new URL('../src/pages/superadmin/styles/Admins.module.css', import.meta.url), 'utf8');
   const columns = [...css.matchAll(/grid-template-columns: ([^;]+);/g)].map(match => match[1]);
-  assert.equal(columns.length, 2); assert.equal(columns[0], columns[1]);
-  assert.equal(columns[0].match(/minmax\([^)]*\)|\d+px/g).length, 4);
+  assert.equal(columns[0], 'var(--account-columns)'); assert.equal(columns[1], columns[0]);
+  const desktopColumns=css.match(/--account-columns: ([^;]+);/)[1];
+  assert.equal(desktopColumns.match(/minmax\([^)]*\)|\d+px/g).length,4);
+  assert.equal(card.getAttribute('role'),'table');assert.equal(card.children[0].getAttribute('role'),'row');
+  assert.deepEqual([...card.querySelectorAll('[role=columnheader]')].map(cell=>cell.textContent),['Name','Email','Status','Actions']);
+  assert.match(css,/@media \(max-width: 600px\)/);assert.match(css,/white-space: normal; overflow-wrap: anywhere/);
   assert.match(css, /overflow-x: auto/); assert.match(css, /min-width: 720px/);
   const dialogCss = await readFile(new URL('../src/components/shared/Dialog.module.css', import.meta.url), 'utf8');
   assert.match(dialogCss, /max-height: calc\(100dvh - 2rem\)/); assert.match(dialogCss, /overflow-y: auto/);
@@ -330,7 +335,7 @@ test('Super Admin password modal exposes dialog focus behavior without submittin
         React.createElement(PasswordModal, { accessible: true, isOpen: true, onClose: () => closed++ }))))));
   const dialog = document.querySelector('[role=dialog]'); assert.ok(dialog);
   assert.equal(document.activeElement.id, 'current-password');
-  await key(document.activeElement, 'Escape'); assert.equal(closed, 1);
+  await key(document.activeElement, 'Escape'); assert.equal(closed, 0);await click(dialog.querySelector('[aria-label=Close]'));assert.equal(closed,1);
   assert.equal(calls.length, 0);
 });
 
@@ -421,4 +426,47 @@ test('malformed statistics cannot render objects as React children or conceal va
     await mountDashboard(DashboardSections, { statistics: { ...ready, data }, logs: { ...ready, data: recentRows } });
     assertDashboardShell(); assert.ok(button('Retry statistics')); assert.ok(host.textContent.includes('Recent account action'));
   }
+});
+
+
+test('account statuses render compact pills and named actions retain their actual purpose',async()=>{
+ await mountAdmins();
+ const statuses=['ACTIVE','INACTIVE','BLOCKED','ARCHIVED',null];
+ await act(async()=>calls[0].resolve(statuses.map((status,index)=>({id:index+1,name:'Admin '+index,email:'long-account-'+index+'@paterostechnologicalcollege.edu.ph',status}))));
+ const rows=[...host.querySelectorAll('[role=table] [role=row]')].slice(1);
+ assert.equal(rows.length,5);
+ for(const [index,row] of rows.entries()){
+  assert.equal(row.children.length,4);assert.equal(row.querySelector('[role=rowheader]').textContent,'Admin '+index);
+  const status=row.children[2].querySelector('span');assert.ok(status.className.includes('statusBadge'));
+  assert.equal(status.textContent,['Active','Inactive','Blocked','Archived','Not set'][index]);
+  assert.equal(status.querySelector('input,select'),null);
+  const [power,remove]=row.querySelectorAll('button');
+  assert.equal(power.getAttribute('aria-label'),index===0?'Deactivate':'Activate');
+  assert.equal(power.title,(index===0?'Deactivate':'Activate')+' Admin '+index);
+  assert.equal(remove.title,'Delete Admin '+index);assert.equal(remove.getAttribute('aria-label'),'Delete Admin '+index);
+  assert.equal(row.querySelector('[role=cell]').title,'long-account-'+index+'@paterostechnologicalcollege.edu.ph');
+ }
+ const css=await readFile(new URL('../src/pages/superadmin/styles/Admins.module.css',import.meta.url),'utf8');
+ assert.match(css,/border-radius: var\(--radius-pill\)/);assert.match(css,/\.statusBadge[\s\S]*?border: 0/);
+ assert.match(css,/\.status_active \{ background: var\(--color-primary-soft\)/);
+ assert.match(css,/\.actionBtn:disabled/);assert.match(css,/:focus-visible/);assert.match(css,/\.tableRow:hover/);
+});
+
+test('status and delete confirmations ignore outside clicks and require explicit action',async()=>{
+ await mountAdmins();await act(async()=>calls[0].resolve([{id:8,name:'Named Admin',email:'named@example.test',status:'ACTIVE'}]));
+ for(const action of ['Deactivate','Delete Named Admin']){
+  const trigger=host.querySelector('[aria-label="'+action+'"]');await click(trigger);
+  const dialog=document.querySelector('[role=dialog]');assert.ok(dialog);assert.equal(calls.length,1);
+  await click(dialog.parentElement);assert.ok(dialog.isConnected);assert.equal(calls.length,1);
+  await key(dialog,'Escape');assert.ok(dialog.isConnected);
+  await click(button('Cancel'));assert.equal(document.querySelector('[role=dialog]'),null);assert.equal(document.activeElement===trigger,true);
+ }
+});
+
+test('account loading, safe errors with Retry, and empty state retain the table surface',async()=>{
+ await mountAdmins();assert.match(host.querySelector('[role=status]').textContent,/Loading admins/);
+ await act(async()=>calls[0].reject({response:{status:500,data:{message:'private SQL'}}}));
+ assert.ok(host.querySelector('[role=alert]'));assert.doesNotMatch(host.textContent,/private SQL/);
+ await click(button('Retry'));assert.equal(calls.length,2);await act(async()=>calls[1].resolve([]));
+ assert.match(host.querySelector('[role=table]').textContent,/No admins yet/);assert.equal(host.querySelectorAll('[role=rowheader]').length,0);
 });

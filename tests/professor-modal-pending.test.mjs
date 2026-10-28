@@ -87,6 +87,7 @@ test('academic dialogs have names, associated labels, initial focus and Escape r
    assert.ok(reachedAction, 'bottom action remains in the dialog keyboard cycle');
    for(const field of dialog.querySelectorAll('input,select,textarea'))assert.ok(field.labels.length>0);
    await act(async()=>dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+   assert.ok(document.querySelector('[role="dialog"]'));await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.trim()==='Cancel' || b.getAttribute('aria-label')==='Close').click());
    assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(document.activeElement,trigger);
   }
   await act(async()=>[...page.host.querySelectorAll('button')].find(b=>b.textContent.includes('S1')).click());
@@ -94,6 +95,7 @@ test('academic dialogs have names, associated labels, initial focus and Escape r
   const dialog=document.querySelector('[role="dialog"]');assert.equal(document.activeElement.id,'week-number');
   for(const field of dialog.querySelectorAll('input'))assert.ok(field.labels.length);
   await act(async()=>dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));
+  assert.ok(document.querySelector('[role="dialog"]'));await act(async()=>[...dialog.querySelectorAll('button')].find(b=>b.textContent.trim()==='Cancel' || b.getAttribute('aria-label')==='Close').click());
   assert.equal(document.activeElement,trigger);
  }finally{await page.close();}
 });

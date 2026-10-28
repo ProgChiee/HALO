@@ -26,11 +26,19 @@ public final class StudentRegistrationValidator {
   return result;
  }
  private static AcademicDetails normalizeAcademic(String id, String section, com.ptc.halo.enums.YearLevel year, java.util.Map<String,String> errors) {
-  id = id == null ? "" : id.strip();
-  section = section == null ? "" : section.strip().replaceAll("\\s+", " ");
-  if (!id.matches("[0-9]{2}AHRT-[0-9]{4}")) errors.put("studentId","Use 2 digits + AHRT + hyphen + 4 digits, for example 29AHRT-0168. Include the hyphen.");
-  if (section.isEmpty() || section.length()>50 || !section.matches("[\\p{L}\\p{M}\\p{N} .'-]+")) errors.put("section","Enter a section of up to 50 characters, for example BSHM 1A.");
+  try { id = validateStudentId(id); } catch (RegistrationValidationException e) { errors.putAll(e.errors); }
+  try { section = validateSection(section); } catch (RegistrationValidationException e) { errors.putAll(e.errors); }
   if (year == null) errors.put("yearLevel","Select your year level.");
   return new AcademicDetails(id, section);
+ }
+ public static String validateStudentId(String id) {
+  id = id == null ? "" : id.strip();
+  if (!id.matches("[0-9]{2}AHRT-[0-9]{4}")) throw new RegistrationValidationException(java.util.Map.of("studentId","Use 2 digits + AHRT + hyphen + 4 digits, for example 29AHRT-0168. Include the hyphen."),400);
+  return id;
+ }
+ public static String validateSection(String section) {
+  section = section == null ? "" : section.strip().replaceAll("\\s+", " ");
+  if (section.isEmpty() || section.length()>50 || !section.matches("[\\p{L}\\p{M}\\p{N} .'-]+")) throw new RegistrationValidationException(java.util.Map.of("section","Enter a section of up to 50 characters, for example BSHM 1A."),400);
+  return section;
  }
 }

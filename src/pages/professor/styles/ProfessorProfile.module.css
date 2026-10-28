@@ -210,7 +210,7 @@
   composes: error from "../../../components/shared/UIPrimitives.module.css";
 }
 .layout { display: flex; height: 100vh; width: 100%; overflow: hidden; }
-.contentArea { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; }
+.contentArea { composes: frame from "../../../components/shared/PageLayout.module.css"; }
 
 @media (max-width: 1024px) {
   .contentArea { height: auto; min-height: 0; overflow-wrap: anywhere; }

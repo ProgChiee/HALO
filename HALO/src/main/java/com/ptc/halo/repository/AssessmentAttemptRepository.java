@@ -32,7 +32,7 @@ public interface AssessmentAttemptRepository
     long countByPassedTrue();
 
     Optional<AssessmentAttemptEntity>
-    findTopByStudentIdAndSubmittedAtIsNotNullOrderBySubmittedAtDesc(
+    findTopByStudentIdAndSubmittedAtIsNotNullOrderBySubmittedAtDescIdDesc(
             Long studentId
     );
 

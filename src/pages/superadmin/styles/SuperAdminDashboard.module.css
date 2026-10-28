@@ -42,12 +42,12 @@
 .subtext {
   color: var(--color-accent-active);
   font-size: var(--text-sm);
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--page-section-gap, 24px);
 }
 
 .statsGrid {
   composes: metrics from "../../../components/shared/PageLayout.module.css";
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--page-section-gap, 24px);
 }
 
 .statCard {

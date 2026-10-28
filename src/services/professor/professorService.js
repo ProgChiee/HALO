@@ -1,6 +1,11 @@
 // API routes verified against the controllers in HALO.zip.
 import defaultClient from '../apiClient';
 
+// Self-only; not exposed through the Admin Preview/Acting service factory.
+export async function updateOwnProfessorId(professorId) {
+  return (await defaultClient.patch('/professor/profile/id', { professorId })).data;
+}
+
 export function createProfessorService(apiClient = defaultClient) {
 
 async function createSubject({ subjectCode, subjectName, description, yearLevel }) {

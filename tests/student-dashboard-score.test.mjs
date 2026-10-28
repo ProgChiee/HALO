@@ -22,8 +22,8 @@ after(async () => { await server.close(); dom.window.close(); });
 test('Continue resumes persisted recent module after remount and navigates to its subject/week', async () => {
   const workflow = { acting: false, basePath: '/student', api: {
     getDashboardData: async () => ({}),
-    getSubjectsData: async () => [{ subjectId: 1, subjectName: 'Older subject', progressPercentage: 0 },
-      { subjectId: 15, subjectName: 'Leadership', progressPercentage: 100 }],
+    getSubjectsData: async () => [{ subjectId: 1, subjectName: 'Older subject', enrolled: true, progressPercentage: 0 },
+      { subjectId: 15, subjectName: 'Leadership', enrolled: true, progressPercentage: 100 }],
     getSubjectWeeks: async id => [{ moduleId: id === 15 ? 42 : 1, weekId: id === 15 ? 18 : 1,
       weekNumber: 1, title: id === 15 ? 'Recent lesson' : 'Older lesson', unlocked: true,
       lessonAvailable: true, completed: id === 15, lastActivityAt: id === 15 ? '2026-10-26T01:00:00' : null }],
@@ -70,3 +70,13 @@ for (const [name, score, expected] of [
     } finally { await act(async () => root.unmount()); host.remove(); }
   });
 }
+
+test('Dashboard does not request or offer lessons from unenrolled subject history',async()=>{
+ const requested=[];
+ const workflow={basePath:'/student',acting:false,api:{getDashboardData:async()=>({completedModules:2}),getSubjectsData:async()=>[{subjectId:15,subjectName:'Unenrolled historical subject',enrolled:false}],getSubjectWeeks:async id=>{requested.push(id);return [];}}};
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{
+  await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},React.createElement(Workflow.Provider,{value:workflow},React.createElement(Router.MemoryRouter,null,React.createElement(Dashboard))))));
+  assert.deepEqual(requested,[]);assert.ok(!host.textContent.includes('Unenrolled historical subject'));assert.ok(![...host.querySelectorAll('button')].some(button=>button.textContent==='Continue'));
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
