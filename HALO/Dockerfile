@@ -33,19 +33,22 @@ RUN printf '%s\n' \
     '  exit 1' \
     'fi' \
     '' \
-    '# Create certificate file' \
+    '# Create temporary certificate file' \
     'printf "%s\n" "$AIVEN_CA_CERT" > /tmp/aiven-ca.pem' \
     '' \
-    '# Create Java truststore' \
-    'keytool -importcert -noprompt -trustcacerts -alias aiven-ca -file /tmp/aiven-ca.pem -keystore /tmp/aiven-truststore.p12 -storetype PKCS12 -storepass changeit' \
+    '# Copy default Java truststore' \
+    'cp "$JAVA_HOME/lib/security/cacerts" /tmp/halo-truststore' \
+    '' \
+    '# Import Aiven CA into Java truststore' \
+    'keytool -importcert -noprompt -trustcacerts -alias aiven-ca -file /tmp/aiven-ca.pem -keystore /tmp/halo-truststore -storepass changeit' \
     '' \
     '# Remove temporary certificate file' \
     'rm -f /tmp/aiven-ca.pem' \
     '' \
     '# Configure Java SSL truststore' \
-    'export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djavax.net.ssl.trustStore=/tmp/aiven-truststore.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=PKCS12"' \
+    'export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djavax.net.ssl.trustStore=/tmp/halo-truststore -Djavax.net.ssl.trustStorePassword=changeit"' \
     '' \
-    '# Start Spring Boot' \
+    '# Start Spring Boot application' \
     'exec java -jar /app/app.jar' \
     > /app/start.sh \
     && chmod +x /app/start.sh
