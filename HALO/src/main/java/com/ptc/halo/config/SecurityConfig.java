@@ -88,6 +88,8 @@ public class SecurityConfig {
                                 ApiSecurityErrors.write(request, response, 403, "INVALID_ROLE_OR_ACCESS")))
                 .authorizeHttpRequests(auth -> auth
 
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/healthz").permitAll()
+
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register/student",
