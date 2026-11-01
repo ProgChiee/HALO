@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /** All persisted lesson paths are resolved against one absolute, configured root. */
 @Component
-public class LessonStoragePaths {
+public class LessonStoragePaths implements LessonMaterialStorage {
     private final Path root;
 
     public LessonStoragePaths(@Value("${halo.lesson-storage.root}") String configuredRoot) {
@@ -42,6 +42,25 @@ public class LessonStoragePaths {
     public String storedPath(Path path) {
         return root.relativize(resolve(path.toString())).toString().replace('\\', '/');
     }
+
+    @Override public String key(String reference) { return storedPath(resolve(reference)); }
+    @Override public byte[] read(String reference) throws IOException {
+        Path path = resolve(reference);
+        if (!Files.isRegularFile(path) || !Files.isReadable(path)) throw new java.io.FileNotFoundException("Material unavailable");
+        try (var stream = Files.newInputStream(path)) {
+            byte[] bytes = stream.readNBytes(MAX_BYTES + 1);
+            if (bytes.length == 0 || bytes.length > MAX_BYTES) throw new IOException("Invalid material size");
+            return bytes;
+        }
+    }
+    @Override public void writeNew(String key, byte[] bytes, String mediaType) throws IOException {
+        Path path = resolve(key);
+        Files.createDirectories(path.getParent());
+        Files.createFile(path);
+        try (var stream = Files.newOutputStream(path)) { stream.write(bytes); }
+        catch (IOException | RuntimeException failure) { Files.deleteIfExists(path); throw failure; }
+    }
+    @Override public void delete(String reference) throws IOException { Files.deleteIfExists(resolve(reference)); }
 
     private IllegalArgumentException invalid() { return new IllegalArgumentException("Invalid lesson storage path"); }
 }

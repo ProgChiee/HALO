@@ -1,5 +1,6 @@
 package com.ptc.halo.dtoResponse;
 
+@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 public class AiLearningFileResponse {
 
     private Long id;

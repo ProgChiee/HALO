@@ -1,4 +1,5 @@
 import { mentorAnswerText } from '../../../utils/mentorAnswerText';
+import LessonAttachments from './LessonAttachments';
 import Topbar from '../../../components/shared/Topbar';
 import VideoLearning from '../../../components/shared/VideoLearning';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
@@ -266,6 +267,7 @@ function ModuleLessonChat({ topicId, weekId }) {
                   <p style={{ whiteSpace: 'pre-wrap' }}>{content}</p>
                 </section>
               ))}
+              <LessonAttachments files={lesson.files || []} load={workflow.api.getLessonAttachment} />
             </section>
           )}
           {loadError && (

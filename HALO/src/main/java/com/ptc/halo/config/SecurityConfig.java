@@ -27,6 +27,9 @@ import com.ptc.halo.security.ApiSecurityErrors;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    @org.springframework.beans.factory.annotation.Value("${halo.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}")
+    private String allowedOrigins="http://localhost:*,http://127.0.0.1:*";
+
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
@@ -123,10 +126,7 @@ public class SecurityConfig {
                 new CorsConfiguration();
 
         configuration.setAllowedOriginPatterns(
-                List.of(
-                        "http://localhost:*",
-                        "http://127.0.0.1:*"
-                )
+                java.util.Arrays.stream(allowedOrigins.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList()
         );
 
         configuration.setAllowedMethods(
@@ -145,6 +145,7 @@ public class SecurityConfig {
         );
 
         configuration.setAllowCredentials(true);
+        configuration.setExposedHeaders(List.of("Content-Disposition"));
 
 
         UrlBasedCorsConfigurationSource source =

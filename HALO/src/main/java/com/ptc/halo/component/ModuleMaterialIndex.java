@@ -29,15 +29,19 @@ public class ModuleMaterialIndex {
     private final ObjectMapper mapper;
     private final Object[] locks = new Object[32];
     private final Path cacheDirectory;
-    private final com.ptc.halo.service.LessonStoragePaths storage;
+    private final com.ptc.halo.service.LessonMaterialStorage storage;
+    private final com.ptc.halo.service.LessonStoragePaths cachePaths;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public ModuleMaterialIndex(ChatClient.Builder builder, ObjectMapper mapper, com.ptc.halo.service.LessonStoragePaths storage) {
-        this(builder.build(), mapper, storage);
+    public ModuleMaterialIndex(ChatClient.Builder builder, ObjectMapper mapper, com.ptc.halo.service.LessonMaterialStorage storage, com.ptc.halo.service.LessonStoragePaths cachePaths) {
+        this(builder.build(), mapper, storage, cachePaths);
     }
     // Explicit constructor for isolated extraction/index tests.
     public ModuleMaterialIndex(ChatClient chat, ObjectMapper mapper, com.ptc.halo.service.LessonStoragePaths storage) {
-        this.chat = chat; this.mapper = mapper; this.storage = storage; this.cacheDirectory = storage.resolve(".module-index");
+        this(chat, mapper, storage, storage);
+    }
+    public ModuleMaterialIndex(ChatClient chat, ObjectMapper mapper, com.ptc.halo.service.LessonMaterialStorage storage, com.ptc.halo.service.LessonStoragePaths cachePaths) {
+        this.chat = chat; this.mapper = mapper; this.storage = storage; this.cachePaths = cachePaths; this.cacheDirectory = cachePaths.resolve(".module-index");
         Arrays.setAll(locks, i -> new Object());
     }
 
@@ -46,7 +50,7 @@ public class ModuleMaterialIndex {
     public Index buildRevision(AiLearningModuleEntity module) { return build(module, false); }
     public void invalidate(Long moduleId) {
         synchronized (locks[Math.floorMod(moduleId.hashCode(), locks.length)]) {
-            try { Files.deleteIfExists(storage.resolve(".module-index/" + moduleId + ".json")); }
+            try { Files.deleteIfExists(cachePaths.resolve(".module-index/" + moduleId + ".json")); }
             catch (java.io.IOException error) { throw new IllegalStateException("Index invalidation failed", error); }
         }
     }
@@ -65,18 +69,14 @@ public class ModuleMaterialIndex {
                     if (file.getModule() == null || !Objects.equals(module.getId(), file.getModule().getId())) {
                         throw problem("MODULE_MATERIAL_MISMATCH");
                     }
-                    Path filePath = storage.resolve(file.getFilePath());
-                    log.info("module_index_file moduleId={} fileId={} filename={} absoluteRecord={} exists={} readable={}", module.getId(), file.getId(), safeName(file.getOriginalFileName()), Path.of(file.getFilePath()).isAbsolute(), Files.isRegularFile(filePath), Files.isReadable(filePath));
-                    if (!Files.isRegularFile(filePath) || !Files.isReadable(filePath)) throw problem("MODULE_MATERIAL_UNREADABLE");
-                    if (Files.size(filePath) > 3L * 1024 * 1024) throw problem("MODULE_MATERIALS_TOO_LARGE");
-                    byte[] bytes = Files.readAllBytes(filePath);
+                    byte[] bytes = storage.read(file.getFilePath());
                     if (bytes.length == 0) throw problem("MODULE_MATERIAL_UNREADABLE");
                     contents.add(bytes);
                     digest.update(mapper.writeValueAsBytes(List.of(file.getId(), file.getOriginalFileName(), file.getFileType())));
                     digest.update(bytes);
                 }
                 String fingerprint = HexFormat.of().formatHex(digest.digest());
-                Path cache = storage.resolve(".module-index/" + module.getId() + ".json");
+                Path cache = cachePaths.resolve(".module-index/" + module.getId() + ".json");
                 if (cacheEnabled && Files.isRegularFile(cache)) {
                     try {
                         Index existing = mapper.readValue(cache.toFile(), Index.class);

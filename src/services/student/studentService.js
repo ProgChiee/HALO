@@ -43,6 +43,10 @@ async function getWeekLesson(weekId, config = {}) {
   return res.data;
 }
 
+async function getLessonAttachment(id, config = {}) {
+  return (await apiClient.get(`/student/ai-learning-modules/files/${encodeURIComponent(id)}/content`, { ...config, responseType: 'blob' })).data;
+}
+
 async function getDashboardData(config = {}) {
   const res = await apiClient.get('/student/dashboard', config);
   return res.data;
@@ -66,6 +70,6 @@ async function getProfilePhoto(config = {}) { return (await apiClient.get('/stud
 async function getMySubjects(config = {}) { return (await apiClient.get('/student/subjects/my', config)).data; }
 async function getBrowseSubjects(config = {}) { return (await apiClient.get('/student/subjects/browse', config)).data; }
 async function getSubjectCurriculum(subjectId, config = {}) { return (await apiClient.get(`/student/subjects/${encodeURIComponent(subjectId)}/curriculum`, config)).data; }
-return { getSubjectCover, getSubjectCurriculum, getMySubjects, getBrowseSubjects, getProfilePhoto, getProgressData, getBadgesData, getBadgeCatalog, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy, getStudyCalendar };
+return { getLessonAttachment, getSubjectCover, getSubjectCurriculum, getMySubjects, getBrowseSubjects, getProfilePhoto, getProgressData, getBadgesData, getBadgeCatalog, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy, getStudyCalendar };
 }
 export const { getProgressData, getBadgesData, getBadgeCatalog, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy, getStudyCalendar } = createStudentService();

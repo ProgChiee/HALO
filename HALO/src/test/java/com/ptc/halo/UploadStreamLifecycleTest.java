@@ -115,9 +115,9 @@ class UploadStreamLifecycleTest {
 
     @Test void inputIsClosedBeforeLaterStorageFailure() throws Exception {
         var paths = mock(LessonStoragePaths.class);
-        when(paths.resolve(anyString())).thenReturn(directory.resolve("probe"));
+
         var service = new FileUploadService(paths);
-        when(paths.resolve(anyString())).thenThrow(new IllegalArgumentException("Forced storage failure"));
+        when(paths.key(anyString())).thenThrow(new IllegalArgumentException("Forced storage failure"));
         for (boolean existing : new boolean[]{false, true}) {
             var file = tracked(validImage(), false);
             assertThrows(IllegalArgumentException.class, () -> upload(service, file, existing));

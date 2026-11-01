@@ -746,6 +746,36 @@
       "method": "GET",
       "path": "/api/admin/preview/student/subjects/{id}/cover",
       "controller": "SubjectCoverController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/student/ai-learning-modules/files/{id}/content",
+      "controller": "LessonAttachmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/professor/ai-learning-modules/files/{id}/content",
+      "controller": "LessonAttachmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/student/ai-learning-modules/files/{id}/content",
+      "controller": "LessonAttachmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/student/ai-learning-modules/files/{id}/content",
+      "controller": "LessonAttachmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/acting/professor/ai-learning-modules/files/{id}/content",
+      "controller": "LessonAttachmentController.java"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/preview/professor/ai-learning-modules/files/{id}/content",
+      "controller": "LessonAttachmentController.java"
     }
   ],
   "dtos": {

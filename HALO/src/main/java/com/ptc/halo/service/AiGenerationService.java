@@ -34,12 +34,12 @@ public class AiGenerationService {
     private final AiLearningModuleRepository aiLearningModuleRepository;
     private final ObjectMapper objectMapper;
     private final ModuleGenerationState generationState;
-    private final LessonStoragePaths storage;
+    private final LessonMaterialStorage storage;
 
     public AiGenerationService(
             ChatClient.Builder chatClientBuilder,
             AiLearningModuleRepository aiLearningModuleRepository,
-            ObjectMapper objectMapper, ModuleMaterialIndex materialIndex, ModuleGenerationState generationState, LessonStoragePaths storage
+            ObjectMapper objectMapper, ModuleMaterialIndex materialIndex, ModuleGenerationState generationState, LessonMaterialStorage storage
     ) {
         this.storage = storage;
         this.generationState = generationState;
@@ -299,32 +299,9 @@ public class AiGenerationService {
                 );
             }
 
-            File file =
-                    storage.resolve(filePath).toFile();
-
-            if (!file.exists()) {
-
-                throw new RuntimeException(
-                        "Uploaded file not found: "
-                                + filePath
-                );
-            }
-
-            if (!file.isFile() || !file.canRead()) {
-
-                throw new RuntimeException(
-                        "Uploaded path is not a file: "
-                                + filePath
-                );
-            }
-
-            if (file.length() == 0) {
-
-                throw new RuntimeException(
-                        "Uploaded file is empty: "
-                                + filePath
-                );
-            }
+            byte[] bytes;
+            try { bytes = storage.read(filePath); }
+            catch (java.io.IOException error) { throw new IllegalStateException("Learning material unavailable", error); }
 
             MediaType mediaType;
 
@@ -347,7 +324,7 @@ public class AiGenerationService {
             Media media =
                     new Media(
                             mediaType,
-                            new FileSystemResource(file)
+                            new org.springframework.core.io.ByteArrayResource(bytes)
                     );
 
             mediaList.add(media);

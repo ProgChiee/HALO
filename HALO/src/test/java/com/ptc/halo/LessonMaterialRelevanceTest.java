@@ -27,7 +27,7 @@ class LessonMaterialRelevanceTest {
  AiGenerationService service;
  @BeforeEach void setup() throws Exception {
   var builder=mock(ChatClient.Builder.class);when(builder.build()).thenReturn(client);
-  var storage=mock(LessonStoragePaths.class);var path=directory.resolve("opaque.pdf");Files.writeString(path,"test media");when(storage.resolve(anyString())).thenReturn(path);
+  var storage=mock(LessonStoragePaths.class);var path=directory.resolve("opaque.pdf");Files.writeString(path,"test media");when(storage.read("opaque.pdf")).thenReturn(Files.readAllBytes(path));
   var subject=new SubjectEntity();subject.setSubjectName("Front Office Operations");subject.setDescription("Hotel guest service");
   var week=new WeekEntity();week.setSubject(subject);week.setWeekNumber(3);week.setTitle("Guest arrival and check-in");module.setWeek(week);
   module.setGeneratedSummary("Saved lesson");module.setLessonText("Guest check-in");

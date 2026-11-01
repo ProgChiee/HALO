@@ -16,11 +16,14 @@ import java.util.UUID;
 public class FileUploadService {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileUploadService.class);
-    private final LessonStoragePaths storage;
+    private final LessonMaterialStorage storage;
+    private LessonMaterialRetention retention;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    void retention(LessonMaterialRetention value) { retention=value; }
 
-    public FileUploadService(LessonStoragePaths storage) throws IOException {
+    public FileUploadService(LessonMaterialStorage storage) throws IOException {
         this.storage = storage;
-        Files.createDirectories(storage.resolve(".storage-probe").getParent());
+
     }
 
     public static final int MAX_FILES = 10;
@@ -99,27 +102,24 @@ public class FileUploadService {
 
     public void deleteFile(String filePath) throws IOException {
         requireTransaction();
-        Path path = storage.resolve(filePath);
+        String key = storage.key(filePath);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override public void afterCommit() { cleanup(path, "delete_after_commit"); }
+            @Override public void afterCommit() {
+                // Recheck committed live/draft/history references. Failure retains the object.
+                try { if (retention == null || !retention.referenced(key)) cleanup(key, "delete_after_commit"); }
+                catch (RuntimeException error) { log.error("material_retained_reference_check_failed"); }
+            }
         });
     }
 
-    private void writeTransactional(byte[] bytes, Path path) throws IOException {
+    private void writeTransactional(byte[] bytes, String key, String mediaType) throws IOException {
         requireTransaction();
-        Files.createFile(path); // Claim a new path exclusively; never overwrite an existing file.
-        // Register before copying so any later DB/audit/optimistic-lock failure cleans up.
+        storage.writeNew(key, bytes, mediaType);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCompletion(int status) {
-                if (status == STATUS_ROLLED_BACK) cleanup(path, "upload_rollback");
+                if (status == STATUS_ROLLED_BACK) cleanup(key, "upload_rollback");
             }
         });
-        try (var output = Files.newOutputStream(path)) {
-            output.write(bytes);
-        } catch (IOException | RuntimeException error) {
-            cleanup(path, "upload_copy_failure");
-            throw error;
-        }
     }
 
     private void requireTransaction() {
@@ -129,12 +129,10 @@ public class FileUploadService {
         }
     }
 
-    private void cleanup(Path path, String operation) {
-        try { Files.deleteIfExists(storage.resolve(path.toString())); }
+    private void cleanup(String key, String operation) {
+        try { storage.delete(key); }
         catch (IOException | RuntimeException error) {
-            // Never turn an already committed DB deletion into a misleading failure response.
-            log.error("file_cleanup_failed operation={} storedFile={} exceptionType={}",
-                    operation, path.getFileName(), error.getClass().getSimpleName());
+            log.error("file_cleanup_failed operation={} exceptionType={}",operation,error.getClass().getSimpleName());
         }
     }
     public AiLearningFileEntity uploadFile(MultipartFile file, AiLearningModuleEntity module) throws IOException {
@@ -144,13 +142,13 @@ public class FileUploadService {
 
     public AiLearningFileEntity uploadValidated(ValidatedUpload file, AiLearningModuleEntity module) throws IOException {
         String storedFileName = newStorageName();
-        Path filePath = storage.resolve(storedFileName);
-        writeTransactional(file.bytes(), filePath);
+        String filePath = storage.key(storedFileName);
+        writeTransactional(file.bytes(), filePath, file.mediaType());
         AiLearningFileEntity entity = new AiLearningFileEntity();
         entity.setModule(module);
         entity.setOriginalFileName(file.originalName());
         entity.setStoredFileName(storedFileName);
-        entity.setFilePath(storage.storedPath(filePath));
+        entity.setFilePath(filePath);
         entity.setFileType(file.mediaType());
         return entity;
     }

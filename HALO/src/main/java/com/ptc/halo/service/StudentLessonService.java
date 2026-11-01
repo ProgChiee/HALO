@@ -62,6 +62,14 @@ public class StudentLessonService {
                 module.getAiGenerationStatus()
         );
 
+        response.setFiles(module.getFiles().stream().map(file -> {
+            var metadata=new com.ptc.halo.dtoResponse.AiLearningFileResponse();
+            metadata.setId(file.getId());
+            metadata.setOriginalFileName(LessonAttachmentService.safeName(file.getOriginalFileName()));
+            metadata.setFileType(file.getFileType());
+            return metadata;
+        }).toList());
+
         return response;
     }
 }
