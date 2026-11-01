@@ -9,7 +9,7 @@ import org.springframework.http.*;
 import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/preview/professor")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class AdminProfessorPreviewController {
  private final AdminProfessorPreviewService mode;
  private final ProfessorAcademicService academic;
@@ -69,8 +69,8 @@ public class AdminProfessorPreviewController {
         return mode.read(authentication,sessionId.toString(),s -> students.getStudentBadges(id,s.getTarget()));
     }
     @GetMapping("/students/progress-summaries")
-    public Object summaries(@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="0") @Min(0) int page, @RequestParam(defaultValue="20") @Min(1) int size, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
-        return mode.read(authentication,sessionId.toString(),s -> { var result=students.getProgressSummaries(s.getTarget(),page,size,view); return Map.of("content",result.getContent(),"number",result.getNumber(),"size",result.getSize(),"totalElements",result.getTotalElements(),"totalPages",result.getTotalPages(),"first",result.isFirst(),"last",result.isLast(),"badgeScope","INSTITUTION_WIDE"); });
+    public Object summaries(@RequestParam(defaultValue="ALL") com.ptc.halo.enums.ProfessorEnrollmentView enrollment, @RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="0") @Min(0) int page, @RequestParam(defaultValue="20") @Min(1) int size, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
+        return mode.read(authentication,sessionId.toString(),s -> { var result=(enrollment==com.ptc.halo.enums.ProfessorEnrollmentView.ALL ? students.getProgressSummaries(s.getTarget(),page,size,view) : students.getProgressSummaries(s.getTarget(),page,size,view,enrollment)); return Map.of("content",result.getContent(),"number",result.getNumber(),"size",result.getSize(),"totalElements",result.getTotalElements(),"totalPages",result.getTotalPages(),"first",result.isFirst(),"last",result.isLast(),"badgeScope","INSTITUTION_WIDE"); });
     }
     @GetMapping("/ai-learning-modules/week/{id}")
     public Object moduleByWeek(@PathVariable @Positive Long id, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
@@ -80,7 +80,7 @@ public class AdminProfessorPreviewController {
     public Object module(@PathVariable @Positive Long id, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
         return mode.read(authentication,sessionId.toString(),s -> modules.getModuleById(id,s.getTarget(),s));
     }
- @GetMapping("/students/engagement") public Object engagement(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID id,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){return mode.read(auth,id.toString(),s->engagement.get(s.getTarget(),page,size,view));}
+ @GetMapping("/students/engagement") public Object engagement(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID id,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="ALL") com.ptc.halo.enums.ProfessorEnrollmentView enrollment, @RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){return mode.read(auth,id.toString(),s->(enrollment==com.ptc.halo.enums.ProfessorEnrollmentView.ALL ? engagement.get(s.getTarget(),page,size,view) : engagement.get(s.getTarget(),page,size,view,enrollment)));}
  @GetMapping("/students/{student}/engagement/modules") public Object moduleEngagement(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID id,@PathVariable Long student,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){return mode.read(auth,id.toString(),s->engagement.modules(s.getTarget(),student,page,size,view));}
  @GetMapping("/profile/photo") public Object photo(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID id){return mode.read(auth,id.toString(),s->{try{var image=photos.read(s.getTarget().getId());return image==null?ResponseEntity.noContent().build():ResponseEntity.ok().contentType(MediaType.IMAGE_PNG).cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").body(image);}catch(java.io.IOException e){throw new org.springframework.web.server.ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,"PHOTO_UNAVAILABLE");}});}
  @RequestMapping(value="/**",method={RequestMethod.POST,RequestMethod.PUT,RequestMethod.PATCH,RequestMethod.DELETE}) public Object readOnly(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID id){return mode.read(auth,id.toString(),s->{throw new AdminApiException(AdminApiException.Code.PREVIEW_READ_ONLY);});}

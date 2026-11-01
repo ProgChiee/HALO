@@ -1,3 +1,4 @@
+import { useAdminWorkflow } from '../../../context/admin/useAdminWorkflow';
 import Topbar from '../../../components/shared/Topbar';
 import IncompleteProfiles from './IncompleteProfiles';
 import { accountDisplay, accountTick } from '../../../utils/adminAccountDisplay';
@@ -18,7 +19,6 @@ import PageShell from '../../../components/shared/PageShell';
 import { useAuth } from '../../../context/login/useAuth';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
 import { MONITORING_CATEGORIES } from '../../../data/admin/monitoringData';
-import { getActivityLog, getProfessorMonitoring, getStudentMonitoring } from '../../../services/admin/adminService';
 import { useToast } from '../../../context/notifications/useToast';
 import { getActivityLogs, getAdminMonitoring } from '../../../services/superadmin/superadminService';
 import { useRemoteData } from '../../../hooks/useRemoteData';
@@ -70,9 +70,11 @@ function QuizChartTooltip({ active, payload }) {
 }
 
 export default function Monitoring() {
+  const adminWorkflow=useAdminWorkflow();
+  const { getActivityLog }=adminWorkflow.api;
   const [activeTab, setActiveTab] = useState('activity');
   const { role } = useAuth();
-  const isSuperAdmin = role === 'superadmin';
+  const isSuperAdmin = role === 'superadmin' && !adminWorkflow.acting;
   const tabs = isSuperAdmin ? [TABS[0], { id: 'admin-activity', label: 'Admin Activity' }] : TABS;
 
   return (
@@ -245,8 +247,9 @@ function ActivityLogTab({ loader, paginated = false }) {
 // Tab 2: AI Usage
 // ---------------------------------------------------------------------------
 function AiUsageTab() {
+  const { getProfessorMonitoring }=useAdminWorkflow().api;
   const [page, setPage] = useState(0);
-  const loader = useCallback(async config => ({ ...await getProfessorMonitoring({ ...config, params: { page, size: 25 } }), requestPage: page }), [page]);
+  const loader = useCallback(async config => ({ ...await getProfessorMonitoring({ ...config, params: { page, size: 25 } }), requestPage: page }), [page, getProfessorMonitoring]);
   const { data, isLoading: loading, error: loadError, reload: loadData } = useRemoteData(loader, { content: [], summary: {}, highlights: [] });
   const isLoading = loading || (!loadError && data.requestPage !== page);
   const professors = data.content;
@@ -369,8 +372,9 @@ function AiUsageTab() {
 // Tab 3: Quiz Performance
 // ---------------------------------------------------------------------------
 function QuizPerformanceTab() {
+  const { getStudentMonitoring }=useAdminWorkflow().api;
   const [page, setPage] = useState(0);
-  const loader = useCallback(async config => ({ ...await getStudentMonitoring({ ...config, params: { page, size: 25 } }), requestPage: page }), [page]);
+  const loader = useCallback(async config => ({ ...await getStudentMonitoring({ ...config, params: { page, size: 25 } }), requestPage: page }), [page, getStudentMonitoring]);
   const { data, isLoading: loading, error: loadError, reload: loadData } = useRemoteData(loader, { content: [], summary: {}, highlights: [] });
   const isLoading = loading || (!loadError && data.requestPage !== page);
   const students = data.content;

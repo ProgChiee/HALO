@@ -97,6 +97,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/super-admin/**")
                         .hasRole("SUPER_ADMIN")
 
+                        .requestMatchers("/api/admin/acting/**", "/api/admin/preview/**")
+                        .hasAnyRole("ADMIN", "SUPER_ADMIN")
+
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
 

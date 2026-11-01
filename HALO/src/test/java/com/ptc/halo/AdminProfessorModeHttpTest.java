@@ -43,7 +43,7 @@ class AdminProfessorModeHttpTest {
  @Test void missingSessionInvalidBodyAndWrongRolesFailBeforeWorkflow() throws Exception {
   token("ADMIN");mvc.perform(get(path+"/subjects").header("Authorization","Bearer test-token")).andExpect(status().isBadRequest());
   mvc.perform(post(path+"/subjects").header("Authorization","Bearer test-token").header("X-Acting-Session",id).contentType("application/json").content("{}")).andExpect(status().isBadRequest());
-  for(String role:java.util.List.of("PROFESSOR","STUDENT","SUPER_ADMIN")){token(role);mvc.perform(get(path+"/subjects").header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isForbidden());}
+  for(String role:java.util.List.of("PROFESSOR","STUDENT")){token(role);mvc.perform(get(path+"/subjects").header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isForbidden());}
   mvc.perform(get(path+"/subjects").header("X-Acting-Session",id)).andExpect(status().isUnauthorized());verifyNoInteractions(mode);
  }
  @Test void sessionBusinessErrorsAreNotMasked() throws Exception {

@@ -38,7 +38,7 @@ class AdminProfessorPreviewHttpTest {
  }
  @Test void missingSessionInvalidBodyAndWrongRolesFailBeforeWorkflow() throws Exception {
   token("ADMIN");mvc.perform(get(path+"/subjects").header("Authorization","Bearer test-token")).andExpect(status().isBadRequest());
-  for(String role:java.util.List.of("PROFESSOR","STUDENT","SUPER_ADMIN")){token(role);mvc.perform(get(path+"/subjects").header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isForbidden());}
+  for(String role:java.util.List.of("PROFESSOR","STUDENT")){token(role);mvc.perform(get(path+"/subjects").header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isForbidden());}
   mvc.perform(get(path+"/subjects").header("X-Acting-Session",id)).andExpect(status().isUnauthorized());verifyNoInteractions(mode);
  }
  @Test void sessionBusinessErrorsAreNotMasked() throws Exception {
@@ -76,5 +76,15 @@ class AdminProfessorPreviewHttpTest {
    if(put!=null)for(String value:put.value())org.junit.jupiter.api.Assertions.assertFalse(value.contains("profile")||value.contains("password"));
    if(post!=null)for(String value:post.value())org.junit.jupiter.api.Assertions.assertFalse(value.contains("profile")||value.contains("password"));
   }
+ }
+
+ @Test void enrollmentReportingUsesValidatedPreviewTarget() throws Exception {
+  token("ADMIN");var target=new com.ptc.halo.entity.UserEntity();target.setId(21L);target.setRole(com.ptc.halo.enums.Role.PROFESSOR);
+  var session=mock(com.ptc.halo.entity.AdminActingSessionEntity.class);when(session.getTarget()).thenReturn(target);
+  when(mode.read(any(),eq(id),any())).thenAnswer(call->{java.util.function.Function<com.ptc.halo.entity.AdminActingSessionEntity,Object> work=call.getArgument(2);return work.apply(session);});
+  when(students.getProgressSummaries(target,0,20,com.ptc.halo.enums.ProfessorStudentView.CURRENT,com.ptc.halo.enums.ProfessorEnrollmentView.NEVER)).thenReturn(org.springframework.data.domain.Page.empty());
+  for(String suffix:java.util.List.of("/students/progress-summaries","/students/engagement"))mvc.perform(get(path+suffix).param("enrollment","NEVER").param("professorId","999").header("Authorization","Bearer test-token").header("X-Acting-Session",id)).andExpect(status().isOk());
+  verify(students).getProgressSummaries(target,0,20,com.ptc.halo.enums.ProfessorStudentView.CURRENT,com.ptc.halo.enums.ProfessorEnrollmentView.NEVER);
+  verify(engagement).get(target,0,20,com.ptc.halo.enums.ProfessorStudentView.CURRENT,com.ptc.halo.enums.ProfessorEnrollmentView.NEVER);
  }
 }

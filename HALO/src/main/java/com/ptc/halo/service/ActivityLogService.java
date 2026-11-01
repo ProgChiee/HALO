@@ -15,6 +15,13 @@ import java.util.stream.Collectors;
 @Service
 public class ActivityLogService {
     private final ActivityLogRepository activityLogRepository;
+    private final ThreadLocal<com.ptc.halo.entity.AdminActingSessionEntity> adminContext=new ThreadLocal<>();
+    public <T> T withAdminContext(com.ptc.halo.entity.AdminActingSessionEntity session,java.util.function.Supplier<T> work) {
+        if(adminContext.get()!=null || session.getAdmin().getRole()!=Role.SUPER_ADMIN || session.getTargetRole()!=Role.ADMIN)
+            throw new org.springframework.security.access.AccessDeniedException("Invalid Admin mode");
+        adminContext.set(session);
+        try{return work.get();}finally{adminContext.remove();}
+    }
     private final com.ptc.halo.repository.UserRepository users;
 
     public ActivityLogService(ActivityLogRepository activityLogRepository, com.ptc.halo.repository.UserRepository users) {
@@ -39,7 +46,7 @@ public class ActivityLogService {
         log.setActingTarget(target);
         log.setActingTargetRole(target.getRole());
         log.setActivityType(ActivityType.ACCOUNT);
-        log.setAction(action + " by Admin " + admin.getId() + " viewing " + (target.getRole() == Role.STUDENT ? "Student" : "Professor") + " " + target.getId());
+        log.setAction(action + " by " + (admin.getRole()==Role.SUPER_ADMIN ? "Super Admin" : "Admin") + " " + admin.getId() + " viewing " + (target.getRole() == Role.STUDENT ? "Student" : "Professor") + " " + target.getId());
         log.setCreatedAt(LocalDateTime.now());
         activityLogRepository.save(log);
     }
@@ -57,7 +64,7 @@ public class ActivityLogService {
         log.setActingTargetRole(session.getTargetRole());
         log.setActingSession(session);
         log.setActivityType(type);
-        log.setAction(action + " by Admin " + session.getAdmin().getId() + " acting as "
+        log.setAction(action + " by " + (session.getAdmin().getRole()==Role.SUPER_ADMIN ? "Super Admin" : "Admin") + " " + session.getAdmin().getId() + " acting as "
                 + session.getTargetRole() + " " + session.getTarget().getId());
         log.setCreatedAt(LocalDateTime.now());
         activityLogRepository.save(log);
@@ -84,8 +91,12 @@ public class ActivityLogService {
             ActivityType activityType,
             String action) {
 
-        ActivityLogEntity log =
-                new ActivityLogEntity();
+        var acting=adminContext.get();
+        if(acting!=null){
+            if(!acting.getTarget().getId().equals(user.getId()))throw new org.springframework.security.access.AccessDeniedException("Invalid audit target");
+            createActingLog(acting,activityType,action);return;
+        }
+        ActivityLogEntity log = new ActivityLogEntity();
 
         log.setUser(user);
 
@@ -107,7 +118,9 @@ public class ActivityLogService {
     public org.springframework.data.domain.Page<ActivityLogResponse> getSuperAdminLogs(int page,int size,String search,ActivityType type) {
         var logs=activityLogRepository.findSuperAdminLogs(type,search.trim().toLowerCase(java.util.Locale.ROOT),paging(page,size));
         var display=ActivityDisplay.prepare(logs.getContent(),users);
-        return logs.map(log->response(log,display.apply(log)));
+        var summaries=ActivitySummary.prepare(logs.getContent(),users);
+        return logs.map(log->{var result=response(log,display.apply(log)); var summary=summaries.apply(log);
+            result.setActivityTitle(summary.title()); result.setActivityDescription(summary.description()); result.setActivityKind(summary.kind()); return result;});
     }
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ActivityLogResponse> getAllLogs() {

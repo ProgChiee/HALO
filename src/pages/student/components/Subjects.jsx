@@ -1,4 +1,5 @@
-﻿import Topbar from '../../../components/shared/Topbar';
+import SubjectCover from '../../../components/shared/SubjectCover';
+import Topbar from '../../../components/shared/Topbar';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
@@ -74,6 +75,7 @@ function SubjectLearning({ requestedSubject }) {
         : <>
           <p className={styles.subtitle}>Choose a weekly lesson for this subject.</p>
           <section className={styles.topicWrapper}>
+            <SubjectCover subjectId={subject.subjectId} load={subject.coverUrl ? workflow.api.getSubjectCover : undefined} />
             <button type="button" aria-expanded={expanded} aria-controls={expanded ? `subject-weeks-${subject.subjectId}` : undefined}
               className={`${styles.topicRow} ${expanded ? styles.topicRowExpanded : ''}`} onClick={toggleSubject}>
               <span className={styles.topicInfo}>

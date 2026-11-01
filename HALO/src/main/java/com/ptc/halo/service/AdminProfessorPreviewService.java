@@ -15,7 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Process-local, bounded preview credentials never enter the real acting-session repository. */
 @Service
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class AdminProfessorPreviewService {
  private final AdminActingSessionService authorization;
  private final ProfessorRepository professors;

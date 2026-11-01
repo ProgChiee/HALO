@@ -21,7 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /** Bounded, process-local preview capabilities. No Student history write dependencies. */
 @Service
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class AdminStudentPreviewService {
     private final AdminActingSessionService authorization;
     private final StudentProfileRepository profiles;

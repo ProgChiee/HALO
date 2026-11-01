@@ -16,7 +16,7 @@ public class LessonStudyController extends StudentLessonExceptionHandler {
  @PreAuthorize("hasRole('STUDENT')")
  public ResponseEntity<Void> record(@PathVariable Long weekId,Authentication auth){study.record(weekId,access.requireStudent(auth));return ResponseEntity.noContent().build();}
  @PostMapping("/api/admin/acting/student/ai-learning-modules/week/{weekId}/study")
- @PreAuthorize("hasRole('ADMIN')")
+ @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public ResponseEntity<Void> support(@PathVariable Long weekId,Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session){
   support.execute(auth,session.toString(),s->{var moduleId=study.record(weekId,s.getTarget());audit.createActingLog(s,ActivityType.MODULE,"Studied lesson module ID "+moduleId);return null;});
   return ResponseEntity.noContent().build();

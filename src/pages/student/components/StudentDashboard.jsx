@@ -9,6 +9,7 @@ import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
 import { useAuth } from '../../../context/login/useAuth';
 import { selectContinueLesson } from '../../../utils/continueLearning';
+import { onStudentEnrollmentChanged } from '../../../utils/studentEnrollmentEvents';
 import styles from '../styles/StudentDashboard.module.css';
 
 // Resume persisted activity across eligible subjects, with a stable no-history fallback.
@@ -28,6 +29,11 @@ export default function StudentDashboard() {
   const [statsRetry, setStatsRetry] = useState(0);
   const [subjectsRetry, setSubjectsRetry] = useState(0);
   const [continueRetry, setContinueRetry] = useState(0);
+
+  useEffect(() => {
+    if (workflow.acting) return;
+    return onStudentEnrollmentChanged(() => { setNextLesson(null); setSubjects([]); setSubjectsStatus('loading'); setSubjectsRetry(value => value + 1); });
+  }, [workflow.acting]);
 
   useEffect(() => {
     const controller = new AbortController();

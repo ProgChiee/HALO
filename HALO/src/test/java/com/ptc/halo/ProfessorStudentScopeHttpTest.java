@@ -76,4 +76,16 @@ class ProfessorStudentScopeHttpTest {
   mvc.perform(get("/api/professor/students/progress-summaries").param("view","ALL").header("Authorization","Bearer test-token"))
    .andExpect(status().isBadRequest());
  }
+
+ @Test void enrollmentFilterIsAdditiveAndUsesAuthenticatedScope() throws Exception {
+  var actor=token("PROFESSOR");
+  for(var filter:com.ptc.halo.enums.ProfessorEnrollmentView.values()) {
+   if(filter==com.ptc.halo.enums.ProfessorEnrollmentView.ALL) continue;
+   when(service.getProgressSummaries(actor,0,20,com.ptc.halo.enums.ProfessorStudentView.FORMER,filter)).thenReturn(org.springframework.data.domain.Page.empty());
+   mvc.perform(get("/api/professor/students/progress-summaries").param("professorId","999").param("view","FORMER").param("enrollment",filter.name()).header("Authorization","Bearer test-token"))
+    .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+   verify(service).getProgressSummaries(actor,0,20,com.ptc.halo.enums.ProfessorStudentView.FORMER,filter);
+  }
+  mvc.perform(get("/api/professor/students/progress-summaries").param("enrollment","INVALID").header("Authorization","Bearer test-token")).andExpect(status().isBadRequest());
+ }
 }

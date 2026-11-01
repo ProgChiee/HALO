@@ -18,6 +18,7 @@ class ProfessorEngagementTest {
    "create table student_profile_entity(user_id bigint,year_level varchar(30))",
    "create table lesson_study_days(student_id bigint,module_id bigint,study_date date,review_count bigint default 0)",
    "create table professor_entity(id bigint primary key,user_id bigint)",
+   "create table student_subject_enrollments(id bigint primary key,student_id bigint,subject_id bigint,active boolean)",
    "create table subjects(id bigint primary key,professor_id bigint,year_level varchar(30))",
    "create table weeks(id bigint primary key,subject_id bigint)",
    "create table ai_learning_modules(id bigint primary key,week_id bigint)",

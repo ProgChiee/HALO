@@ -100,9 +100,12 @@ public class ProfessorStudentService {
         return getProgressSummaries(professor,page,size,com.ptc.halo.enums.ProfessorStudentView.CURRENT);
     }
     public org.springframework.data.domain.Page<ProfessorStudentSummary> getProgressSummaries(UserEntity professor, int page, int size, com.ptc.halo.enums.ProfessorStudentView view) {
+        return getProgressSummaries(professor,page,size,view,com.ptc.halo.enums.ProfessorEnrollmentView.ALL);
+    }
+    public org.springframework.data.domain.Page<ProfessorStudentSummary> getProgressSummaries(UserEntity professor,int page,int size,com.ptc.halo.enums.ProfessorStudentView view,com.ptc.halo.enums.ProfessorEnrollmentView enrollment) {
         requireProfessor(professor);
         if (page < 0 || size < 1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_PAGINATION");
-        return userRepository.findProfessorProgressSummaries(professor.getId(), view.statuses(),
+        return userRepository.findProfessorProgressSummariesFiltered(professor.getId(), view.statuses(), enrollment.name(),
                 org.springframework.data.domain.PageRequest.of(page, Math.min(size, 100)));
     }
     public ProfessorStudentProgressResponse

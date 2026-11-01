@@ -1,3 +1,4 @@
+import { useAdminWorkflow } from '../../../context/admin/useAdminWorkflow';
 import Topbar from '../../../components/shared/Topbar';
 import ProfileName from '../../../components/shared/ProfileName';
 import ProfilePhoto from '../../../components/shared/ProfilePhoto';
@@ -6,7 +7,6 @@ import { useAuth } from '../../../context/login/useAuth';
 import { User as UserIcon } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import { ADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getAdminProfile } from '../../../services/admin/adminService';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/AdminProfile.module.css';
 
@@ -18,6 +18,8 @@ import styles from '../styles/AdminProfile.module.css';
 const noProfilePhoto = async () => null;
 
 export default function AdminProfile() {
+  const adminWorkflow=useAdminWorkflow();
+  const { getAdminProfile }=adminWorkflow.api;
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -37,7 +39,7 @@ export default function AdminProfile() {
     }
     loadData();
     return () => { isMounted = false; };
-  }, []);
+  }, [getAdminProfile]);
 
   if (isLoading) {
     return (
@@ -57,7 +59,7 @@ export default function AdminProfile() {
     );
   }
 
-  const displayName = (user?.name ?? profile.name);
+  const displayName = (adminWorkflow.acting ? profile.name : user?.name ?? profile.name);
   const avatarInitial = displayName?.trim().charAt(0).toUpperCase() || '?';
 
   return (
@@ -71,11 +73,11 @@ export default function AdminProfile() {
 
       <main className={styles.main}>
         <div className={styles.profileHeader}>
-          <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={Boolean(user?.mustChangePassword)} getProfilePhoto={user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{displayName}</p><p className={styles.subMeta}>Admin</p></div>} />
+          <ProfilePhoto identity={profile.userId} initial={avatarInitial} readOnly={adminWorkflow.acting || Boolean(user?.mustChangePassword)} getProfilePhoto={adminWorkflow.acting || user?.mustChangePassword ? noProfilePhoto : undefined} identityContent={<div><p className={styles.fullName}>{displayName}</p><p className={styles.subMeta}>Admin</p></div>} />
         </div>
 
         <div className={styles.infoCard}>
-          <ProfileName key={profile.userId} name={displayName} readOnly={Boolean(user?.mustChangePassword)} />
+          <ProfileName key={profile.userId} name={displayName} readOnly={adminWorkflow.acting || Boolean(user?.mustChangePassword)} />
         </div>
 
         <div className={styles.infoCard}>

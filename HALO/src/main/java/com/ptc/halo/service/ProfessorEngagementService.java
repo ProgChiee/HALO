@@ -34,7 +34,8 @@ public class ProfessorEngagementService {
           where professor.user_id=:professor
         )
         """;
-    public record Engagement(Long userId, String name, long activeDaysWeek, long activeDaysMonth, long mentorSessionsWeek, long mentorSessionsMonth) {
+    public record Engagement(Long userId, String name, long activeDaysWeek, long activeDaysMonth, long mentorSessionsWeek, long mentorSessionsMonth, String enrollmentStatus) {
+        public Engagement(Long id,String name,long week,long month,long sessionsWeek,long sessionsMonth){this(id,name,week,month,sessionsWeek,sessionsMonth,null);}
         public String getWeeklyConsistency(){return consistency(activeDaysWeek,3,2);}
         public String getMonthlyConsistency(){return consistency(activeDaysMonth,8,4);}
     }
@@ -69,16 +70,19 @@ public class ProfessorEngagementService {
     // Persisted study dates/timestamps use Manila wall time; ISO Monday weeks.
     public Page get(UserEntity professor,int page,int size,ProfessorStudentView view) { return get(professor,page,size,StudyActivityTime.today(clock),view); }
     public Page get(UserEntity professor,int page,int size,LocalDate today) { return get(professor,page,size,today,ProfessorStudentView.CURRENT); }
-    public Page get(UserEntity professor,int page,int size,LocalDate today,ProfessorStudentView view) {
+    public Page get(UserEntity professor,int page,int size,ProfessorStudentView view,com.ptc.halo.enums.ProfessorEnrollmentView enrollment) { return get(professor,page,size,StudyActivityTime.today(clock),view,enrollment); }
+    public Page get(UserEntity professor,int page,int size,LocalDate today,ProfessorStudentView view) { return get(professor,page,size,today,view,com.ptc.halo.enums.ProfessorEnrollmentView.ALL); }
+    public Page get(UserEntity professor,int page,int size,LocalDate today,ProfessorStudentView view,com.ptc.halo.enums.ProfessorEnrollmentView enrollment) {
         if(professor==null || professor.getId()==null || professor.getRole()!=Role.PROFESSOR) throw new AccessDeniedException("Professor required");
         if(page<0 || size<1) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"INVALID_PAGINATION");
         size=Math.min(size,100);
         var week=today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));var month=today.withDayOfMonth(1);
         var args=new HashMap<String,Object>();args.put("professor",professor.getId());args.put("limit",size);args.put("offset",(long)page*size);
         args.put("statuses",view.statusNames());args.put("week",week.atStartOfDay());args.put("month",month.atStartOfDay());args.put("from",(week.isBefore(month)?week:month).atStartOfDay());args.put("until",today.plusDays(1).atStartOfDay());
-        String roster=" from user_entity u join scoped_students s on s.student_id=u.id where u.role='STUDENT' and u.status in (:statuses)";
+        args.put("enrollment",enrollment.name());
+        String roster=" from user_entity u join scoped_students s on s.student_id=u.id where u.role='STUDENT' and u.status in (:statuses)"+com.ptc.halo.repository.ProfessorEnrollmentScope.SQL_FILTER;
         long total=jdbc.queryForObject(SCOPE+"select count(*)"+roster,args,Long.class);
-        var students=jdbc.query(SCOPE+"select u.id,u.name"+roster+" order by u.id limit :limit offset :offset",args,(rs,n)->new Engagement(rs.getLong(1),rs.getString(2),0,0,0,0));
+        var students=jdbc.query(SCOPE+"select u.id,u.name,"+com.ptc.halo.repository.ProfessorEnrollmentScope.SQL_STATUS+" as enrollment_status"+roster+" order by u.id limit :limit offset :offset",args,(rs,n)->new Engagement(rs.getLong(1),rs.getString(2),0,0,0,0,rs.getString(3)));
         var metrics=new HashMap<Long,Engagement>();
         if(!students.isEmpty()) {
             args.put("students",students.stream().map(Engagement::userId).toList());
@@ -105,7 +109,7 @@ public class ProfessorEngagementService {
                 """;
             jdbc.query(SCOPE+events,args,(org.springframework.jdbc.core.RowCallbackHandler)rs->metrics.put(rs.getLong(1),new Engagement(rs.getLong(1),null,rs.getLong(2),rs.getLong(3),rs.getLong(4),rs.getLong(5))));
         }
-        var result=students.stream().map(s->{var m=metrics.getOrDefault(s.userId(),s);return new Engagement(s.userId(),s.name(),m.activeDaysWeek(),m.activeDaysMonth(),m.mentorSessionsWeek(),m.mentorSessionsMonth());}).toList();
+        var result=students.stream().map(s->{var m=metrics.getOrDefault(s.userId(),s);return new Engagement(s.userId(),s.name(),m.activeDaysWeek(),m.activeDaysMonth(),m.mentorSessionsWeek(),m.mentorSessionsMonth(),s.enrollmentStatus());}).toList();
         int pages=(int)((total+size-1)/size);
         return new Page(result,page,size,total,pages,page==0,(long)(page+1)*size>=total,StudyActivityTime.ZONE.getId(),"MONDAY");
     }

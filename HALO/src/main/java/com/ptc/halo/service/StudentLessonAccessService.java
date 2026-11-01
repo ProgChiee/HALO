@@ -44,7 +44,14 @@ public class StudentLessonAccessService {
         if (profile.getYearLevel() == null || profile.getYearLevel() != subject.getYearLevel()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "STUDENT_NOT_ENROLLED");
         }
-        if (!enrollments.existsByStudent_IdAndSubject_Id(student.getId(), subject.getId())) {
+        // Protected write transactions hold this row until commit. Unenrollment cannot
+        // commit between their authorization check and the academic write.
+        boolean writing = org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly();
+        boolean enrolled = writing
+                ? enrollments.findActiveForUpdate(student.getId(), subject.getId()).isPresent()
+                : enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(student.getId(), subject.getId());
+        if (!enrolled) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ENROLLMENT_REQUIRED");
         }
     }

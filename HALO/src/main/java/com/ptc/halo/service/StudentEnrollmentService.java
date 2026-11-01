@@ -29,18 +29,63 @@ public class StudentEnrollmentService {
   return summaries.getStudentSubjects(student).stream().filter(s->s.getEligibleModuleCount()!=null && s.getEligibleModuleCount()>0).toList();
  }
  public List<StudentSubjectResponse> list(UserEntity student,boolean mine){
+  if(mine)return mySubjects(student);
   var available=eligible(student);var ids=new HashSet<>(enrollments.subjectIds(student.getId()));
   return available.stream().filter(s->ids.contains(s.getSubjectId())==mine).sorted(Comparator.comparing(StudentSubjectResponse::getSubjectId)).toList();
  }
+ private List<StudentSubjectResponse> mySubjects(UserEntity student){
+  access.validateStudent(student);
+  // Membership is independent of current eligibility. Fetch metadata in bulk, never lesson content.
+  var owned=enrollments.findActiveSubjects(student.getId());
+  if(owned.stream().anyMatch(Objects::isNull)){
+   org.slf4j.LoggerFactory.getLogger(StudentEnrollmentService.class).error("Active enrollment references a missing subject");
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"ENROLLMENT_INTEGRITY_ERROR");
+  }
+  var profile=profiles.findByUserId(student.getId()).orElse(null);
+  var result=summaries.summarizeSubjects(student,owned);
+  for(var subject:result){
+   String reason=null;
+   if(profile==null || profile.getYearLevel()==null)reason="PROFILE_INCOMPLETE";
+   else if(profile.getYearLevel()!=subject.getYearLevel())reason="YEAR_LEVEL_MISMATCH";
+   else if(subject.getEligibleModuleCount()==null || subject.getEligibleModuleCount()==0)reason="NO_PUBLISHED_LESSONS";
+   subject.setEnrolled(true);
+   subject.setLearningAvailable(reason==null);
+   subject.setLearningUnavailableReason(reason);
+   if(reason!=null){subject.setProgressPercentage(null);subject.setCompletedWeeks(null);}
+  }
+  return result.stream().sorted(Comparator.comparing(StudentSubjectResponse::getSubjectId)).toList();
+ }
  @Transactional
  public void enroll(Authentication authentication,Long subjectId){
+  validateId(subjectId);
   // The same user lock serializes retries and lifecycle changes across backend instances.
   var student=AuthenticatedAccount.lock(users,authentication);
   var eligible=eligible(student);
   if(eligible.stream().noneMatch(s->s.getSubjectId().equals(subjectId)))throw new ResponseStatusException(HttpStatus.NOT_FOUND,"SUBJECT_UNAVAILABLE");
-  if(enrollments.existsByStudent_IdAndSubject_Id(student.getId(),subjectId))return;
+  var existing=enrollments.findForUpdate(student.getId(),subjectId);
+  if(existing.isPresent()){
+   if(existing.get().isActive())return;
+   existing.get().reactivate();
+   enrollments.saveAndFlush(existing.get());
+   activity.createLog(student,com.ptc.halo.enums.ActivityType.ACCOUNT,"Re-enrolled in subject ID "+subjectId);
+   return;
+  }
   var subject=subjects.findById(subjectId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"SUBJECT_UNAVAILABLE"));
   enrollments.saveAndFlush(new StudentSubjectEnrollmentEntity(student,subject));
   activity.createLog(student,com.ptc.halo.enums.ActivityType.ACCOUNT,"Enrolled in subject "+subject.getSubjectCode());
  }
+ @Transactional
+ public void unenroll(Authentication authentication,Long subjectId){
+  validateId(subjectId);
+  var student=AuthenticatedAccount.lock(users,authentication);
+  access.validateStudent(student);
+  // A Student can leave their own enrollment even if their academic eligibility has changed.
+  var enrollment=enrollments.findForUpdate(student.getId(),subjectId)
+   .orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"ENROLLMENT_NOT_FOUND"));
+  if(!enrollment.isActive())return;
+  enrollment.deactivate();
+  enrollments.saveAndFlush(enrollment);
+  activity.createLog(student,com.ptc.halo.enums.ActivityType.ACCOUNT,"Unenrolled from subject ID "+subjectId);
+ }
+ private void validateId(Long subjectId){if(subjectId==null || subjectId<=0)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"INVALID_SUBJECT_ID");}
 }

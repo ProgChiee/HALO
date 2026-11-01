@@ -1,217 +1,41 @@
-.layout {
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  max-width: 100vw;
-  overflow: hidden;
-  background: var(--color-bg-content);
-}
-
 .contentArea { composes: frame from "../../../components/shared/PageLayout.module.css"; }
-
-.topbar {
- composes: topbar from "../../../components/shared/Navigation.module.css";
-  padding: var(--space-md) var(--space-xl);
-}
-
-.breadcrumb {
- composes: breadcrumb from "../../../components/shared/Navigation.module.css";
-}
-
-.main {
-  composes: regular from "../../../components/shared/PageLayout.module.css";
-  padding: var(--space-xl);
-}
-
-.overviewRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xl);
-  margin-bottom: var(--space-xl);
-  flex-wrap: wrap;
-}
-
-.overallBlock {
-  flex-shrink: 0;
-  text-align: center;
-  padding: var(--space-lg) var(--space-xl);
-}
-
-.overallPercent {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-accent-active);
-  line-height: var(--line-height-tight);
-}
-
-.overallLabel {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  margin-top: var(--space-sm);
-}
-
-.progressRing {
-  position: relative;
-  width: 140px;
-  height: 140px;
-}
-
-.progressRingText {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.progressRingFill {
-  transition: stroke-dashoffset 800ms ease;
-}
-
-.statsGrid {
-  composes: metrics from "../../../components/shared/PageLayout.module.css";
-  flex: 1;
-}
-
-.statCard {
-  composes: surface from "../../../components/shared/UIPrimitives.module.css";
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
-}
-
-.statIcon {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-primary-soft);
-  border-radius: var(--radius-sm);
-  color: var(--color-accent-active);
-}
-
-.statValue {
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text-primary);
-}
-
-.statLabel {
-  font-size: var(--text-xs);
-  color: var(--color-accent-active);
-}
-
-.sectionHeaderRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-md);
-}
-
-.sectionTitle {
-  font-size: var(--font-size-2xl);
-  color: var(--color-accent-active);
-  margin-bottom: var(--space-md);
-
-  font-weight: var(--font-weight-semibold);
-
-  line-height: var(--line-height-heading);
-}
-
-.viewAllLink {
-  font-size: var(--text-sm);
-  color: var(--color-accent-active);
-  font-weight: var(--font-weight-semibold);
-}
-
-.rowsList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-xl);
-}
-
-.subjectRow,
-.quizRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--color-bg-stat-card);
-  border: 1px solid var(--color-border-stat-card);
-  border-radius: var(--radius-stat-card);
-  padding: var(--space-md) var(--space-lg);
-}
-
-.subjectName,
-.quizTitle {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.subjectProgress {
-  font-size: var(--text-sm);
-  color: var(--color-accent-active);
-  font-weight: var(--font-weight-semibold);
-}
-
-.quizScoreGroup {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.quizScore {
-  font-size: var(--text-sm);
-  color: var(--color-accent-active);
-  font-weight: var(--font-weight-semibold);
-}
-
-.gradeBadge {
-  composes: chip from "../../../components/shared/UIPrimitives.module.css";
-  padding: var(--space-1) var(--space-sm);
-}
-
-.gradeA {
-  background: var(--color-accent-active);
-  color: var(--color-text-on-button);
-}
-
-.gradeB {
-  background: var(--color-primary-soft);
-  color: var(--color-accent-active);
-}
-
-.gradeC {
-  background: var(--color-accent-soft-bg);
-  color: var(--color-warning-text);
-}
-
-.loadingText {
-  composes: loading from "../../../components/shared/UIPrimitives.module.css";
-  padding: var(--space-xl);
-}
-.emptyState {
-  composes: empty from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-xl); }
-
-@media (max-width: 768px) {
-  .topbar, .main { padding: var(--space-4); }
-  .statsGrid { flex-basis: 100%; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
-}
-
-/* Keep the learning overview calm and long subject/history titles readable. */
-.overviewRow { gap: var(--space-6); align-items: center; }
-.overallBlock { padding: var(--space-4); }
-.statsGrid, .statCard, .statCard > div { min-width: 0; }
-.statLabel { color: var(--color-text-muted); }
-.statValue, .overallPercent, .subjectProgress, .quizScore { font-variant-numeric: tabular-nums; }
-.sectionTitle { color: var(--color-text-primary); font-size: var(--font-size-xl); }
-.sectionHeaderRow { gap: var(--space-3); flex-wrap: wrap; }
-.subjectRow, .quizRow { gap: var(--space-4); flex-wrap: wrap; }
-.subjectName, .quizTitle { min-width: 0; overflow-wrap: anywhere; flex: 1 1 12rem; }
-.quizScoreGroup, .subjectProgress { flex-shrink: 0; }
-.gradeA { background: var(--color-primary-soft); color: var(--color-success-text); }
-@media (max-width: 768px) { .overviewRow { justify-content: center; } }
+.main { composes: regular from "../../../components/shared/PageLayout.module.css"; }
+.overviewRow { display: grid; grid-template-columns: minmax(140px, 180px) minmax(0, 1fr); align-items: center; gap: var(--space-6); margin-bottom: var(--space-6); }
+.subjectRow { background: var(--color-bg-stat-card); border: 1px solid var(--color-border); border-radius: var(--radius-lg); min-width: 0; }
+.overallBlock { display: grid; justify-items: center; align-content: center; gap: var(--space-3); padding: var(--space-3) 0; min-width: 0; }
+.progressRing { position: relative; width: min(140px, 100%); aspect-ratio: 1; flex-shrink: 0; }
+.ringSvg { display: block; width: 100%; height: 100%; overflow: visible; }
+.progressRingText { position: absolute; inset: 0; display: grid; place-items: center; }
+.overallPercent { margin: 0; font-size: var(--font-size-3xl); font-weight: 700; color: var(--color-accent-active); line-height: 1; }
+.overallLabel { margin: 0; font-size: var(--font-size-base); font-weight: 600; color: var(--color-text-primary); text-align: center; }
+.statsGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--space-4); min-width: 0; }
+.statCard { composes: statCard from "./StudentDashboard.module.css"; min-height: 128px; box-sizing: border-box; }
+.statIcon { composes: statIcon from "./StudentDashboard.module.css"; }
+.statValue { composes: statValue from "./StudentDashboard.module.css"; }
+.statLabel { composes: statLabel from "./StudentDashboard.module.css"; }
+.overallPercent, .statValue, .subjectProgress { font-variant-numeric: tabular-nums; }
+.sectionHeaderRow { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); }
+.sectionTitle { margin: 0; font-size: var(--font-size-xl); font-weight: 600; color: var(--color-text-primary); }
+.viewAllLink { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-accent-active); }
+.searchBar { margin-bottom: var(--space-4); }
+.searchLabel { display: block; margin-bottom: var(--space-2); font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-secondary); }
+.searchControls { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.searchControls input { flex: 1 1 220px; min-width: 0; width: 100%; min-height: 44px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-stat-card); color: var(--color-text-primary); font: inherit; font-size: var(--font-size-sm); }
+.searchControls input::placeholder { color: var(--color-text-secondary); opacity: 1; }
+.searchControls button { min-height: 44px; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-stat-card); color: var(--color-accent-active); font: inherit; font-size: var(--font-size-sm); cursor: pointer; }
+.searchControls button:hover { background: var(--color-primary-soft); }
+.searchControls input:focus-visible, .searchControls button:focus-visible, .viewAllLink:focus-visible { outline: 2px solid var(--color-accent-active); outline-offset: 3px; }
+.rowsList { display: grid; gap: var(--space-3); }
+.subjectRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3) var(--space-4); padding: var(--space-4); align-items: center; }
+.subjectInfo { min-width: 0; }
+.subjectName { margin: 0; font-size: var(--font-size-base); font-weight: 600; line-height: 1.5; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.subjectCode { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.subjectProgress { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-accent-active); }
+.subjectBar { grid-column: 1 / -1; appearance: none; display: block; width: 100%; height: 6px; border: 0; border-radius: var(--radius-pill); overflow: hidden; background: var(--color-border); color: var(--color-accent-active); }
+.subjectBar::-webkit-progress-bar { background: var(--color-border); border-radius: var(--radius-pill); }
+.subjectBar::-webkit-progress-value { background: var(--color-accent-active); border-radius: var(--radius-pill); }
+.subjectBar::-moz-progress-bar { background: var(--color-accent-active); border-radius: var(--radius-pill); }
+.loadingText { composes: loading from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-6); }
+.emptyState { composes: empty from "../../../components/shared/UIPrimitives.module.css"; margin: 0; padding: var(--space-6); }
+@media (max-width: 768px) { .overviewRow { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); } .progressRing { width: min(128px, 100%); } }
+@media (max-width: 480px) { .statsGrid { grid-template-columns: minmax(0, 1fr); } }

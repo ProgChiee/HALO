@@ -42,6 +42,36 @@ async function mount({browse=false,acting=false,preview=false,mine=[],available=
  return {host,reads,get subjectReads(){return subjectReads;},async navigate(destination){await act(async()=>historyNavigate(destination));},async close(){await act(async()=>root.unmount());host.remove();}};
 }
 const button=(host,text)=>[...host.querySelectorAll('button')].find(x=>x.textContent.trim()===text);
+test('unavailable active enrollments remain manageable without learning links in all modes',async()=>{
+ for(const mode of [{},{acting:true,preview:true},{acting:true,preview:false}]){
+  const rows=['YEAR_LEVEL_MISMATCH','NO_PUBLISHED_LESSONS','PROFILE_INCOMPLETE','UNKNOWN'].map((reason,index)=>({...subject,subjectId:15+index,learningAvailable:false,learningUnavailableReason:reason,subjectName:index===3?null:subject.subjectName,subjectCode:null,yearLevel:null,totalWeeks:null,progressPercentage:null}));
+  const ui=await mount({...mode,mine:rows});try{
+   assert.equal(ui.host.querySelectorAll('article').length,4);assert.equal(ui.host.querySelectorAll('progress').length,0);
+   assert.equal(ui.host.querySelectorAll('a[href*="?subject="]').length,0);assert.equal(button(ui.host,'Review Subject'),undefined);
+   assert.equal((ui.host.textContent.match(/Currently Unavailable/g)||[]).length,4);assert.doesNotMatch(ui.host.textContent,/null%|undefined|0%/);
+   assert.match(ui.host.textContent,/current year level/);assert.match(ui.host.textContent,/no published lessons/);assert.match(ui.host.textContent,/profile needs attention/);
+   assert.equal([...ui.host.querySelectorAll('button')].filter(b=>b.textContent==='Unenroll').length,mode.acting?0:4);
+   if(!mode.acting){await act(async()=>ui.host.querySelector('[aria-label="Unenroll from this subject"]').click());assert.match(document.querySelector('[role="dialog"]').textContent,/Subject unavailable/);await act(async()=>button(document.querySelector('[role="dialog"]'),'Keep Subject').click());}
+  }finally{await ui.close();}
+ }
+});
+test('enrollment confirmation shows dynamic metadata and safely cancels with focus restoration',async()=>{
+ let calls=0;api.defaults.adapter=async()=>{calls++;throw new Error('Unexpected write');};
+ for(const weeks of [1,2]){
+  const name='Long subject title '.repeat(12);
+  const ui=await mount({browse:true,mobile:true,available:[{...subject,subjectName:name,totalWeeks:weeks}]});try{
+   const trigger=button(ui.host,'Enroll in Subject');await act(async()=>trigger.click());let dialog=document.querySelector('[role="dialog"]');
+   assert.equal(dialog.querySelector('h2').textContent,'Enroll in Subject?');assert.equal(dialog.querySelector('h2 + p').textContent,name);
+   assert.deepEqual([...dialog.querySelectorAll('li')].map(node=>node.textContent),['HRM-2222','1st Year',`${weeks} ${weeks===1?'week':'weeks'}`]);
+   assert.equal(dialog.getAttribute('aria-labelledby'),dialog.querySelector('h2').id);assert.match(document.getElementById(dialog.getAttribute('aria-describedby')).textContent,/subject to availability and learning requirements/);
+   assert.equal(document.activeElement,button(dialog,'Cancel'));assert.ok(ui.host.hasAttribute('inert'));assert.equal(document.body.style.overflow,'hidden');
+   await act(async()=>dialog.parentElement.click());assert.ok(dialog.isConnected);
+   await act(async()=>button(dialog,'Cancel').dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true})));assert.equal(document.activeElement,button(dialog,'Confirm Enrollment'));
+   await act(async()=>button(dialog,'Cancel').click());assert.equal(document.activeElement,trigger);assert.equal(document.querySelector('[role="dialog"]'),null);
+   await act(async()=>trigger.click());dialog=document.querySelector('[role="dialog"]');await act(async()=>dialog.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(document.activeElement,trigger);assert.equal(calls,0);
+  }finally{await ui.close();}
+ }
+});
 test('subjects submenu auto expands, active child is marked and toggle remains operable',async()=>{
  const ui=await mount();try{const toggle=button(ui.host,'Subjects');assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.ok(ui.host.querySelector('nav a[aria-current="page"][href="/student/subjects/my"]'));await act(async()=>toggle.click());assert.equal(toggle.getAttribute('aria-expanded'),'false');await act(async()=>toggle.click());assert.equal(toggle.getAttribute('aria-expanded'),'true');}finally{await ui.close();}
 });
@@ -55,9 +85,11 @@ test('empty views and failed reads expose helpful recovery',async()=>{
 });
 test('enrollment blocks duplicate clicks, retains safe errors and refreshes available subjects after success',async()=>{
  let resolve,reject,calls=0,rows=[subject];api.defaults.adapter=config=>{calls++;assert.equal(config.method,'post');assert.equal(config.url,'/student/subjects/15/enrollment');return new Promise((yes,no)=>{resolve=yes;reject=no;});};
- const ui=await mount({browse:true,loader:async()=>rows});try{const enroll=button(ui.host,'Enroll in Subject');await act(async()=>{enroll.click();enroll.click();});assert.equal(calls,1);assert.ok(button(ui.host,'Enrolling...').disabled);
- await act(async()=>reject({response:{status:500,data:{message:'private details'}}}));assert.doesNotMatch(ui.host.textContent,/private details/);assert.ok(button(ui.host,'Enroll in Subject'));
- await act(async()=>button(ui.host,'Enroll in Subject').click());rows=[];await act(async()=>resolve({status:200,headers:{},config:{},data:{enrolled:true}}));assert.equal(calls,2);assert.match(ui.host.textContent,/You are enrolled in Hospitality leadership/);assert.equal(button(ui.host,'Enroll in Subject'),undefined);
+ const ui=await mount({browse:true,loader:async()=>rows});try{const enroll=button(ui.host,'Enroll in Subject');await act(async()=>enroll.click());assert.equal(calls,0);const dialog=document.querySelector('[role="dialog"]');
+ await act(async()=>{button(dialog,'Confirm Enrollment').click();button(dialog,'Confirm Enrollment')?.click();});assert.equal(calls,1);assert.ok(button(dialog,'Enrolling...').disabled);assert.ok(button(dialog,'Cancel').disabled);
+ await act(async()=>dialog.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.ok(dialog.isConnected);
+ await act(async()=>reject({response:{status:500,data:{message:'private details'}}}));assert.doesNotMatch(dialog.textContent,/private details/);assert.match(dialog.querySelector('[role="alert"]').textContent,/Please try again/);
+ await act(async()=>button(dialog,'Confirm Enrollment').click());rows=[];await act(async()=>resolve({status:200,headers:{},config:{},data:{enrolled:true}}));assert.equal(calls,2);assert.match(ui.host.textContent,/You are enrolled in Hospitality leadership/);assert.equal(button(ui.host,'Enroll in Subject'),undefined);assert.equal(document.querySelector('[role="dialog"]'),null);
  }finally{await ui.close();}
 });
 test('Preview and Support show eligible subjects but never enrollment controls',async()=>{
@@ -343,4 +375,76 @@ test('segmented navigation uses compact theme tokens, visible focus and wrapping
  assert.match(css,/\.links a \{[^}]*text-decoration: none;[^}]*overflow-wrap: anywhere/);
  assert.match(css,/:not\(\[aria-current="page"\]\):hover/);assert.match(css,/:focus-visible/);
  assert.match(css,/@media\(max-width:640px\) \{ \.links \{ width: 100%; \} \.links a \{ flex: 1/);
+});
+
+
+test('Unenroll confirmation is explicit, keyboard-contained and cancellation preserves enrollment',async()=>{
+ let writes=0;api.defaults.adapter=async()=>{writes++;throw new Error('Must not submit');};
+ const ui=await mount({mine:[subject]});try{
+  const trigger=button(ui.host,'Unenroll');assert.ok(trigger);await act(async()=>trigger.click());
+  const dialog=document.querySelector('[role="dialog"]');assert.equal(dialog.getAttribute('aria-modal'),'true');assert.equal(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent,'Unenroll from Subject?');
+  assert.match(document.getElementById(dialog.getAttribute('aria-describedby')).textContent,/Your existing progress, assessment results, and learning history will be preserved/);
+  assert.equal(document.activeElement,button(dialog,'Keep Subject'));assert.equal(document.body.style.overflow,'hidden');assert.ok(ui.host.hasAttribute('inert'));
+  await act(async()=>dialog.parentElement.click());assert.ok(dialog.isConnected);
+  await act(async()=>dialog.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));assert.ok(dialog.isConnected);
+  const last=button(dialog,'Confirm Unenroll');last.focus();await act(async()=>last.dispatchEvent(new window.KeyboardEvent('keydown',{key:'Tab',bubbles:true})));assert.equal(document.activeElement,button(dialog,'Keep Subject'));
+  await act(async()=>button(dialog,'Keep Subject').click());assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(document.activeElement,trigger);assert.equal(writes,0);assert.equal(ui.host.querySelectorAll('article').length,1);
+ }finally{await ui.close();}
+});
+
+test('Unenroll prevents duplicate submits, retains errors, and synchronizes My/Browse and re-enrollment',async()=>{
+ let resolve,reject;const calls=[],mine=[subject],available=[];
+ api.defaults.adapter=config=>{calls.push(config);return new Promise((yes,no)=>{resolve=yes;reject=no;});};
+ const ui=await mount({mine,available,navigationFlow:true});try{
+  await act(async()=>button(ui.host,'Unenroll').click());let dialog=document.querySelector('[role="dialog"]');
+  await act(async()=>{button(dialog,'Confirm Unenroll').click();button(dialog,'Confirm Unenroll')?.click();});
+  assert.equal(calls.length,1);assert.equal(calls[0].method,'delete');assert.equal(calls[0].url,'/student/subjects/15/enrollment');assert.equal(calls[0].data,undefined);
+  assert.ok(button(dialog,'Unenrolling...').disabled);assert.ok(button(dialog,'Keep Subject').disabled);assert.equal(ui.host.querySelectorAll('article').length,1);
+  await act(async()=>reject({response:{status:500,data:{message:'private SQL'}}}));assert.ok(dialog.isConnected);assert.ok(dialog.querySelector('[role="alert"]'));assert.doesNotMatch(dialog.textContent,/private SQL/);
+  await act(async()=>button(dialog,'Confirm Unenroll').click());mine.splice(0);available.push({...subject,enrolled:false});
+  await act(async()=>resolve({status:200,headers:{},config:calls.at(-1),data:{enrolled:false}}));
+  assert.equal(document.querySelector('[role="dialog"]'),null);assert.equal(ui.host.querySelectorAll('article').length,0);assert.match(ui.host.textContent,/Your learning history is preserved/);assert.ok(ui.reads.filter(x=>x==='my').length>=2);
+  await ui.navigate('/student/subjects/browse');assert.ok(button(ui.host,'Enroll in Subject'));assert.equal(button(ui.host,'Unenroll'),undefined);assert.ok(ui.reads.includes('browse'));
+  await act(async()=>button(ui.host,'Enroll in Subject').click());await act(async()=>button(document.querySelector('[role="dialog"]'),'Confirm Enrollment').click());available.splice(0);mine.push(subject);
+  await act(async()=>resolve({status:200,headers:{},config:calls.at(-1),data:{enrolled:true}}));
+  await ui.navigate('/student/subjects/my');assert.equal(ui.host.querySelector('progress').value,50);assert.ok(button(ui.host,'Unenroll'));assert.deepEqual(calls.map(c=>c.method),['delete','delete','post']);
+ }finally{await ui.close();}
+});
+
+test('Unenroll handles authorization/network errors without removing the subject',async()=>{
+ for(const [status,expected] of [[401,/session has expired/],[403,/not authorized/],[404,/no longer available/],[undefined,/Could not reach HALO/]]){
+  api.defaults.adapter=async()=>{throw status?{response:{status}}:{code:'ERR_NETWORK'};};
+  const ui=await mount({mine:[subject],mobile:true});try{
+   await act(async()=>button(ui.host,'Unenroll').click());const dialog=document.querySelector('[role="dialog"]');
+   await act(async()=>button(dialog,'Confirm Unenroll').click());assert.match(dialog.querySelector('[role="alert"]').textContent,expected);assert.ok(button(dialog,'Keep Subject'));assert.equal(ui.host.querySelectorAll('article').length,1);
+  }finally{await ui.close();}
+ }
+});
+
+test('Preview and Support never expose unenrollment, including enrolled cards',async()=>{
+ for(const preview of [true,false]){
+  const ui=await mount({mine:[subject],acting:true,preview});try{assert.equal(button(ui.host,'Unenroll'),undefined);assert.ok(ui.host.querySelector('a[href*="subjects?subject=15"]'));assert.match(ui.host.textContent,/Enrollment is read-only/);}finally{await ui.close();}
+ }
+});
+
+test('Unenroll presentation provides responsive actions and themed danger focus states',async()=>{
+ const {readFile}=await import('node:fs/promises');const css=await readFile(new URL('../src/pages/student/styles/EnrollmentSubjects.module.css',import.meta.url),'utf8');
+ assert.match(css,/color: var\(--color-danger-text\)/);assert.match(css,/border: 1px solid var\(--color-danger-border\)/);assert.match(css,/\.unenrollDialog :focus-visible/);assert.match(css,/@media\(max-width:640px\).*\.dialogActions > button.*min-height: 44px/);
+ assert.match(css,/\.unenrollDialog \{[^}]*width: min\(480px, 100%\)[^}]*padding: var\(--space-6\)[^}]*background: var\(--color-surface\)[^}]*border: 1px solid var\(--color-border\)/);
+ assert.match(css,/\.unenrollDialog p \{[^}]*overflow-wrap: anywhere/);
+ assert.match(css,/\.dialogActions \{[^}]*justify-content: flex-end/);
+ assert.match(css,/@media\(max-width:480px\)[^\n]*flex-direction: column/);
+ const shared=await readFile(new URL('../src/components/shared/Dialog.module.css',import.meta.url),'utf8');
+ assert.match(shared,/max-height: calc\(100dvh - 2rem\)/);assert.match(shared,/overflow-y: auto/);
+});
+
+test('Unenroll contains the selected long subject name and decorative warning in a labelled modal',async()=>{
+ const subjectName='Hospitality Management and Professional Practice '.repeat(8);
+ const ui=await mount({mine:[{...subject,subjectName}],mobile:true});try{
+  await act(async()=>button(ui.host,'Unenroll').click());const dialog=document.querySelector('[role="dialog"]');
+  assert.equal(dialog.querySelector('h2 + p').textContent,subjectName);
+  assert.ok(dialog.querySelector('[aria-hidden="true"] svg'));
+  assert.deepEqual([...dialog.querySelectorAll('button')].map(node=>node.textContent),['Keep Subject','Confirm Unenroll']);
+  await act(async()=>button(dialog,'Keep Subject').click());assert.equal(document.querySelector('[role="dialog"]'),null);
+ }finally{await ui.close();}
 });

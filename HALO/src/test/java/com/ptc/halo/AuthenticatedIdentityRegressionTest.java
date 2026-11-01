@@ -134,7 +134,7 @@ class AuthenticatedIdentityRegressionTest {
             verify(users,never()).updateOwnName(anyLong(),anyString());
         });
     }
-    @ParameterizedTest @EnumSource(value=Role.class,names={"STUDENT","PROFESSOR","SUPER_ADMIN"})
+    @ParameterizedTest @EnumSource(value=Role.class,names={"STUDENT","PROFESSOR"})
     void otherRolesCannotAcquireAdminActingIdentity(Role role) throws Exception {
         var sessions=mock(AdminActingSessionRepository.class);
         afterAuthentication(role,auth->{
@@ -152,5 +152,20 @@ class AuthenticatedIdentityRegressionTest {
         var u=account(1,Role.ADMIN,"admin@example.test");var auth=TestIdentity.auth(u);accounts.put(1L,u);
         u.setTokenVersion(1);
         assertThrows(org.springframework.security.authentication.BadCredentialsException.class,()->AuthenticatedAccount.find(users,auth));
+    }
+
+    @Test void superAdminActingUsesOriginalImmutableIdentityAfterEmailReuse() throws Exception {
+        var sessions=mock(AdminActingSessionRepository.class);var audit=mock(ActivityLogService.class);
+        when(sessions.save(any())).thenAnswer(c->c.getArgument(0));
+        accounts.put(3L,account(3,Role.ADMIN,"target@example.test"));
+        var mode=new AdminActingSessionService(users,sessions,audit);
+        afterAuthentication(Role.SUPER_ADMIN,auth->{
+            var created=mode.create(auth,new AdminActingSessionRequest(3L,Role.ADMIN));
+            assertEquals(1L,created.adminUserId());assertEquals(3L,created.target().userId());
+            assertThrows(AdminApiException.class,()->mode.validate(auth,"unowned-session"));
+        });
+        verify(users).findForAssessmentLifecycle(1L);verify(users,never()).findByEmail(anyString());
+        verify(sessions).findByIdAndAdmin_Id("unowned-session",1L);
+        verify(audit).createActingLog(argThat(s->s.getAdmin().getId()==1L&&s.getAdmin().getRole()==Role.SUPER_ADMIN),eq("Started acting session"));
     }
 }

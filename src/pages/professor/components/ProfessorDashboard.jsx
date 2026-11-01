@@ -30,7 +30,9 @@ export default function ProfessorDashboard() {
  }, [retry, getProfessorDashboardData]);
  const subjects = workflow.basePath + '/subjects', progress = workflow.basePath + '/progress';
  const statCards = [
-  { id: 'totalStudents', icon: Users, label: 'My Students', to: progress },
+  { id: 'totalStudents', icon: Users, label: 'Eligible Students', to: progress },
+  { id: 'activelyEnrolledStudents', icon: Users, label: 'Actively Enrolled Students', to: progress },
+  { id: 'eligibleStudentsWithoutActiveEnrollment', icon: Users, label: 'Eligible Students Without Active Enrollment', to: progress },
   { id: 'totalSubjects', icon: BookOpen, label: 'My Subjects', to: subjects },
   { id: 'totalModules', icon: FileText, label: 'Total Modules', to: subjects },
   { id: 'approvedModules', icon: CheckCircle2, label: 'Approved Modules', to: subjects },
@@ -44,8 +46,8 @@ export default function ProfessorDashboard() {
    <main className={styles.main}>
     <header className={styles.pageHeader}><div><h1 className={styles.greeting}>Teaching Overview</h1><p className={styles.subtext}>Welcome back, {firstName}. Your teaching, at a glance.</p></div><Link className={styles.manageLink} to={subjects}>My Subjects <ArrowRight size={16} /></Link></header>
     {isLoading ? <p className={styles.loadingText} role="status">Loading your teaching overview...</p> : loadError || !data ? <section className={styles.panel}><p role="alert">{professorErrorMessage(loadError, "Couldn't load the dashboard. Please try again.")}</p><Button variant="secondary" onClick={() => { setIsLoading(true); setLoadError(null); setRetry(n => n + 1); }}>Retry</Button></section> : <>
-     <section className={styles.statsGrid} aria-label="Teaching summary">{statCards.map(({ id, icon: Icon, label, to }) => <Link key={id} to={to} className={styles.statCard}><span className={styles.statIcon}><Icon size={20} /></span><div><p className={styles.statValue}>{data[id] ?? 0}</p><p className={styles.statLabel}>{label}</p></div></Link>)}</section>
-     <p className={styles.scopeNote}>Student metrics include active Students eligible for your subjects. Passed Attempts includes submitted passing attempts across quiz versions.</p>
+     <section className={styles.statsGrid} aria-label="Teaching summary">{statCards.map(({ id, icon: Icon, label, to }) => <Link key={id} to={to} className={styles.statCard}><span className={styles.statIcon}><Icon size={20} /></span><div><p className={styles.statValue}>{data[id] ?? (id === 'activelyEnrolledStudents' || id === 'eligibleStudentsWithoutActiveEnrollment' ? 'Unavailable' : 0)}</p><p className={styles.statLabel}>{label}</p></div></Link>)}</section>
+     <p className={styles.scopeNote}>Student metrics include ACTIVE accounts academically eligible for your subjects. Enrollment counts unique Students with active membership in your eligible subjects; students without active membership may be new or previously enrolled. Passed Attempts includes submitted passing attempts across quiz versions.</p>
      <div className={styles.overviewGrid}>
       <section className={styles.panel} aria-labelledby="performance-title">
        <div className={styles.sectionHeaderRow}><h2 id="performance-title" className={styles.sectionTitle}>Student Performance</h2><Link to={progress} className={styles.manageLink}>Student Progress <ArrowRight size={15} /></Link></div>

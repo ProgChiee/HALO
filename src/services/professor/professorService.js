@@ -7,6 +7,10 @@ export async function updateOwnProfessorId(professorId) {
 }
 
 export function createProfessorService(apiClient = defaultClient) {
+async function getSubjectCover(id,config={}) { const response=await apiClient.get(`/professor/subjects/${encodeURIComponent(id)}/cover`,{...config,responseType:'blob'});return response.status===204?null:response.data; }
+async function saveSubjectCover(id,file){const form=new FormData();form.append('image',file);return apiClient.put(`/professor/subjects/${encodeURIComponent(id)}/cover`,form);}
+async function removeSubjectCover(id){return apiClient.delete(`/professor/subjects/${encodeURIComponent(id)}/cover`);}
+
 
 async function createSubject({ subjectCode, subjectName, description, yearLevel }) {
   const res = await apiClient.post('/professor/subjects', { subjectCode, subjectName, description, yearLevel });
@@ -181,7 +185,7 @@ async function getStudentProgressSummaries(page = 0, size = 20, config = {}) {
   const getQuizRevision = async (id, config = {}) => (await apiClient.get(quizPath(id), config)).data;
   const generateQuizRevision = async id => (await apiClient.post(quizPath(id) + '/generate', undefined, { timeout: 180000 })).data;
   const approveQuizRevision = async (id, draftId) => (await apiClient.post(quizPath(id) + '/approve', { draftId })).data;
-  return { getRevisionHistory, getRevisionHistoryVersion, getQuizRevision, generateQuizRevision, approveQuizRevision, getRevision, startRevision, saveRevision, reviewRevision, publishRevision, discardRevision, getProfilePhoto, createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement, getStudentAssessmentHistory };
+  return { saveSubjectCover,removeSubjectCover,getSubjectCover, getRevisionHistory, getRevisionHistoryVersion, getQuizRevision, generateQuizRevision, approveQuizRevision, getRevision, startRevision, saveRevision, reviewRevision, publishRevision, discardRevision, getProfilePhoto, createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement, getStudentAssessmentHistory };
 }
 
 export const { createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement, getStudentAssessmentHistory } = createProfessorService();

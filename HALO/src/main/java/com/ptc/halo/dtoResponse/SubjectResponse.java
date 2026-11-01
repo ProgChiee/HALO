@@ -14,6 +14,9 @@ public class SubjectResponse {
 
     private YearLevel yearLevel;
 
+    // Authenticated resource; 204 means no custom cover. Clients retain their local default.
+    public String getCoverUrl() { return id == null ? null : "subjects/" + id + "/cover"; }
+
     public SubjectResponse() {
     }
 

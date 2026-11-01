@@ -197,3 +197,9 @@
 .viewControls { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .viewControls button[aria-pressed="true"] { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-text-primary); }
 .statusBadge { display: inline-block; margin-inline-start: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-muted); font-weight: 400; }
+
+.enrollmentFilter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-block: var(--space-4); }
+.enrollmentFilter label { color: var(--color-text-primary); font-weight: 600; }
+.enrollmentFilter select { min-height: 44px; max-width: 100%; padding: var(--space-2) var(--space-3); background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: var(--radius-md); font: inherit; }
+.enrollmentFilter select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+@media (max-width: 480px) { .enrollmentFilter { align-items: stretch; flex-direction: column; } .enrollmentFilter select { width: 100%; } }

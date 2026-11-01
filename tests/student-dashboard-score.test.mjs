@@ -80,3 +80,23 @@ test('Dashboard does not request or offer lessons from unenrolled subject histor
   assert.deepEqual(requested,[]);assert.ok(!host.textContent.includes('Unenrolled historical subject'));assert.ok(![...host.querySelectorAll('button')].some(button=>button.textContent==='Continue'));
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+
+test('enrollment changes refresh normal dashboard shortcuts while preserving historical totals and mode isolation',async()=>{
+ const {notifyStudentEnrollmentChanged}=await server.ssrLoadModule('/src/utils/studentEnrollmentEvents.js');
+ for(const acting of [false,true]){
+  let enrolled=true,reads=0;const workflow={acting,preview:acting,target:{name:'Synthetic'},leave(){},basePath:acting?'/admin/student-preview/test':'/student',api:{
+   getDashboardData:async()=>({completedModules:2,passedAssessments:2,totalBadges:1,latestAssessmentScore:40}),
+   getSubjectsData:async()=>{reads++;return [{subjectId:15,subjectName:'Current enrolled subject',enrolled,progressPercentage:50}];},
+   getSubjectWeeks:async()=>[{moduleId:42,weekId:18,weekNumber:1,title:'Current lesson',unlocked:true,lessonAvailable:true}]
+  }};
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+  try{
+   await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Synthetic'},logout(){}}},React.createElement(Workflow.Provider,{value:workflow},React.createElement(Router.MemoryRouter,null,React.createElement(Dashboard))))));
+   const before=reads;enrolled=false;await act(async()=>notifyStudentEnrollmentChanged());
+   assert.equal(reads,before+(acting?0:1));
+   if(!acting){assert.ok(!host.textContent.includes('Current enrolled subject'));assert.ok(![...host.querySelectorAll('button')].some(b=>b.textContent==='Continue'));}
+   assert.ok(host.textContent.includes('40%'));assert.ok(host.textContent.includes('Assessments passed'));
+  }finally{await act(async()=>root.unmount());host.remove();}
+ }
+});

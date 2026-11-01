@@ -94,45 +94,24 @@
 }
 
 .activityList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.activityRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  list-style: none; margin: 0; padding: 0;
   background: var(--color-bg-stat-card);
   border: 1px solid var(--color-border-stat-card);
   border-radius: var(--radius-md);
-  padding: var(--space-md) var(--space-lg);
 }
-
-.activityText {
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
+.activityRow {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 12px; align-items: center; padding: 14px 16px;
 }
-
-.activityActor {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-accent-active);
-}
-
-.activityTime {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  flex-shrink: 0;
-  margin-left: var(--space-md);
-}
-
-.loadingText {
-  composes: loading from "../../../components/shared/UIPrimitives.module.css";
-  padding: var(--space-xl);
-}
-.activityRow > div { min-width: 0; overflow-wrap: anywhere; }
+.activityRow + .activityRow { border-top: 1px solid var(--color-border-stat-card); }
+.activityIcon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-md); color: var(--color-accent-active); background: var(--color-primary-soft); }
+.activityContent { min-width: 0; overflow-wrap: anywhere; }
+.activityText { margin: 0; font-size: var(--text-sm); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
+.activityDescription { margin: 4px 0 0; font-size: var(--text-sm); line-height: 1.5; color: var(--color-text-muted); }
+.activityTime { font-size: var(--text-xs); color: var(--color-text-muted); }
+.loadingText { composes: loading from "../../../components/shared/UIPrimitives.module.css"; padding: var(--space-lg); }
 @media (max-width: 768px) {
-  .activityRow { align-items: flex-start; flex-direction: column; gap: var(--space-2); }
-  .activityTime { margin-left: 0; }
+  .activityRow { grid-template-columns: 32px minmax(0, 1fr); gap: 8px 12px; }
+  .activityTime { grid-column: 2; }
   .statsGrid { grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); }
 }

@@ -55,7 +55,7 @@ class AdminActingHttpTest {
  }
  @Test void anonymousAndOtherRolesCannotUseAnyEndpoint() throws Exception {
   mvc.perform(get(PATH+"/targets").param("role","STUDENT")).andExpect(status().isUnauthorized());
-  for(String role:List.of("STUDENT","PROFESSOR","SUPER_ADMIN")) {
+  for(String role:List.of("STUDENT","PROFESSOR")) {
    token(role);
    mvc.perform(get(PATH+"/targets").param("role","STUDENT").header("Authorization","Bearer test-token")).andExpect(status().isForbidden());
    mvc.perform(post(PATH+"/sessions").header("Authorization","Bearer test-token").contentType("application/json").content("{}" )).andExpect(status().isForbidden());

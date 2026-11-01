@@ -1,9 +1,10 @@
-﻿import { useEffect, useState, useId } from 'react';
+import SubjectCover from '../../../components/shared/SubjectCover';
+import { useEffect, useState, useId } from 'react';
 import Dialog from '../../../components/shared/Dialog';
 import { yearLabels } from '../../../utils/registration';
 import styles from '../styles/CurriculumPreview.module.css';
 
-export default function CurriculumPreview({ subjectId, load, onClose }) {
+export default function CurriculumPreview({ subjectId, load, loadCover, onClose }) {
  const titleId=useId();
  const [data,setData]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState(null),[retry,setRetry]=useState(0);
  useEffect(()=>{
@@ -19,6 +20,7 @@ export default function CurriculumPreview({ subjectId, load, onClose }) {
  return <Dialog labelledBy={titleId} onClose={onClose} closeOnEscape className={styles.dialog} initialFocus="button">
   <header className={styles.header}><h2 id={titleId}>Curriculum Preview</h2><button type="button" onClick={onClose}>Close</button></header>
   {loading?<p role="status">Loading curriculum...</p>:error?<div role="alert"><p>{error.message}</p>{error.retry && <button type="button" onClick={()=>{setLoading(true);setError(null);setRetry(n=>n+1);}}>Retry</button>}</div>:data && <>
+   <SubjectCover subjectId={subjectId} load={loadCover} />
    <h3>{data.subjectName}</h3>
    <p aria-label="Subject metadata" className={`${styles.meta} ${styles.metadata}`}>{[
     data.subjectCode,

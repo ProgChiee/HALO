@@ -318,7 +318,7 @@ test('dashboard renders each successful section independently of the failed sect
   React.createElement(AuthContext.Provider, { value: { user: null } }, React.createElement(DashboardSections, { statistics, logs }))));
  const ok = { isLoading: false, error: null, reload: () => {} };
  const stats = { ...ok, data: { totalUsers: 123, totalAdmins: 4, totalStudents: 100, totalProfessors: 18, activeUsers: 120, inactiveUsers: 3 } };
- const logs = { ...ok, data: [{ id: 1, userName: 'Actor', action: 'Test activity', createdAt: '2026-01-01T12:00:00' }] };
+ const logs = { ...ok, data: [{ id: 1, userName: 'Actor', action: 'Test activity', activityTitle: 'Test activity', activityDescription: 'Actor recorded an administrative activity.', createdAt: '2026-01-01T12:00:00' }] };
  let html = render(stats, { ...logs, error: new Error('failed') });
  assert.ok(html.includes('Total Users')); assert.ok(html.includes('123')); assert.ok(html.includes('Retry activity logs'));
  html = render({ ...stats, data: null, error: new Error('failed') }, logs);

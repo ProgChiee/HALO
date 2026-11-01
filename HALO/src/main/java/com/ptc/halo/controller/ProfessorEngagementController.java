@@ -13,14 +13,14 @@ public class ProfessorEngagementController extends ProfessorErrorResponses {
  public ProfessorEngagementController(ProfessorEngagementService engagement,UserRepository users,AdminProfessorModeService acting){this.engagement=engagement;this.users=users;this.acting=acting;}
  @GetMapping("/api/professor/students/engagement")
  @PreAuthorize("hasRole('PROFESSOR')")
- public Object get(Authentication auth,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){
+ public Object get(Authentication auth,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="ALL") com.ptc.halo.enums.ProfessorEnrollmentView enrollment, @RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){
   if(auth==null)throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required");
-  return engagement.get(com.ptc.halo.security.AuthenticatedAccount.find(users, auth).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),page,size,view);
+  return (enrollment==com.ptc.halo.enums.ProfessorEnrollmentView.ALL ? engagement.get(com.ptc.halo.security.AuthenticatedAccount.find(users, auth).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),page,size,view) : engagement.get(com.ptc.halo.security.AuthenticatedAccount.find(users, auth).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),page,size,view,enrollment));
  }
  @GetMapping("/api/admin/acting/professor/students/engagement")
- @PreAuthorize("hasRole('ADMIN')")
- public Object acting(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){
-  return acting.execute(auth,session.toString(),s->engagement.get(s.getTarget(),page,size,view));
+ @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+ public Object acting(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="ALL") com.ptc.halo.enums.ProfessorEnrollmentView enrollment, @RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){
+  return acting.execute(auth,session.toString(),s->(enrollment==com.ptc.halo.enums.ProfessorEnrollmentView.ALL ? engagement.get(s.getTarget(),page,size,view) : engagement.get(s.getTarget(),page,size,view,enrollment)));
  }
  @GetMapping("/api/professor/students/{studentId}/engagement/modules")
  @PreAuthorize("hasRole('PROFESSOR')")
@@ -29,7 +29,7 @@ public class ProfessorEngagementController extends ProfessorErrorResponses {
   return engagement.modules(com.ptc.halo.security.AuthenticatedAccount.find(users, auth).orElseThrow(()->new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Authentication required")),studentId,page,size,view);
  }
  @GetMapping("/api/admin/acting/professor/students/{studentId}/engagement/modules")
- @PreAuthorize("hasRole('ADMIN')")
+ @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object actingModules(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session,@PathVariable Long studentId,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="CURRENT") com.ptc.halo.enums.ProfessorStudentView view, @RequestParam(defaultValue="20") int size){
   return acting.execute(auth,session.toString(),s->engagement.modules(s.getTarget(),studentId,page,size,view));
  }

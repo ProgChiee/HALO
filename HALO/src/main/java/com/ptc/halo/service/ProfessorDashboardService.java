@@ -99,6 +99,10 @@ public class ProfessorDashboardService {
                 totalStudents
         );
 
+        long enrolledStudents=overview.activelyEnrolledStudents(professor.getId());
+        response.setActivelyEnrolledStudents(enrolledStudents);
+        response.setEligibleStudentsWithoutActiveEnrollment(totalStudents-enrolledStudents);
+
         response.setTotalSubjects(
                 totalSubjects
         );

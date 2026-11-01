@@ -8,7 +8,13 @@ public class StudentSubjectEnrollmentEntity {
  @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="subject_id",nullable=false) private SubjectEntity subject;
  @Column(nullable=false) private long recordedAtEpochMs;
  @Column(nullable=false,length=32) private String source;
+ @Column(nullable=false) private boolean active = true;
+ private Long unenrolledAtEpochMs;
  protected StudentSubjectEnrollmentEntity() {}
  public StudentSubjectEnrollmentEntity(UserEntity student,SubjectEntity subject){this.student=student;this.subject=subject;this.recordedAtEpochMs=java.time.Instant.now().toEpochMilli();this.source="SELF_ENROLLED";}
  public Long getId(){return id;}
+ public boolean isActive(){return active;}
+ public Long getUnenrolledAtEpochMs(){return unenrolledAtEpochMs;}
+ public void deactivate(){if(active){active=false;unenrolledAtEpochMs=java.time.Instant.now().toEpochMilli();}}
+ public void reactivate(){active=true;unenrolledAtEpochMs=null;}
 }

@@ -17,11 +17,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties={"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect","spring.jpa.open-in-view=false"},showSql=false)
-@Import({MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
+@Import({StudentEnrollmentService.class,StudentSubjectService.class,MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class MentorExternalTransactionTest {
  @Autowired AssessmentService service;
  @Autowired MentorService mentor;
+ @Autowired StudentEnrollmentService enrollmentService;
  @Autowired MentorSessionRepository sessions;
  @Autowired MentorMessageRepository messages;
  @MockBean com.ptc.halo.component.ModuleMaterialIndex index;
@@ -51,7 +52,7 @@ class MentorExternalTransactionTest {
   var module=new AiLearningModuleEntity();module.setWeek(week);module.setAiGenerationStatus(AiGenerationStatus.COMPLETED);module.setStatus(LessonStatus.APPROVED);module=modules.saveAndFlush(module);
   var assessment=new AssessmentEntity();assessment.setModule(module);assessment.setTitle("Quiz");assessment.setPassingScore(70);assessment.setStatus(AssessmentStatus.AVAILABLE);assessment.setCreatedAt(LocalDateTime.now());assessment=assessments.saveAndFlush(assessment);
   q1=question(assessment,1,"A");q2=question(assessment,2,"B");
-  var profile=new StudentProfileEntity();profile.setUser(student);profile.setStudentId("ST03-1");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
+  var profile=new StudentProfileEntity();profile.setUser(student);profile.setStudentId("ST03-1");profile.setSection("BSHM 1A");profile.setYearLevel(YearLevel.FIRST_YEAR);profiles.saveAndFlush(profile);
   enrollments.saveAndFlush(new StudentSubjectEnrollmentEntity(student,subject));
   attempt=service.startAttempt(module.getId(),student);
  }
@@ -148,5 +149,56 @@ class MentorExternalTransactionTest {
   when(builder.build().prompt().system(startsWith("Classify HALO"))).thenReturn(spec);
   when(spec.user(anyString())).thenReturn(spec);
   when(spec.call().content()).thenAnswer(inv->{assertFalse(active());return "{\"intent\":\"LESSON_QUESTION\"}";});
+ }
+
+ @Test void deactivationRejectsOldMentorAndAssessmentIdsAndReenrollmentPreservesThem(){
+  prepareIndex();Long moduleId=modules.findAll().get(0).getId(),subjectId=subjects.findAll().get(0).getId();
+  var opened=mentor.openSession(moduleId,student);var enrollmentId=enrollments.findAll().get(0).getId();
+  enrollmentService.unenroll(TestIdentity.auth(student),subjectId);
+  for(Runnable request:List.<Runnable>of(()->mentor.openSession(moduleId,student),()->mentor.sendMessage(opened.getSessionId(),student,"hello"),()->mentor.getConversation(opened.getSessionId(),student),()->mentor.getExchange(opened.getSessionId(),student,UUID.randomUUID().toString()),()->service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"A"),item(q2.getId(),"B")))))
+   assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,request::run).getReason());
+  assertEquals(1,sessions.count());assertEquals(1,messages.count());assertEquals(0,answers.count());assertNull(attempts.findById(attempt.getId()).orElseThrow().getSubmittedAt());
+  enrollmentService.enroll(TestIdentity.auth(student),subjectId);
+  assertEquals(enrollmentId,enrollments.findAll().get(0).getId());assertEquals(opened.getSessionId(),mentor.openSession(moduleId,student).getSessionId());
+  assertEquals(attempt.getId(),service.startAttempt(moduleId,student).getId());
+ }
+ @Test void unenrollmentDuringAiRejectsFinalExchangeWithoutDeletingHistory(){
+  prepareIndex();var opened=mentor.openSession(modules.findAll().get(0).getId(),student);
+  respond(()->enrollmentService.unenroll(TestIdentity.auth(student),subjects.findAll().get(0).getId()));
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->mentor.sendMessage(opened.getSessionId(),student,"Explain this lesson")).getReason());
+  assertEquals(1,messages.count());assertEquals(1,sessions.count());assertEquals(1,attempts.count());
+ }
+ @Test void finalMentorWriteBlocksUnenrollmentUntilCommit() throws Exception {
+  prepareIndex();var opened=mentor.openSession(modules.findAll().get(0).getId(),student);var subjectId=subjects.findAll().get(0).getId();
+  var held=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);var started=new java.util.concurrent.CountDownLatch(1);var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+  try{
+   var write=pool.submit(()->mentor.sendMessage(opened.getSessionId(),student,"hello",UUID.randomUUID().toString(),()->{},()->{held.countDown();try{assertTrue(release.await(10,java.util.concurrent.TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}}));
+   assertTrue(held.await(10,java.util.concurrent.TimeUnit.SECONDS));
+   var revoke=pool.submit(()->{started.countDown();enrollmentService.unenroll(TestIdentity.auth(student),subjectId);});
+   try{assertTrue(started.await(10,java.util.concurrent.TimeUnit.SECONDS));assertThrows(java.util.concurrent.TimeoutException.class,()->revoke.get(200,java.util.concurrent.TimeUnit.MILLISECONDS));}finally{release.countDown();}
+   write.get(15,java.util.concurrent.TimeUnit.SECONDS);revoke.get(15,java.util.concurrent.TimeUnit.SECONDS);
+   assertEquals(3,messages.count());assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->mentor.sendMessage(opened.getSessionId(),student,"hello")).getReason());assertEquals(3,messages.count());
+  }finally{release.countDown();pool.shutdownNow();}
+ }
+
+ @Test void quizSubmissionAndUnenrollmentSerializeInBothOrders() throws Exception {
+  Long subjectId=subjects.findAll().get(0).getId();var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+  try{
+   for(boolean quizFirst:List.of(false,true)){
+    enrollmentService.enroll(TestIdentity.auth(student),subjectId);
+    var held=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);var started=new java.util.concurrent.CountDownLatch(1);
+    var first=pool.submit(()->new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(tx->{
+     if(quizFirst)service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"A"),item(q2.getId(),"B")));else enrollmentService.unenroll(TestIdentity.auth(student),subjectId);
+     held.countDown();try{assertTrue(release.await(10,java.util.concurrent.TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}
+    }));
+    assertTrue(held.await(10,java.util.concurrent.TimeUnit.SECONDS));
+    var second=pool.submit(()->{started.countDown();try{if(quizFirst)enrollmentService.unenroll(TestIdentity.auth(student),subjectId);else service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"A"),item(q2.getId(),"B")));return "OK";}catch(ResponseStatusException e){return e.getReason();}});
+    try{assertTrue(started.await(10,java.util.concurrent.TimeUnit.SECONDS));assertThrows(java.util.concurrent.TimeoutException.class,()->second.get(200,java.util.concurrent.TimeUnit.MILLISECONDS));}finally{release.countDown();}
+    first.get(15,java.util.concurrent.TimeUnit.SECONDS);assertEquals(quizFirst?"OK":"ENROLLMENT_REQUIRED",second.get(15,java.util.concurrent.TimeUnit.SECONDS));
+    assertEquals(quizFirst?100:0,attempts.findById(attempt.getId()).orElseThrow().getScore());assertEquals(quizFirst?2:0,answers.count());
+   }
+   assertEquals("ENROLLMENT_REQUIRED",assertThrows(ResponseStatusException.class,()->service.getAttemptResult(attempt.getId(),student)).getReason());
+   assertEquals(100,attempts.findById(attempt.getId()).orElseThrow().getScore());assertEquals(2,answers.count());
+  }finally{pool.shutdownNow();}
  }
 }

@@ -94,9 +94,13 @@ public class MentorService {
         return new Captured(module, module.getVersion(), fileState(module), history);
     }
     private AiLearningModuleEntity revalidate(Captured captured, UserEntity student) {
+        // Serialize the final write phase with enrollment/quiz/study lifecycle changes.
+        // No user or enrollment lock is held while calling the external AI provider.
+        var current = users.findForAssessmentLifecycle(student.getId()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED"));
         var module = aiLearningModuleRepository.findForMentorOpenById(captured.module().getId()).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "MODULE_NOT_FOUND"));
-        progressionService.validateModuleAccess(module.getId(), currentStudent(student));
+        progressionService.validateModuleAccess(module.getId(), current);
         if (!Objects.equals(captured.version(), module.getVersion()) || !captured.files().equals(fileState(module)))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "MENTOR_STATE_CHANGED");
         return module;

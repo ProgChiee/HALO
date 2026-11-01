@@ -34,7 +34,7 @@ test('earned and all locked cards use backend data, retain historical text and m
   assert.equal(won.querySelectorAll('li').length,1);assert.equal(locked.querySelectorAll('li').length,2);
   assert.match(won.textContent,/Historical earned title/);assert.match(won.textContent,/Historical earned description/);
   assert.equal(won.querySelectorAll('svg').length,1);assert.equal(locked.querySelectorAll('svg').length,2);
-  assert.match(view.host.querySelector('header').textContent,/1 earned/);assert.match(locked.textContent,/2 remaining/);
+  assert.match(view.host.querySelector('header').textContent,/1 Earned/);assert.match(locked.textContent,/2 remaining/);
   assert.doesNotMatch(locked.textContent,/First milestone/);assert.match(locked.textContent,/Next milestone/);assert.match(locked.textContent,/Pass a practice assessment/);
   assert.equal([...view.host.querySelectorAll('li span')].filter(s=>s.textContent==='Earned').length,1);
   assert.equal([...view.host.querySelectorAll('li span')].filter(s=>s.textContent==='Locked').length,2);
@@ -101,7 +101,7 @@ test('artwork preserves backend titles, counts, statuses and ownership context i
    assert.equal(earned.querySelector('img').alt,'Historical title badge');assert.match(earned.textContent,/Original requirement/);
    const locked=section(view.host,'Badges to Unlock').querySelectorAll('li');assert.match(locked[0].className,/lockedCard/);assert.ok(locked[0].querySelector('img').src.endsWith('perfect-score.png'));
    assert.equal(locked[1].querySelector('img'),null);assert.equal(locked[1].querySelector('svg').getAttribute('aria-hidden'),'true');
-   assert.match(view.host.textContent,/1 earned/);assert.match(view.host.textContent,/2 remaining/);assert.match(locked[0].textContent,/Perfect requirement/);
+   assert.match(view.host.textContent,/1 Earned/);assert.match(view.host.textContent,/2 remaining/);assert.match(locked[0].textContent,/Perfect requirement/);
   }finally{await view.close();}
  }
 });
@@ -126,8 +126,43 @@ test('every current backend badge renders artwork in earned and locked sections 
      assert.match(card.className,earned.length?/earnedCard/:/lockedCard/);
      assert.equal(card.lastElementChild.textContent,earned.length?'Earned':'Locked');
     });
-    assert.match(view.host.querySelector('header').textContent,new RegExp(earned.length+' earned'));
+    assert.match(view.host.querySelector('header').textContent,new RegExp(earned.length+' Earned'));
    }finally{await view.close();}
   }
+ }
+});
+
+
+test('Badges uses one compact shared header with a dynamic count and proper heading hierarchy in every mode',async()=>{
+ for(const mode of [{acting:false},{acting:true,preview:true},{acting:true,preview:false}]){
+  for(const count of [0,6]){
+   const earned=Array.from({length:count},(_,id)=>({...definitions[0],badgeType:'HISTORICAL_'+id,id}));
+   const view=await mount({getBadgesData:async()=>earned,getBadgeCatalog:async()=>definitions},mode);
+   try{
+    const header=view.host.querySelector('[data-page-topbar]');assert.ok(header);assert.match(header.className,/badgesHeader/);
+    assert.equal(view.host.querySelectorAll('[data-page-topbar]').length,1);assert.equal(view.host.querySelectorAll('h1').length,1);
+    assert.equal(header.querySelector('h1').textContent,'Badges');
+    const title=header.querySelector('h1').parentElement;assert.match(title.className,/headerTitle/);assert.equal(title.querySelector('svg').getAttribute('aria-hidden'),'true');
+    assert.match(title.parentElement.className,/headerContent/);
+    assert.equal(header.querySelector('span').textContent,count+' Earned');
+    assert.deepEqual([...view.host.querySelectorAll('main h2')].map(h=>h.textContent),['Earned','Badges to Unlock']);
+   }finally{await view.close();}
+  }
+ }
+});
+
+test('Badges header wraps without resizing shared Topbars, uses aligned gutters and readable theme colors',async()=>{
+ const css=await readFile(new URL('../src/pages/student/styles/Badges.module.css',import.meta.url),'utf8');
+ const shared=await readFile(new URL('../src/components/shared/Navigation.module.css',import.meta.url),'utf8');
+ const tokens=await readFile(new URL('../src/styles/variables.css',import.meta.url),'utf8');
+ assert.match(css,/\.headerContent \{[^}]+align-items: center; flex-wrap: wrap/);
+ assert.match(css,/\.badgesHeader \{ padding-block: var\(--space-3\); margin-bottom: var\(--space-4\)/);
+ assert.match(css,/\.main\.main \{[^}]+padding: 0 var\(--page-gutter, 24px\) var\(--page-gutter, 24px\)/);
+ assert.match(css,/\.countPill \{[^}]+background: var\(--color-primary-soft\); color: var\(--color-success-text\)/);
+ assert.match(shared,/min-height: 76px/);assert.match(shared,/min-height: 64px/);
+ const luminance=hex=>{const rgb=hex.match(/[a-f0-9]{2}/gi).map(n=>parseInt(n,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;};
+ for(const theme of [tokens.split('[data-theme="dark"]')[0],tokens.split('[data-theme="dark"]')[1]]){
+  const fg=theme.match(/--color-success-text: (#[A-Fa-f0-9]+)/)[1],bg=theme.match(/--color-primary-soft: (#[A-Fa-f0-9]+)/)[1];
+  const a=luminance(fg),b=luminance(bg);assert.ok((Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5);
  }
 });

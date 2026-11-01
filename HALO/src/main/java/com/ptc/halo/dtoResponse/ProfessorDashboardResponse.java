@@ -22,6 +22,12 @@ public class ProfessorDashboardResponse {
     public void setPerformanceThrough(java.time.LocalDate value){performanceThrough=value;}
 
 
+    private Long activelyEnrolledStudents;
+    private Long eligibleStudentsWithoutActiveEnrollment;
+    public Long getActivelyEnrolledStudents(){return activelyEnrolledStudents;}
+    public void setActivelyEnrolledStudents(Long value){activelyEnrolledStudents=value;}
+    public Long getEligibleStudentsWithoutActiveEnrollment(){return eligibleStudentsWithoutActiveEnrollment;}
+    public void setEligibleStudentsWithoutActiveEnrollment(Long value){eligibleStudentsWithoutActiveEnrollment=value;}
     private Long totalStudents;
     private Long totalSubjects;
     private Long totalModules;

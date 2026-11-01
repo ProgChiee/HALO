@@ -1,17 +1,18 @@
 // API routes verified against the controllers in HALO.zip.
-import apiClient from '../apiClient';
+import defaultClient from '../apiClient';
+export function createAdminService(apiClient = defaultClient) {
 
-export async function getProfessors(config = {}) {
+async function getProfessors(config = {}) {
   const res = await apiClient.get('/admin/professors', config);
   return res.data;
 }
 
-export async function getProfessorById(id) {
+async function getProfessorById(id) {
   const res = await apiClient.get(`/admin/professors/${id}`);
   return res.data;
 }
 
-export async function createProfessor({ name, email, password, professorId }) {
+async function createProfessor({ name, email, password, professorId }) {
   const res = await apiClient.post('/admin/create-professor', {
     name,
     email,
@@ -21,32 +22,32 @@ export async function createProfessor({ name, email, password, professorId }) {
   return res.data;
 }
 
-export async function updateProfessor(id, { name, email, professorId }) {
+async function updateProfessor(id, { name, email, professorId }) {
   const res = await apiClient.put(`/admin/professors/${id}`, { name, email, professorId });
   return res.data;
 }
 
-export async function setProfessorStatus(id, status) {
+async function setProfessorStatus(id, status) {
   const res = await apiClient.patch(`/admin/professors/${id}/status`, { status });
   return res.data;
 }
 
-export async function getStudents(config = {}) {
+async function getStudents(config = {}) {
   const res = await apiClient.get('/admin/students', config);
   return res.data;
 }
 
-export async function getStudentById(id) {
+async function getStudentById(id) {
   const res = await apiClient.get(`/admin/students/${id}`);
   return res.data;
 }
 
-export async function setStudentStatus(id, status) {
+async function setStudentStatus(id, status) {
   const res = await apiClient.patch(`/admin/students/${id}/status`, { status });
   return res.data;
 }
 
-export async function updateStudent(id, { name, studentId, section, yearLevel }) {
+async function updateStudent(id, { name, studentId, section, yearLevel }) {
   const res = await apiClient.put(`/admin/students/${id}`, {
     name,
     studentId,
@@ -56,32 +57,32 @@ export async function updateStudent(id, { name, studentId, section, yearLevel })
   return res.data;
 }
 
-export async function getAdminDashboardData(config = {}) {
+async function getAdminDashboardData(config = {}) {
   const res = await apiClient.get('/admin/dashboard', config);
   return res.data;
 }
 
-export async function getAdminRecentActivity(config = {}) {
+async function getAdminRecentActivity(config = {}) {
   const res = await apiClient.get('/admin/dashboard/recent-activity', config);
   return res.data;
 }
 
-export async function getProfessorMonitoring(config = {}) {
+async function getProfessorMonitoring(config = {}) {
   const res = await apiClient.get('/admin/professors/monitoring', config);
   return res.data;
 }
 
-export async function getStudentMonitoring(config = {}) {
+async function getStudentMonitoring(config = {}) {
   const res = await apiClient.get('/admin/students/monitoring', config);
   return res.data;
 }
 
-export async function getAdminProfile(config = {}) {
+async function getAdminProfile(config = {}) {
   const res = await apiClient.get('/admin/profile', config);
   return res.data;
 }
 
-export async function getActivityLog({ role, activityType, signal, params = {} } = {}) {
+async function getActivityLog({ role, activityType, signal, params = {} } = {}) {
   const res = await apiClient.get('/admin/activity-logs', {
     params: { page: 0, size: 20, ...params, role, type: activityType ?? params.activityType, activityType: undefined },
     signal,
@@ -89,10 +90,14 @@ export async function getActivityLog({ role, activityType, signal, params = {} }
   return res.data;
 }
 
-export async function archiveProfessor(id) { return (await apiClient.patch(`/admin/professors/${id}/archive`)).data; }
+async function archiveProfessor(id) { return (await apiClient.patch(`/admin/professors/${id}/archive`)).data; }
 
-export async function restoreProfessor(id) { return (await apiClient.patch(`/admin/professors/${id}/restore`)).data; }
+async function restoreProfessor(id) { return (await apiClient.patch(`/admin/professors/${id}/restore`)).data; }
 
-export async function archiveStudent(id) { return (await apiClient.patch(`/admin/students/${id}/archive`)).data; }
+async function archiveStudent(id) { return (await apiClient.patch(`/admin/students/${id}/archive`)).data; }
 
-export async function restoreStudent(id) { return (await apiClient.patch(`/admin/students/${id}/restore`)).data; }
+async function restoreStudent(id) { return (await apiClient.patch(`/admin/students/${id}/restore`)).data; }
+
+return { getProfessors, getProfessorById, createProfessor, updateProfessor, setProfessorStatus, getStudents, getStudentById, setStudentStatus, updateStudent, getAdminDashboardData, getAdminRecentActivity, getProfessorMonitoring, getStudentMonitoring, getAdminProfile, getActivityLog, archiveProfessor, restoreProfessor, archiveStudent, restoreStudent };
+}
+export const { getProfessors, getProfessorById, createProfessor, updateProfessor, setProfessorStatus, getStudents, getStudentById, setStudentStatus, updateStudent, getAdminDashboardData, getAdminRecentActivity, getProfessorMonitoring, getStudentMonitoring, getAdminProfile, getActivityLog, archiveProfessor, restoreProfessor, archiveStudent, restoreStudent } = createAdminService();

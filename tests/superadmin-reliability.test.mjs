@@ -341,7 +341,7 @@ test('Super Admin password modal exposes dialog focus behavior without submittin
 
 
 const dashboardStats = { totalUsers: 321, totalAdmins: 4, totalStudents: 300, totalProfessors: 16, activeUsers: 310, inactiveUsers: 11 };
-const recentRows = [{ id: 1, userName: 'Test Actor', action: 'Recent account action', createdAt: '2026-01-01T12:00:00' }];
+const recentRows = [{ id: 1, userName: 'Test Actor', action: 'Recent account action', activityTitle: 'Recent account action', activityDescription: 'Administrator recorded an account activity.', createdAt: '2026-01-01T12:00:00' }];
 const resource = suffix => calls.filter(call => call.config.url.endsWith(suffix)).at(-1);
 const safeFailure = { response: { status: 500, data: { message: 'private SQL and stack trace' } } };
 async function mountDashboard(Component, props = {}) {

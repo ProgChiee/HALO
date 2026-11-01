@@ -6,6 +6,13 @@ public class StudentSubjectResponse {
 
     private Long subjectId;
     private boolean enrolled;
+    // Additive management metadata; protected learning APIs remain authoritative.
+    private Boolean learningAvailable;
+    private String learningUnavailableReason;
+    public Boolean getLearningAvailable() { return learningAvailable; }
+    public void setLearningAvailable(Boolean value) { learningAvailable = value; }
+    public String getLearningUnavailableReason() { return learningUnavailableReason; }
+    public void setLearningUnavailableReason(String value) { learningUnavailableReason = value; }
     public boolean isEnrolled() { return enrolled; }
     public void setEnrolled(boolean enrolled) { this.enrolled = enrolled; }
 
@@ -24,6 +31,9 @@ public class StudentSubjectResponse {
     private Integer completedWeeks;
 
     private Integer progressPercentage;
+
+    // Authenticated resource; 204 means no custom cover. Clients retain their local default.
+    public String getCoverUrl() { return subjectId == null ? null : "subjects/" + subjectId + "/cover"; }
 
     public StudentSubjectResponse() {
     }

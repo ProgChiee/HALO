@@ -9,7 +9,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
-@RestControllerAdvice(assignableTypes = {AdminActingController.class, AdminController.class, AdminDashboardController.class,
+@RestControllerAdvice(assignableTypes = {SuperAdminAdminModeController.class, AdminActingController.class, AdminController.class, AdminDashboardController.class,
         AdminProfessorMonitoringController.class, AdminStudentMonitoringController.class})
 public class AdminValidationHandler {
     private ResponseEntity<?> response(int status, String code, String message) {
@@ -39,7 +39,7 @@ public class AdminValidationHandler {
     public ResponseEntity<?> authentication() { return response(401, "AUTHENTICATION_REQUIRED", "Please sign in to continue."); }
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<?> forbidden() { return response(403, "ACCESS_DENIED", "You do not have permission to perform this action."); }
-    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    @ExceptionHandler({org.springframework.web.bind.MissingServletRequestParameterException.class, org.springframework.web.bind.MissingRequestHeaderException.class})
     public ResponseEntity<?> missingParameter() { return invalid(Map.of("request", "A required parameter is missing.")); }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> unexpected(Exception error) {

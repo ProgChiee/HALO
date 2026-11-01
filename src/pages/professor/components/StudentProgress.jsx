@@ -1,3 +1,4 @@
+import { professorEnrollmentOptions, professorEnrollmentLabel } from '../../../utils/professorEnrollment';
 import Topbar from '../../../components/shared/Topbar';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useCallback, useState } from 'react';
@@ -12,15 +13,16 @@ import LearningEngagement from './LearningEngagement';
 export default function StudentProgress() {
   const [page, setPage] = useState(0);
   const [view, setView] = useState('CURRENT');
+  const [enrollment, setEnrollment] = useState('ALL');
   // A new page unmounts the previous request state immediately.
-  return <StudentProgressPage key={`${view}-${page}`} page={page} view={view} onViewChange={next => { setView(next); setPage(0); }} onPageChange={setPage} />;
+  return <StudentProgressPage key={`${view}-${enrollment}-${page}`} enrollment={enrollment} onEnrollmentChange={next => { setEnrollment(next); setPage(0); }} page={page} view={view} onViewChange={next => { setView(next); setPage(0); }} onPageChange={setPage} />;
 }
 
-function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
+function StudentProgressPage({ page, onPageChange, view, onViewChange, enrollment, onEnrollmentChange }) {
   const workflow = useProfessorWorkflow();
   const { getStudentProgressSummaries } = workflow.api;
 
-  const loadPage = useCallback((config) => getStudentProgressSummaries(page, 20, { ...config, params: { view } }), [page, view, getStudentProgressSummaries]);
+  const loadPage = useCallback((config) => getStudentProgressSummaries(page, 20, { ...config, params: { view, ...(enrollment === 'ALL' ? {} : { enrollment }) } }), [page, view, enrollment, getStudentProgressSummaries]);
   const { data, isLoading, error: loadError, reload } = useRemoteData(loadPage);
 
   if (isLoading) {
@@ -58,16 +60,24 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
       </Topbar>
 
       <main className={styles.main}>
-        <div className={styles.viewControls} role="group" aria-label="Student population">
+        <div className={styles.viewControls} role="group" aria-label="Account Status">
+          <strong>Account Status</strong>
           <button className={styles.compactButton} aria-pressed={view === 'CURRENT'} onClick={() => onViewChange('CURRENT')}>Current Students</button>
           <button className={styles.compactButton} aria-pressed={view === 'FORMER'} onClick={() => onViewChange('FORMER')}>Former / Archived</button>
+        </div>
+        <p className={styles.engagementHelp}>Current means active accounts. Former / Archived means inactive or archived accounts. Enrollment membership is a separate filter.</p>
+        <div className={styles.enrollmentFilter}>
+          <label htmlFor="professor-enrollment-filter">Enrollment Status</label>
+          <select id="professor-enrollment-filter" value={enrollment} onChange={event => onEnrollmentChange(event.target.value)}>
+            {professorEnrollmentOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
         </div>
         {view === 'FORMER' && <p className={styles.engagementHelp}>Read-only history for inactive and archived students in your subject scope.</p>}
         <div className={styles.statsGrid}>
           <div className={styles.statCard}>
             <div className={styles.statIcon}><Users size={18} /></div>
             <p className={styles.statValue}>{totalStudents}</p>
-            <p className={styles.statLabel}>{view === 'CURRENT' ? 'Current students in your subjects' : 'Former students in your subjects'}</p>
+            <p className={styles.statLabel}>{view === 'CURRENT' ? 'Matching active Student accounts' : 'Matching inactive / archived Student accounts'}</p>
           </div>
           <div className={styles.statCard}>
             <div className={styles.statIcon}><CheckCircle2 size={18} /></div>
@@ -85,6 +95,7 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
           <table className={styles.progressTable} aria-label="Student progress"><thead><tr className={styles.tableHeaderRow}>
             <th scope="col">Student</th>
             <th scope="col">Section</th>
+            <th scope="col">Enrollment Status</th>
             <th scope="col">Completed Modules</th>
             <th scope="col">Assessments Passed</th>
             <th scope="col">Institution-wide Achievements</th>
@@ -92,8 +103,9 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
 
           {rows.map((student) => (
             <tr key={student.userId} className={styles.tableRow}>
-              <td className={styles.studentName}>{student.name}{view === 'FORMER' && <span className={styles.statusBadge}>{student.status === 'ARCHIVED' ? 'Archived' : 'Inactive'}</span>}</td>
+              <td className={styles.studentName}>{student.name}<span className={styles.statusBadge}>{student.status === 'ARCHIVED' ? 'Archived' : student.status === 'INACTIVE' ? 'Inactive' : 'Active account'}</span></td>
               <td>{student.section || 'Not assigned'}</td>
+              <td>{professorEnrollmentLabel(student.enrollmentStatus)}</td>
               <td className={styles.completedModules}>{student.completedModules ?? 'Unavailable'}</td>
               <td>{student.passedAssessments ?? 'Unavailable'}</td>
               <td>{student.totalBadges ?? 'Unavailable'}</td>
@@ -101,7 +113,7 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
           ))}
 
           {rows.length === 0 && (
-            <tr><td colSpan={5} className={styles.emptyState}>{view === 'FORMER' ? 'No former or archived students in your subject scope.' : 'No current students in your subject scope.'}</td></tr>
+            <tr><td colSpan={6} className={styles.emptyState}>{enrollment !== 'ALL' ? 'No students match these account and enrollment filters.' : view === 'FORMER' ? 'No former or archived students in your subject scope.' : 'No current students in your subject scope.'}</td></tr>
           )}
           </tbody></table>
         </div>
@@ -110,7 +122,7 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange }) {
           <span> Page {data.number + 1} of {Math.max(1, data.totalPages)} </span>
           <button disabled={data.last} onClick={() => onPageChange(page + 1)}>Next</button>
         </nav>
-        <LearningEngagement view={view} />
+        <LearningEngagement key={`${view}-${enrollment}`} view={view} enrollment={enrollment} />
       </main>
     </PageShell>
   );

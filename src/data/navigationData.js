@@ -27,6 +27,9 @@ export const SUPERADMIN_NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutGrid, path: '/superadmin', end: true, section: 'Main' },
   { label: 'Admins', icon: Users, path: '/superadmin/admins', section: 'Main' },
   { label: 'Monitoring', icon: Activity, path: '/superadmin/monitoring', section: 'Main' },
+  {label:'Admin Mode',icon:Users,path:'/superadmin/admin-mode',section:'Modes'},
+  {label:'Professor Mode',icon:GraduationCap,path:'/superadmin/professor-mode',section:'Modes'},
+  {label:'Student Mode',icon:Users,path:'/superadmin/student-mode',section:'Modes'},
   { label: 'Profile', icon: UserIcon, path: '/superadmin/profile', section: 'Account' },
   { label: 'Settings', icon: Settings, path: '/superadmin/settings', section: 'Account' },
 ];

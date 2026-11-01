@@ -13,7 +13,7 @@ export default function StudentPageShell({ children }) {
       <p>{workflow.preview ? 'No changes will be saved to this Student account.' : 'Actions may modify this Student account and are audited.'}</p>
       <div className={modeStyles.actions}>
         <button type="button" disabled={workflow.leaving} onClick={() => workflow.leave(true)}>Change Account</button>
-        <button type="button" disabled={workflow.leaving} onClick={() => workflow.leave(false)}>Exit Mode</button>
+        <button type="button" disabled={workflow.leaving} onClick={() => workflow.leave(false)}>{workflow.returnLabel || 'Exit Mode'}</button>
       </div>
       {workflow.exitError && <p role="alert">{workflow.exitError}</p>}
     </section>}

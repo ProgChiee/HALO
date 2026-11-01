@@ -1,3 +1,5 @@
+import SubjectCover from '../../../components/shared/SubjectCover';
+import SubjectCoverDialog from './SubjectCoverDialog';
 import Topbar from '../../../components/shared/Topbar';
 import Dialog from '../../../components/shared/Dialog';
 import { professorErrorMessage } from '../../../utils/professorErrors';
@@ -32,6 +34,8 @@ export default function SubjectManagement() {
   const navigate = useNavigate();
 
   const { data: subjects, setData: setSubjects, isLoading, error: loadError, reload: loadSubjects } = useRemoteData(getSubjects, []);
+  const [coverSubject,setCoverSubject]=useState(null);
+  const [coverRevisions,setCoverRevisions]=useState({});
   const [expandedId, setExpandedId] = useState(null);
   const { weeksBySubject, weeksLoading, weekErrors, loadWeeks, replaceWeek } = useSubjectWeeks(getWeeks);
 
@@ -289,6 +293,7 @@ export default function SubjectManagement() {
               const weeks = weeksBySubject[subject.id];
               return (
                 <div key={subject.id} className={styles.subjectCard}>
+                  <SubjectCover subjectId={subject.id} load={subject.coverUrl ? workflow.api.getSubjectCover : undefined} revision={coverRevisions[subject.id] ?? 0} />
                   <div className={styles.subjectHeader}>
                     <button className={styles.subjectHeaderClickable} onClick={() => toggleExpand(subject.id)}>
                       <BookOpen size={16} className={styles.subjectIcon} />
@@ -299,6 +304,7 @@ export default function SubjectManagement() {
                     </button>
 
                     <div className={styles.subjectActions}>
+                      {!workflow.preview && <button type="button" className={styles.coverAction} disabled={isSubmitting} onClick={()=>setCoverSubject(subject)}>Change cover</button>}
                       <button className={styles.iconBtn} disabled={isSubmitting || workflow.preview} onClick={() => openEditSubject(subject)} aria-label="Edit subject">
                         <Pencil size={14} />
                       </button>
@@ -348,6 +354,7 @@ export default function SubjectManagement() {
         )}
       </main>
 
+      {coverSubject && !workflow.preview && <SubjectCoverDialog subject={coverSubject} api={workflow.api} onClose={()=>setCoverSubject(null)} onSaved={()=>{setCoverRevisions(old=>({...old,[coverSubject.id]:(old[coverSubject.id]??0)+1}));setCoverSubject(null);showToast('Subject cover updated.','success');}} />}
       {subjectModal && (
         <Dialog labelledBy="subject-dialog" busy={isSubmitting} onClose={closeModal} className={styles.modal}>
             <div className={styles.modalHeader}>

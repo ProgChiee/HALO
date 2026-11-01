@@ -27,6 +27,7 @@ apiClient.interceptors.response.use(
         code: /^[A-Z_]{1,64}$/.test(error.response?.data?.code ?? error.code ?? '') ? (error.response?.data?.code ?? error.code) : 'REQUEST_FAILED',
       });
     }
+    if (error.response?.data?.code === 'ACTING_MODE_ALREADY_ACTIVE') window.dispatchEvent(new Event('halo:mode-conflict'));
     const sentToken = error.config?.headers?.Authorization;
     const { token } = readSession();
     // An old request or an invalid password on a public form must not

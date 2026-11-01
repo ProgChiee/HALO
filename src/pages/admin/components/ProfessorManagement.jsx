@@ -1,5 +1,5 @@
+import { useAdminWorkflow } from '../../../context/admin/useAdminWorkflow';
 import Topbar from '../../../components/shared/Topbar';
-import { archiveProfessor, restoreProfessor } from '../../../services/admin/adminService';
 import AccountLifecycle, { AccountStateFilters } from '../../../components/shared/AccountLifecycle';
 import Dialog from '../../../components/shared/Dialog';
 import { accountText, accountDisplay, accountInitial } from '../../../utils/adminAccountDisplay';
@@ -12,12 +12,6 @@ import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { useAuth } from '../../../context/login/useAuth';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import {
-  getProfessors,
-  createProfessor,
-  setProfessorStatus,
-  updateProfessor,
-} from '../../../services/admin/adminService';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/ProfessorManagement.module.css';
@@ -38,16 +32,18 @@ import styles from '../styles/ProfessorManagement.module.css';
 // flow with your backend team).
 
 export default function ProfessorManagement() {
+  const adminWorkflow=useAdminWorkflow();
+  const { archiveProfessor, restoreProfessor, getProfessors, createProfessor, setProfessorStatus, updateProfessor }=adminWorkflow.api;
   const { showToast } = useToast();
   const { role } = useAuth();
-  const isSuperAdmin = role === 'superadmin';
+  const isSuperAdmin = role === 'superadmin' && !adminWorkflow.acting;
 
   const mutationVersion = useRef(0);
   const [statusUpdates, setStatusUpdates] = useState({});
   const fetchProfessors = useCallback(async (config) => {
     const version = mutationVersion.current;
     return { rows: await getProfessors(config), version };
-  }, []);
+  }, [getProfessors]);
   const { data: snapshot, isLoading, error: loadError, reload: loadProfessors } = useRemoteData(fetchProfessors, { rows: [], version: 0 });
   // A GET started before a committed status mutation cannot replace that status.
   // Preserve the GET's other fields (for example a freshly edited name/email).

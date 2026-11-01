@@ -1,3 +1,4 @@
+import { professorEnrollmentLabel } from '../../../utils/professorEnrollment';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import { useRemoteData } from '../../../hooks/useRemoteData';
@@ -5,9 +6,9 @@ import { professorErrorMessage } from '../../../utils/professorErrors';
 import styles from '../styles/StudentProgress.module.css';
 import AssessmentAttemptHistory from './AssessmentAttemptHistory';
 
-export default function LearningEngagement({ view = 'CURRENT' }) {
+export default function LearningEngagement({ view = 'CURRENT', enrollment = 'ALL' }) {
   const [page, setPage] = useState(0);
-  return <EngagementPage key={`${view}-${page}`} view={view} page={page} changePage={setPage} />;
+  return <EngagementPage key={`${view}-${enrollment}-${page}`} enrollment={enrollment} view={view} page={page} changePage={setPage} />;
 }
 
 function ModuleActivity({ student, onClose, view, panelId }) {
@@ -46,23 +47,23 @@ function ModuleActivityPage({ studentId, page, setPage, view }) {
   </>;
 }
 
-function EngagementPage({ page, changePage, view }) {
+function EngagementPage({ page, changePage, view, enrollment }) {
   const { api } = useProfessorWorkflow();
   const [selected, setSelected] = useState(null);
   const panelPrefix = useId();
   const trigger = useRef(null);
-  const load = useCallback(config => api.getLearningEngagement(page, 20, { ...config, params: { view } }), [api, page, view]);
+  const load = useCallback(config => api.getLearningEngagement(page, 20, { ...config, params: { view, ...(enrollment === 'ALL' ? {} : { enrollment }) } }), [api, page, view, enrollment]);
   const { data, isLoading, error, reload } = useRemoteData(load);
   return <section aria-labelledby="learning-engagement-title" className={styles.engagement}>
     <h2 id="learning-engagement-title">Learning Engagement</h2>
-    <p className={styles.engagementHelp}>Only students eligible for your subjects. Study days include lesson opens, assessments, completions, and Mentor messages. Lesson-open history starts when tracking is deployed.</p>
+    <p className={styles.engagementHelp}>Academically eligible students matching the account and enrollment filters. Historical activity is retained after unenrollment. Study days include lesson opens, assessments, completions, and Mentor messages. Lesson-open history starts when tracking is deployed.</p>
     {isLoading ? <p role="status">Loading engagement...</p> : error ? <div role="alert"><p>{professorErrorMessage(error, 'Could not load learning engagement. Please try again.')}</p><button onClick={reload}>Retry engagement</button></div> : <>
 
       <div className={styles.tableCard} role="region" aria-label="Learning engagement table, scroll horizontally" tabIndex={0}>
         <table className={styles.progressTable} aria-label="Learning engagement">
           <thead><tr className={styles.tableHeaderRow}><th scope="col">Student</th><th scope="col">Active Study Days<br />This Week</th><th scope="col">Active Study Days<br />This Month</th><th scope="col">AI Mentor Sessions<br />This Week</th><th scope="col">AI Mentor Sessions<br />This Month</th></tr></thead>
-          <tbody>{(data?.content ?? []).map(student => <tr key={student.userId} className={styles.tableRow}><th scope="row">{student.name || 'Student'}<br /><button className={styles.compactButton} aria-expanded={selected?.userId === student.userId} aria-controls={`${panelPrefix}-${student.userId}`} onClick={event => { trigger.current = event.currentTarget; setSelected(student); }}>View module activity</button></th><td>{student.activeDaysWeek}<br /><small>{student.weeklyConsistency}</small></td><td>{student.activeDaysMonth}<br /><small>{student.monthlyConsistency}</small></td><td>{student.mentorSessionsWeek}</td><td>{student.mentorSessionsMonth}</td></tr>)}
-            {!data?.content?.length && <tr><td colSpan={5} className={styles.emptyState}>{view === 'FORMER' ? 'No former or archived students in your subject scope.' : 'No current students are eligible for your subjects.'}</td></tr>}
+          <tbody>{(data?.content ?? []).map(student => <tr key={student.userId} className={styles.tableRow}><th scope="row">{student.name || 'Student'}{student.enrollmentStatus && <><br /><small>{professorEnrollmentLabel(student.enrollmentStatus)}</small></>}<br /><button className={styles.compactButton} aria-expanded={selected?.userId === student.userId} aria-controls={`${panelPrefix}-${student.userId}`} onClick={event => { trigger.current = event.currentTarget; setSelected(student); }}>View module activity</button></th><td>{student.activeDaysWeek}<br /><small>{student.weeklyConsistency}</small></td><td>{student.activeDaysMonth}<br /><small>{student.monthlyConsistency}</small></td><td>{student.mentorSessionsWeek}</td><td>{student.mentorSessionsMonth}</td></tr>)}
+            {!data?.content?.length && <tr><td colSpan={5} className={styles.emptyState}>{enrollment !== 'ALL' ? 'No students match these account and enrollment filters.' : view === 'FORMER' ? 'No former or archived students in your subject scope.' : 'No current students are eligible for your subjects.'}</td></tr>}
           </tbody>
         </table>
       </div>

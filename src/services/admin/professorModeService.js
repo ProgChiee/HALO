@@ -36,7 +36,11 @@ export function createActingProfessorScope(sessionId, onInvalid, preview = false
     } catch (error) {
       if (!active || controller.signal.aborted) throw new axios.CanceledError();
       if (['ACTING_SESSION_INVALID', 'INVALID_TARGET_ROLE', 'ACTING_TARGET_INACTIVE'].includes(error.response?.data?.code)
-          || error.response?.status === 403) onInvalid();
+         ) onInvalid();
+      else if ([403,404].includes(error.response?.status)) {
+        try { await (preview ? validateProfessorPreview : validateProfessorSession)(sessionId,{signal:controller.signal}); }
+        catch(validation) { if(active && !controller.signal.aborted && [400,403,404,409].includes(validation.response?.status)) onInvalid(); }
+      }
       throw error;
     } finally {
       pending.delete(controller);

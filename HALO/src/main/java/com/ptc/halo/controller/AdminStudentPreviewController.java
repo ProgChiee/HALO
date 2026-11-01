@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/admin/preview/student")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class AdminStudentPreviewController {
     private final AdminStudentPreviewService mode;
     private final StudentDashboardService dashboard;

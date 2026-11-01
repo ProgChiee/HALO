@@ -77,4 +77,17 @@ class EngagementHttpTest {
  @Test void realStudentStudyUsesAuthenticatedIdentity() throws Exception {
   var u=token("STUDENT");mvc.perform(post("/api/student/ai-learning-modules/week/3/study").param("studentId","999").header("Authorization","Bearer token")).andExpect(status().isNoContent());verify(study).record(3L,u);
  }
+
+ @Test void enrollmentFiltersPreserveNormalAndActingIdentity() throws Exception {
+  var actor=token("PROFESSOR");
+  mvc.perform(get("/api/professor/students/engagement").param("enrollment","PREVIOUS").param("professorId","777").header("Authorization","Bearer token")).andExpect(status().isOk());
+  verify(engagement).get(actor,0,20,com.ptc.halo.enums.ProfessorStudentView.CURRENT,com.ptc.halo.enums.ProfessorEnrollmentView.PREVIOUS);
+  token("ADMIN");var target=new UserEntity();target.setId(99L);target.setRole(Role.PROFESSOR);
+  var session=mock(AdminActingSessionEntity.class);when(session.getTarget()).thenReturn(target);String id=UUID.randomUUID().toString();
+  when(acting.execute(any(),eq(id),any())).thenAnswer(call->((AdminProfessorModeService.Work<?>)call.getArgument(2)).apply(session));
+  mvc.perform(get("/api/admin/acting/professor/students/engagement").param("enrollment","ACTIVE").param("professorId","777").header("X-Acting-Session",id).header("Authorization","Bearer token")).andExpect(status().isOk());
+  verify(engagement).get(target,0,20,com.ptc.halo.enums.ProfessorStudentView.CURRENT,com.ptc.halo.enums.ProfessorEnrollmentView.ACTIVE);
+  when(acting.execute(any(),eq(id),any())).thenThrow(new org.springframework.security.access.AccessDeniedException("Denied"));
+  mvc.perform(get("/api/admin/acting/professor/students/engagement").param("enrollment","ACTIVE").header("X-Acting-Session",id).header("Authorization","Bearer token")).andExpect(status().isForbidden());verifyNoMoreInteractions(engagement);
+ }
 }

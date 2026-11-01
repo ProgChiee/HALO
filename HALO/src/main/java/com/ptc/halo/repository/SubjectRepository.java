@@ -9,6 +9,9 @@ import java.util.Optional;
 
 public interface SubjectRepository
         extends JpaRepository<SubjectEntity, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select s from SubjectEntity s where s.id=:id and s.professor.user.id=:owner")
+    Optional<SubjectEntity> findCoverForUpdate(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("owner") Long owner);
     long countByProfessor_User_Id(Long professorId);
 
     List<SubjectEntity> findByProfessor_User_Id(Long userId);

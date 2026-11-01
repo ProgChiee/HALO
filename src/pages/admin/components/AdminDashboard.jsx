@@ -1,10 +1,10 @@
+import { useAdminWorkflow } from '../../../context/admin/useAdminWorkflow';
 import Topbar from '../../../components/shared/Topbar';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { adminErrorMessage } from '../../../utils/adminErrors';
 import { LayoutGrid, Users, GraduationCap, BookOpen, FileText, UserCheck, UserX, Activity } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import { ADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getAdminDashboardData, getAdminRecentActivity } from '../../../services/admin/adminService';
 import styles from '../styles/AdminDashboard.module.css';
 
 // ✅ Wired to the real backend — AdminDashboardController.
@@ -13,6 +13,8 @@ import styles from '../styles/AdminDashboard.module.css';
 // comes from the separate getAdminRecentActivity() call.
 
 export default function AdminDashboard() {
+  const adminWorkflow=useAdminWorkflow();
+  const { getAdminDashboardData, getAdminRecentActivity }=adminWorkflow.api;
   const { data, isLoading: statsLoading, error: statsError, reload: retryStats } = useRemoteData(getAdminDashboardData);
   const { data: activity, isLoading: activityLoading, error: activityError, reload: retryActivity } = useRemoteData(getAdminRecentActivity, []);
 

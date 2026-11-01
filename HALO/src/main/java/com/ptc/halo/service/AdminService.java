@@ -301,7 +301,7 @@ public class AdminService {
         return new StudentListResponse(updatedStudent,studentProfileRepository.findByUserId(id).orElse(null));
     }
     @org.springframework.transaction.annotation.Transactional
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public StudentListResponse updateStudent(
             Long id,
             StudentUpdateRequest request,

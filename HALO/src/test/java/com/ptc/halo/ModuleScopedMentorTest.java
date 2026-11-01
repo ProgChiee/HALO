@@ -48,7 +48,7 @@ class ModuleScopedMentorTest {
         module = mock(AiLearningModuleEntity.class); when(module.getId()).thenReturn(15L);
         when(module.getStatus()).thenReturn(LessonStatus.APPROVED);
         files = new ArrayList<>(); when(module.getFiles()).thenReturn(files);
-        student = new UserEntity(); student.setId(8L);
+        student = new UserEntity(); student.setId(8L); student.setRole(Role.STUDENT); student.setStatus(Status.ACTIVE);
         modules = mock(AiLearningModuleRepository.class); sessions = mock(MentorSessionRepository.class);
         messages = mock(MentorMessageRepository.class);
         var session = mock(MentorSessionEntity.class); when(session.getStudent()).thenReturn(student);
@@ -56,6 +56,9 @@ class ModuleScopedMentorTest {
         when(sessions.findById(21L)).thenReturn(Optional.of(session));
         when(messages.findTop10BySessionIdOrderByCreatedAtDesc(21L)).thenReturn(List.of());
         var users = mock(UserRepository.class); when(users.findById(8L)).thenReturn(Optional.of(student));
+        // Final Mentor writes resolve the same immutable account under its lifecycle lock.
+        // ConversationalMentorTest inherits this fixture; unrelated IDs remain unstubbed.
+        when(users.findForAssessmentLifecycle(8L)).thenReturn(Optional.of(student));
         when(modules.findWithFilesById(15L)).thenReturn(Optional.of(module));
         when(modules.findForMentorOpenById(15L)).thenReturn(Optional.of(module));
         mentor = new MentorService(builder, modules, sessions, messages, mapper,

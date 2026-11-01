@@ -35,3 +35,27 @@
 .secondary:hover { background: var(--color-primary-soft); }
 @media(max-width:640px) { .cardActions > button { flex: 1 1 auto; } }
 @media(max-width:640px) { .links { width: 100%; } .links a { flex: 1; min-height: 44px; } }
+.dangerOutline { display: inline-flex; align-items: center; justify-content: center; background: var(--color-surface); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-4); min-height: 44px; font: inherit; font-size: var(--text-sm); cursor: pointer; }
+.dangerOutline:hover:not(:disabled) { background: var(--color-danger-soft); }
+.dangerOutline:disabled, .dialogActions button:disabled { opacity: .6; cursor: wait; }
+.unenrollDialog { width: min(480px, 100%); display: grid; gap: var(--space-3); padding: var(--space-6); color: var(--color-text-primary); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: 0 12px 36px rgb(0 0 0 / 18%); }
+.unenrollDialog > * { min-width: 0; max-width: 100%; }
+.unenrollDialog h2 { margin: 0; font-size: var(--text-lg); line-height: 1.35; }
+.unenrollDialog p { margin: 0; font-size: var(--text-sm); line-height: 1.6; overflow-wrap: anywhere; }
+.unenrollDialog p:not(.dialogSubject):not(.dialogError) { color: var(--color-text-muted); }
+.dialogWarning { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--color-danger-soft); color: var(--color-danger-text); }
+.dialogError { color: var(--color-danger-text); }
+.dialogWarning.enrollIcon { background: var(--color-primary-soft); color: var(--color-primary); }
+.dialogActions .primary { margin-top: 0; }
+.unavailable { color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.5; }
+.unavailable span { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--color-bg-content); border: 1px solid var(--color-border); color: var(--color-text-primary); font-weight: 600; }
+.unavailable p { margin-top: var(--space-2); }
+.dialogSubject { font-weight: 600; }
+.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+.dialogActions button { min-height: 44px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+.dialogActions .secondary { color: var(--color-text-primary); }
+.dialogActions .dangerOutline { background: var(--color-danger-soft); font-weight: 600; }
+.unenrollDialog :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.cardActions > a { display: inline-flex; align-items: center; justify-content: center; }
+@media(max-width:640px) { .cardActions > a, .dialogActions > button { flex: 1 1 auto; min-height: 44px; } }
+@media(max-width:480px) { .unenrollDialog { padding: var(--space-4); } .dialogActions { flex-direction: column; } .dialogActions > button { width: 100%; } }

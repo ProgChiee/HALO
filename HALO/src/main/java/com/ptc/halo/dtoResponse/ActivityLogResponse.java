@@ -7,6 +7,15 @@ import java.time.LocalDateTime;
 
 public class ActivityLogResponse {
 
+    private String activityTitle;
+    private String activityDescription;
+    private String activityKind;
+    public String getActivityTitle() { return activityTitle; }
+    public void setActivityTitle(String value) { activityTitle = value; }
+    public String getActivityDescription() { return activityDescription; }
+    public void setActivityDescription(String value) { activityDescription = value; }
+    public String getActivityKind() { return activityKind; }
+    public void setActivityKind(String value) { activityKind = value; }
     private Long id;
     private String userName;
     private String userEmail;

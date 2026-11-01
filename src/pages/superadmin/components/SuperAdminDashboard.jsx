@@ -1,3 +1,4 @@
+import RecentActivityItem from './RecentActivityItem';
 import Topbar from '../../../components/shared/Topbar';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useRemoteData } from '../../../hooks/useRemoteData';
@@ -83,21 +84,12 @@ export function DashboardSections({ statistics, logs }) {
             <p>{apiErrorMessage(logs.error, 'Unable to load recent activity.')}</p>
             <button onClick={logs.reload}>Retry activity logs</button>
           </div>
-        ) : <div className={styles.activityList}>
-          {activity.map((item) => (
-            <div key={item.id} className={styles.activityRow}>
-              <div>
-                <p className={styles.activityText}>
-                  {item.displayAction || <><span className={styles.activityActor}>{item.userName}</span> {item.action}</>}
-                </p>
-              </div>
-              <span className={styles.activityTime}>{new Date(item.createdAt).toLocaleString()}</span>
-            </div>
-          ))}
+        ) : <ul className={styles.activityList} aria-label="Recent activity entries">
+          {activity.map(item => <RecentActivityItem key={item.id} item={item} />)}
           {activity.length === 0 && (
-            <p className={styles.loadingText}>No recent activity yet.</p>
+            <li className={styles.loadingText}>No recent activity yet.</li>
           )}
-        </div>}
+        </ul>}
       </main>
     </PageShell>
   );

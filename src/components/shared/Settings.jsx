@@ -1,3 +1,4 @@
+import { useAdminWorkflow } from '../../context/admin/useAdminWorkflow';
 import { useState, useSyncExternalStore } from 'react';
 import { Sun, Moon, Monitor } from 'lucide-react';
 import PageShell from './PageShell';
@@ -18,7 +19,8 @@ export default function Settings({ role }) {
   const { user } = useAuth();
   const professorWorkflow = useProfessorWorkflow();
   const studentWorkflow = useStudentWorkflow();
-  const acting = professorWorkflow.acting || studentWorkflow.acting;
+  const adminWorkflow=useAdminWorkflow();
+  const acting = professorWorkflow.acting || studentWorkflow.acting || adminWorkflow.acting;
   const [showChangePassword, setShowChangePassword] = useState(user?.mustChangePassword === true);
   const theme = useSyncExternalStore(subscribe, snapshot, () => 'light');
   return <PageShell responsive navItems={navigation[role]} roleBadge={labels[role]}>

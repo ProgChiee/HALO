@@ -1,3 +1,5 @@
+const AdminMode = lazy(() => import('../pages/admin/acting/AdminMode'));
+const AdminModeSelector = lazy(() => import('../pages/admin/acting/AdminMode').then(m=>({default:m.AdminModeSelector})));
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
@@ -36,6 +38,10 @@ const Badges = lazy(() => import('../pages/student/components/Badges'));
 const Profile = lazy(() => import('../pages/student/components/Profile'));
 const Quiz = lazy(() => import('../pages/student/components/Quiz'));
 
+function AdminModeHome() {
+  const { actingSessionId } = useParams();
+  return <Navigate to={'/superadmin/admin-mode/' + encodeURIComponent(actingSessionId)} replace />;
+}
 function LessonChatRoute() {
   const { topicId, weekId } = useParams();
   return <LessonChat key={topicId + ':' + weekId} />;
@@ -92,6 +98,54 @@ export default function AppRoutes() {
         }
       />
 
+      <Route path="/superadmin/student-mode" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><StudentModeSelector /></ProtectedRoute>} />
+      <Route path="/superadmin/student-mode/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><StudentMode /></ProtectedRoute>}>
+        <Route index element={<StudentDashboard />} />
+        <Route path="subjects" element={<Subjects />} />
+        <Route path="subjects/my" element={<EnrollmentSubjects />} />
+        <Route path="subjects/browse" element={<EnrollmentSubjects browse />} />
+        <Route path="lesson/:topicId/:weekId" element={<LessonChatRoute />} />
+        <Route path="quiz/:topicId/:weekId" element={<QuizRoute />} />
+        <Route path="progress" element={<Progress />} />
+        <Route path="badges" element={<Badges />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="*" element={<Navigate to="subjects/my" replace />} />
+      </Route>
+      <Route path="/superadmin/student-preview/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><StudentMode preview /></ProtectedRoute>}>
+        <Route index element={<StudentDashboard />} />
+        <Route path="subjects" element={<Subjects />} />
+        <Route path="subjects/my" element={<EnrollmentSubjects />} />
+        <Route path="subjects/browse" element={<EnrollmentSubjects browse />} />
+        <Route path="lesson/:topicId/:weekId" element={<LessonChatRoute />} />
+        <Route path="quiz/:topicId/:weekId" element={<QuizRoute />} />
+        <Route path="progress" element={<Progress />} />
+        <Route path="badges" element={<Badges />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="*" element={<Navigate to="subjects/my" replace />} />
+      </Route>
+      <Route path="/superadmin/professor-mode" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><ProfessorModeSelector /></ProtectedRoute>} />
+      <Route path="/superadmin/professor-mode/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><ProfessorMode /></ProtectedRoute>}>
+        <Route index element={<ProfessorDashboard />} />
+        <Route path="subjects" element={<ProfessorSubjectManagement />} />
+        <Route path="subjects/:subjectId/week/:weekId" element={<LessonEditorRoute />} />
+        <Route path="progress" element={<StudentProgress />} />
+        <Route path="profile" element={<ProfessorProfile />} />
+        <Route path="*" element={<Navigate to="subjects" replace />} />
+      </Route>
+
+      <Route path="/superadmin/professor-preview/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><ProfessorMode preview /></ProtectedRoute>}>
+        <Route index element={<ProfessorDashboard />} />
+        <Route path="subjects" element={<ProfessorSubjectManagement />} />
+        <Route path="subjects/:subjectId/week/:weekId" element={<LessonEditorRoute />} />
+        <Route path="progress" element={<StudentProgress />} />
+        <Route path="profile" element={<ProfessorProfile />} />
+        <Route path="*" element={<Navigate to="subjects" replace />} />
+      </Route>
+
+      <Route path="/superadmin/admin-mode" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><AdminModeSelector/></ProtectedRoute>}/>
+      <Route path="/superadmin/admin-mode/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.SUPERADMIN]}><AdminMode/></ProtectedRoute>}>
+       <Route index element={<AdminDashboard/>}/><Route path="professors" element={<ProfessorManagement/>}/><Route path="students" element={<StudentManagement/>}/><Route path="monitoring" element={<Monitoring/>}/><Route path="profile" element={<AdminProfile/>}/><Route path="settings" element={<Settings role="admin"/>}/><Route path="*" element={<AdminModeHome/>}/>
+      </Route>
       <Route path="/admin/student-mode" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><StudentModeSelector /></ProtectedRoute>} />
       <Route path="/admin/student-mode/:actingSessionId" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><StudentMode /></ProtectedRoute>}>
         <Route index element={<StudentDashboard />} />

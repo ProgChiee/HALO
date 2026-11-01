@@ -10,7 +10,11 @@ export async function updateAcademicProfile(field, value) {
 
 // Never included in Admin acting/preview adapters.
 export async function enrollInSubject(subjectId) { return (await defaultClient.post('/student/subjects/' + encodeURIComponent(subjectId) + '/enrollment')).data; }
+// Deactivates only the authenticated Student's enrollment; excluded from acting adapters.
+export async function unenrollFromSubject(subjectId) { return (await defaultClient.delete('/student/subjects/' + encodeURIComponent(subjectId) + '/enrollment')).data; }
 export function createStudentService(apiClient = defaultClient) {
+async function getSubjectCover(id,config={}) { const response=await apiClient.get(`/student/subjects/${encodeURIComponent(id)}/cover`,{...config,responseType:'blob'});return response.status===204?null:response.data; }
+
 
 async function getStudyCalendar(month, config = {}) {
   return (await apiClient.get('/student/study-calendar', { ...config, params: month ? { month } : {} })).data;
@@ -62,6 +66,6 @@ async function getProfilePhoto(config = {}) { return (await apiClient.get('/stud
 async function getMySubjects(config = {}) { return (await apiClient.get('/student/subjects/my', config)).data; }
 async function getBrowseSubjects(config = {}) { return (await apiClient.get('/student/subjects/browse', config)).data; }
 async function getSubjectCurriculum(subjectId, config = {}) { return (await apiClient.get(`/student/subjects/${encodeURIComponent(subjectId)}/curriculum`, config)).data; }
-return { getSubjectCurriculum, getMySubjects, getBrowseSubjects, getProfilePhoto, getProgressData, getBadgesData, getBadgeCatalog, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy, getStudyCalendar };
+return { getSubjectCover, getSubjectCurriculum, getMySubjects, getBrowseSubjects, getProfilePhoto, getProgressData, getBadgesData, getBadgeCatalog, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy, getStudyCalendar };
 }
 export const { getProgressData, getBadgesData, getBadgeCatalog, getWeekLesson, getDashboardData, getSubjectsData, getSubjectWeeks, getProfileData, recordLessonStudy, getStudyCalendar } = createStudentService();

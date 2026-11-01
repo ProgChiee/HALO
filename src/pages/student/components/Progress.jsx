@@ -15,6 +15,7 @@ export default function Progress() {
   const [loadError, setLoadError] = useState(false);
 
   const [subjects, setSubjects] = useState([]);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -64,23 +65,22 @@ export default function Progress() {
   const completedModules = subjects.reduce((sum, s) => sum + s.completedWeeks, 0);
   const overall = totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
 
+  const query = search.trim().toLowerCase();
+  const visibleSubjects = subjects.filter(subject =>
+    [subject.subjectName, subject.subjectCode].some(value => (value ?? '').toLowerCase().includes(query)));
+
   return (
     <StudentPageShell>
 
       <div className={styles.contentArea}>
-        <Topbar>
-          <div className={styles.breadcrumb}>
-            <CheckCircle2 size={16} />
-            Progress
-          </div>
-        </Topbar>
+        <Topbar title="Progress" />
 
         <main className={styles.main}>
           <div className={styles.overviewRow}>
             <div className={styles.overallBlock}>
-              <div className={styles.progressRing}>
-                <svg width="140" height="140" viewBox="0 0 140 140">
-                  <circle cx="70" cy="70" r="60" fill="none" stroke="var(--color-background)" strokeWidth="10" />
+              <div className={styles.progressRing} role="progressbar" aria-label="Overall Progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={overall}>
+                <svg className={styles.ringSvg} viewBox="0 0 140 140" aria-hidden="true" focusable="false">
+                  <circle cx="70" cy="70" r="60" fill="none" stroke="var(--color-border)" strokeWidth="10" />
                   <circle
                     cx="70"
                     cy="70"
@@ -92,45 +92,52 @@ export default function Progress() {
                     strokeDasharray={2 * Math.PI * 60}
                     strokeDashoffset={2 * Math.PI * 60 * (1 - overall / 100)}
                     transform="rotate(-90 70 70)"
-                    className={styles.progressRingFill}
                   />
                 </svg>
                 <div className={styles.progressRingText}>
                   <p className={styles.overallPercent}>{overall}%</p>
                 </div>
               </div>
-              <p className={styles.overallLabel}>Overall</p>
+              <h2 className={styles.overallLabel}>Overall Progress</h2>
             </div>
 
             <div className={styles.statsGrid}>
               <div className={styles.statCard}>
-                <span className={styles.statIcon}><CheckCircle2 size={16} /></span>
-                <div>
+                <span className={styles.statIcon}><CheckCircle2 size={20} aria-hidden="true" /></span>
                   <p className={styles.statValue}>{completedModules}</p>
                   <p className={styles.statLabel}>Modules completed</p>
-                </div>
               </div>
               <div className={styles.statCard}>
-                <span className={styles.statIcon}><BookOpen size={16} /></span>
-                <div>
+                <span className={styles.statIcon}><BookOpen size={20} aria-hidden="true" /></span>
                   <p className={styles.statValue}>{totalModules}</p>
                   <p className={styles.statLabel}>Total modules</p>
-                </div>
               </div>
             </div>
           </div>
 
           <div className={styles.sectionHeaderRow}>
             <h2 className={styles.sectionTitle}>Subject Progress</h2>
-            <Link to={workflow.basePath + '/subjects/my'} className={styles.viewAllLink}>View all →</Link>
+            <Link to={workflow.basePath + '/subjects/my'} className={styles.viewAllLink}>View all subjects</Link>
+          </div>
+          <div className={styles.searchBar}>
+            <label htmlFor="subject-progress-search" className={styles.searchLabel}>Search subjects</label>
+            <div className={styles.searchControls}>
+              <input id="subject-progress-search" type="search" value={search}
+                placeholder="Search subjects by name or code..."
+                onChange={event => setSearch(event.target.value)} />
+              {search && <button type="button" onClick={() => { setSearch(''); document.getElementById('subject-progress-search')?.focus(); }}>Clear search</button>}
+            </div>
           </div>
           <div className={styles.rowsList}>
-            {subjects.map((subject) => (
+            {visibleSubjects.map((subject) => (
               <div key={subject.subjectId} className={styles.subjectRow}>
-                <span className={styles.subjectName}>{subject.subjectName}</span>
+                <div className={styles.subjectInfo}><h3 className={styles.subjectName}>{subject.subjectName}</h3>
+                  {subject.subjectCode && <p className={styles.subjectCode}>{subject.subjectCode}</p>}</div>
                 <span className={styles.subjectProgress}>{subject.progressPercentage}%</span>
+                <progress className={styles.subjectBar} max={100} value={subject.progressPercentage} aria-label={`${subject.subjectName} progress`} />
               </div>
             ))}
+            {subjects.length > 0 && visibleSubjects.length === 0 && <p className={styles.emptyState} role="status">No subjects found. Try another name or code.</p>}
             {subjects.length === 0 && (
               <p className={styles.emptyState}>No subjects enrolled yet.</p>
             )}

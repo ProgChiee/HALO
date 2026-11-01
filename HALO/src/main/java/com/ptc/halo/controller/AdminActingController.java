@@ -15,11 +15,15 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/admin/acting")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class AdminActingController {
     private final AdminActingSessionService service;
     public AdminActingController(AdminActingSessionService service) { this.service = service; }
     public record TargetPage(List<AdminActingTargetResponse> content, int page, int size, long totalElements, int totalPages) {}
+    @GetMapping("/active") @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public List<AdminActingSessionService.ActiveMode> active(Authentication authentication){return service.activeModes(authentication);}
+    @DeleteMapping("/active/{id}") @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<Void> exitActive(Authentication authentication,@PathVariable UUID id){service.exitActiveMode(authentication,id.toString());return ResponseEntity.noContent().build();}
     @GetMapping("/targets")
     public TargetPage targets(Authentication authentication, @RequestParam Role role,
             @RequestParam(defaultValue = "0") @Min(0) int page,

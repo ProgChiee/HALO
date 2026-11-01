@@ -178,7 +178,7 @@ test('all role and acting menus share logo-first sections without changing desti
         assert.equal(aside.querySelector('nav a').textContent.trim(), 'Dashboard');
         assert.equal(aside.querySelector('nav a[aria-current="page"]').getAttribute('href'), navItems[0].path);
         const sections = [...aside.querySelectorAll('nav p')].map(p => p.textContent);
-        assert.deepEqual(sections, roleBadge === 'Admin' ? ['Main', 'Modes', 'Account'] : ['Main', 'Account']);
+        assert.deepEqual(sections, ['Admin','Superadmin'].includes(roleBadge) ? ['Main', 'Modes', 'Account'] : ['Main', 'Account']);
       } finally { await cleanup(); }
     }
   }

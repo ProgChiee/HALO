@@ -31,6 +31,7 @@ class StudentIncompleteProfileHttpTest {
     @MockBean WeekRepository weeks;
     @MockBean AiLearningModuleRepository modules;
     @MockBean StudentModuleProgressRepository progress;
+    @MockBean StudentSubjectEnrollmentRepository enrollments;
     @MockBean StudentLearningProgressionService progression;
     @MockBean CustomUserDetailsService details;
     @MockBean JwtService jwt;
@@ -56,7 +57,7 @@ class StudentIncompleteProfileHttpTest {
         mvc.perform(get("/api/student/subjects?yearLevel=FIRST_YEAR").header("Authorization","Bearer test-token"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("PROFILE_INCOMPLETE"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Contact an administrator")));
-        verifyNoInteractions(subjects,weeks);
+        verifyNoInteractions(subjects,weeks,enrollments);
     }
     @Test void unauthenticatedAndOtherRolesCannotReadStudentProfileOrSubjects() throws Exception {
         for (String path:new String[]{"/api/student/profile","/api/student/subjects"}) {

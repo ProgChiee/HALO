@@ -58,16 +58,22 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
             (select count(a.id) from AssessmentAttemptEntity a
              where a.student.id = u.id and a.passed = true
              and a.assessment.module.week.subject.professor.user.id = :professorId),
-            (select count(b.id) from StudentBadgeEntity b where b.student.id = u.id))
+            (select count(b.id) from StudentBadgeEntity b where b.student.id = u.id),
+            """ + ProfessorEnrollmentScope.JPQL_STATUS + """
+            )
         from UserEntity u left join StudentProfileEntity profile on profile.user.id = u.id
         where u.role = com.ptc.halo.enums.Role.STUDENT and u.status in :statuses
         and exists (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel)
-        order by u.id asc
-        """, countQuery = "select count(u.id) from UserEntity u join StudentProfileEntity profile on profile.user.id=u.id where u.role = com.ptc.halo.enums.Role.STUDENT and u.status in :statuses and exists (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel)")
-    org.springframework.data.domain.Page<com.ptc.halo.dtoResponse.ProfessorStudentSummary> findProfessorProgressSummaries(
+        """ + ProfessorEnrollmentScope.JPQL_FILTER + " order by u.id asc", countQuery = "select count(u.id) from UserEntity u join StudentProfileEntity profile on profile.user.id=u.id where u.role = com.ptc.halo.enums.Role.STUDENT and u.status in :statuses and exists (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=profile.yearLevel)" + ProfessorEnrollmentScope.JPQL_FILTER)
+    org.springframework.data.domain.Page<com.ptc.halo.dtoResponse.ProfessorStudentSummary> findProfessorProgressSummariesFiltered(
             @org.springframework.data.repository.query.Param("professorId") Long professorId,
             @org.springframework.data.repository.query.Param("statuses") java.util.List<Status> statuses,
+            @org.springframework.data.repository.query.Param("enrollment") String enrollment,
             org.springframework.data.domain.Pageable pageable);
+
+    default org.springframework.data.domain.Page<com.ptc.halo.dtoResponse.ProfessorStudentSummary> findProfessorProgressSummaries(Long professorId, java.util.List<Status> statuses, org.springframework.data.domain.Pageable pageable) {
+        return findProfessorProgressSummariesFiltered(professorId,statuses,"ALL",pageable);
+    }
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select u from UserEntity u where u.email = :email")

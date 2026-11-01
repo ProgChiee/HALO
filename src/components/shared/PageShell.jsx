@@ -1,3 +1,8 @@
+import { useLocation } from 'react-router-dom';
+import ActiveModeRecovery from '../../pages/admin/acting/ActiveModeRecovery';
+import { useAdminWorkflow } from '../../context/admin/useAdminWorkflow';
+import { ADMIN_NAV_ITEMS } from '../../data/navigationData';
+import modeStyles from '../../pages/admin/acting/ProfessorMode.module.css';
 import { useState, useEffect, useSyncExternalStore, useId } from 'react';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './Sidebar';
@@ -49,6 +54,14 @@ function ResponsiveLayout({ compact, sidebarProps, children, className, navigati
 }
 
 export default function PageShell({ navItems, progress, sectionLabel, roleBadge, children, responsive = false, className = '', navigationLabel = roleBadge ? `HALO · ${roleBadge}` : 'HALO' }) {
+  const mode=useAdminWorkflow();
+  const {pathname}=useLocation();
+  if(mode.acting){
+    navItems=ADMIN_NAV_ITEMS.filter(item=>item.section!=='Modes').map(item=>({...item,path:item.path.replace('/admin',mode.basePath)}));
+    roleBadge='Admin';sectionLabel='Admin';navigationLabel='HALO - Admin Mode';
+    children=<><section className={modeStyles.banner} aria-label="Admin acting mode"><strong>Admin Mode - Acting as {mode.target.name}</strong><span>Changes are audited under your Super Admin identity.</span><button disabled={mode.leaving} onClick={mode.leave}>Return to Super Admin</button>{mode.exitError&&<p role="alert">{mode.exitError}</p>}</section>{children}</>;
+  }
+  if (roleBadge === 'Super Admin' && !mode.acting && /^\/superadmin(?:\/(?:admin|professor|student)-(?:mode|preview)(?:\/.*)?)?\/?$/.test(pathname)) children=<><ActiveModeRecovery />{children}</>;
   const sidebarProps = { navItems, progress, sectionLabel, roleBadge };
   if (responsive) return <ResponsiveShell {...sidebarProps} className={className} navigationLabel={navigationLabel}>{children}</ResponsiveShell>;
   return <div className={styles.shell}>

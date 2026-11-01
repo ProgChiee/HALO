@@ -10,7 +10,7 @@ export default function ProfessorPageShell({ navItems, children, ...props }) {
       <span>{workflow.preview ? "Read-only" : "Changes affect real academic data and are audited."}</span>
       <div className={styles.actions}>
         <button type="button" disabled={workflow.leaving} onClick={() => workflow.leave(true)}>Change Account</button>
-        <button type="button" disabled={workflow.leaving} onClick={() => workflow.leave(false)}>{workflow.preview ? "Exit Preview" : "Exit Mode"}</button>
+        <button type="button" disabled={workflow.leaving} onClick={() => workflow.leave(false)}>{workflow.returnLabel || (workflow.preview ? "Exit Preview" : "Exit Mode")}</button>
       </div>
       {workflow.exitError && <p role="alert">{workflow.exitError}</p>}
     </section>}

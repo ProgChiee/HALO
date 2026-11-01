@@ -16,6 +16,8 @@ public interface ProfessorDashboardRepository extends Repository<UserEntity,Long
  (select s.id from SubjectEntity s where s.professor.user.id=:professorId and s.yearLevel=p.yearLevel))
  """)
  long students(Long professorId);
+ @Query("select count(u) from UserEntity u where u.status=com.ptc.halo.enums.Status.ACTIVE and "+UserRepository.PROFESSOR_STUDENT_SCOPE+" and "+ProfessorEnrollmentScope.JPQL_ACTIVE)
+ long activelyEnrolledStudents(Long professorId);
  String ATTEMPT_SCOPE="""
  a.student.role=com.ptc.halo.enums.Role.STUDENT and a.student.status=com.ptc.halo.enums.Status.ACTIVE
  and a.assessment.module.week.subject.professor.user.id=:professorId

@@ -16,7 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Objects;
 
 @Service
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class AdminProfessorModeService {
     private final AdminActingSessionService sessions;
     private final ProfessorRepository professors;

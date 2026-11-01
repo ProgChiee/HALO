@@ -156,3 +156,29 @@ test('read-only assessment history shows original versions, scores, dates, pagin
   assert.ok(calls.some(c=>c.url==='/professor/students/8/assessments'));
  } finally {await ui.close();api.defaults.adapter=adapter;}
 });
+
+test('enrollment filters reset pagination and filter monitoring and engagement independently of account status',async()=>{
+ const original=api.defaults.adapter,calls=[];
+ api.defaults.adapter=async config=>{
+  calls.push(config); const filter=config.params.enrollment;
+  const content=filter==='PREVIOUS'?[]:[{...row(8,'Scoped student'),status:'ACTIVE',enrollmentStatus:filter||'NEVER'}];
+  return {status:200,headers:{},config,data:{...page(config.params.page,content),totalElements:content.length?21:0,totalPages:content.length?2:0}};
+ };
+ const ui=await mount();try{
+  assert.equal(ui.host.querySelector('label[for="professor-enrollment-filter"]').textContent,'Enrollment Status');
+  await act(async()=>button(ui.host,'Next').click());
+  const select=()=>ui.host.querySelector('#professor-enrollment-filter');
+  async function choose(value){await act(async()=>{select().value=value;select().dispatchEvent(new Event('change',{bubbles:true}));});}
+  for(const value of ['ACTIVE','NEVER','PREVIOUS']){
+   await choose(value);
+   const requests=calls.filter(c=>c.params.enrollment===value);
+   assert.equal(requests.length,2);assert.ok(requests.every(c=>c.params.page===0&&c.params.view==='CURRENT'));
+   assert.ok(requests.some(c=>c.url.endsWith('/engagement')));
+  }
+  assert.match(ui.host.textContent,/No students match these account and enrollment filters/);
+  await act(async()=>button(ui.host,'Former / Archived').click());
+  assert.ok(calls.slice(-2).every(c=>c.params.view==='FORMER'&&c.params.enrollment==='PREVIOUS'));
+  await choose('ALL');assert.ok(calls.slice(-2).every(c=>!('enrollment' in c.params)));
+  assert.ok(calls.every(c=>c.method==='get'));
+ }finally{await ui.close();api.defaults.adapter=original;}
+});

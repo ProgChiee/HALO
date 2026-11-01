@@ -91,7 +91,7 @@ test('Professor dashboard renders scoped teaching counts', async () => {
   try {
     await act(async () => root.render(React.createElement(AuthContext.Provider, { value: { user: { name: 'Professor' }, logout() {} } },
       React.createElement(Router.MemoryRouter, {}, React.createElement(Component)))));
-    for (const [label, value] of [['My Students', '12'], ['My Subjects', '2'], ['Total Modules', '3'], ['Approved Modules', '1'], ['Assessments', '4'], ['Passed Attempts', '5']]) {
+    for (const [label, value] of [['Eligible Students', '12'], ['Actively Enrolled Students', 'Unavailable'], ['Eligible Students Without Active Enrollment', 'Unavailable'], ['My Subjects', '2'], ['Total Modules', '3'], ['Approved Modules', '1'], ['Assessments', '4'], ['Passed Attempts', '5']]) {
       const labelNode = [...host.querySelectorAll('p')].find(node => node.textContent === label);
       assert.ok(labelNode, label);
       assert.equal(labelNode.previousElementSibling.textContent, value);

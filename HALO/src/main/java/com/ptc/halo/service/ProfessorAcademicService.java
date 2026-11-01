@@ -23,6 +23,7 @@ import java.util.List;
 @Service
 public class ProfessorAcademicService {
 
+    private final org.springframework.context.ApplicationEventPublisher events;
     private final SubjectRepository subjectRepository;
     private final ProfessorRepository professorRepository;
     private final WeekRepository weekRepository;
@@ -31,7 +32,8 @@ public class ProfessorAcademicService {
     public ProfessorAcademicService(
             SubjectRepository subjectRepository,
             WeekRepository weekRepository,
-            ActivityLogService activityLogService, ProfessorRepository professorRepository) {
+            ActivityLogService activityLogService, ProfessorRepository professorRepository, org.springframework.context.ApplicationEventPublisher events) {
+        this.events=events;
         this.professorRepository = professorRepository;
 
         this.subjectRepository = subjectRepository;
@@ -150,6 +152,7 @@ public class ProfessorAcademicService {
         try {
             subjectRepository.delete(subject);
             subjectRepository.flush();
+            events.publishEvent(new SubjectCoverStorage.Deleted(id));
         } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
             // A concurrent dependent insert may race the existence check.
             // Keep the FK and roll back the whole transaction.

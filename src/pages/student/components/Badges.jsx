@@ -42,7 +42,7 @@ export default function Badges() {
   const catalog = useRemoteData(loadCatalog, []);
 
   if (earned.isLoading || earned.error) return <StudentPageShell>
-      <Topbar title="Badges" />
+      <Topbar title="Badges" className={styles.badgesHeader} />
     <div className={styles.contentArea}>
       {earned.isLoading ? <p role="status" className={styles.loadingText}>Loading your badges...</p> : <div role="alert" className={styles.feedback}>
         <p>Couldn't load your badges. Please try again.</p><button className={styles.retryButton} onClick={earned.reload}>Retry badges</button>
@@ -54,9 +54,9 @@ export default function Badges() {
   const locked = catalog.data.filter(badge => !earnedTypes.has(badge.badgeType));
   return <StudentPageShell>
     <div className={styles.contentArea}>
-      <Topbar><div className={styles.breadcrumb}>
-        <Award size={16} aria-hidden="true" />Badges
-        <span className={styles.countPill}>{earned.data.length} earned</span>
+      <Topbar className={styles.badgesHeader}><div className={styles.headerContent}>
+        <div className={styles.headerTitle}><Award size={20} aria-hidden="true" /><h1>Badges</h1></div>
+        <span className={styles.countPill}>{earned.data.length} Earned</span>
       </div></Topbar>
       <main className={styles.main}>
         <section aria-labelledby="earned-badges-title">

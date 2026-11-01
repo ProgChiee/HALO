@@ -25,7 +25,7 @@ class StudentLessonAccessTest {
     @BeforeEach void setup() {
         student.setId(8L); student.setRole(Role.STUDENT); student.setStatus(Status.ACTIVE);
         subject.setYearLevel(YearLevel.FIRST_YEAR);
-        when(enrollments.existsByStudent_IdAndSubject_Id(eq(8L), any())).thenReturn(true);
+        when(enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(eq(8L), any())).thenReturn(true);
         StudentProfileEntity profile = new StudentProfileEntity();
         profile.setYearLevel(YearLevel.FIRST_YEAR);
         when(profiles.findByUserId(8L)).thenReturn(Optional.of(profile));
@@ -38,7 +38,7 @@ class StudentLessonAccessTest {
         assertEquals(status, error.getStatusCode().value()); assertEquals(reason, error.getReason());
     }
     @Test void approvedAndCompletedIsAccessible() { assertDoesNotThrow(() -> access.validatePublished(module, student)); }
-    @Test void yearEligibilityDoesNotSubstituteForEnrollment() { when(enrollments.existsByStudent_IdAndSubject_Id(eq(8L),any())).thenReturn(false); denied(403, "ENROLLMENT_REQUIRED", () -> access.validatePublished(module, student)); }
+    @Test void yearEligibilityDoesNotSubstituteForEnrollment() { when(enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(eq(8L),any())).thenReturn(false); denied(403, "ENROLLMENT_REQUIRED", () -> access.validatePublished(module, student)); }
     @Test void wrongYearIsForbidden() { subject.setYearLevel(YearLevel.SECOND_YEAR); denied(403, "STUDENT_NOT_ENROLLED", () -> access.validatePublished(module, student)); }
     @Test void missingProfileIsForbidden() { when(profiles.findByUserId(8L)).thenReturn(Optional.empty()); denied(403, "STUDENT_NOT_ENROLLED", () -> access.validatePublished(module, student)); }
     @Test void wrongRoleIsForbidden() { student.setRole(Role.PROFESSOR); denied(403, "INVALID_ROLE", () -> access.validatePublished(module, student)); }

@@ -89,7 +89,7 @@ public class StudentSubjectService {
         return summarizeSubjects(student, subjects);
     }
 
-    private List<StudentSubjectResponse> summarizeSubjects(UserEntity student, List<SubjectEntity> subjects) {
+    List<StudentSubjectResponse> summarizeSubjects(UserEntity student, List<SubjectEntity> subjects) {
         if (subjects.isEmpty()) return List.of();
         var enrolledIds = new java.util.HashSet<>(enrollments.subjectIds(student.getId()));
         var rows = weekRepository.findStudentWeekRows(subjects.stream().map(SubjectEntity::getId).toList(), student.getId());

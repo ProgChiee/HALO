@@ -144,4 +144,21 @@ class AdminActingSessionTest {
         assertThrows(IllegalStateException.class,()->service.revoke(auth(admin),id));
         assertNull(sessions.findById(id).orElseThrow().getRevokedAt());assertEquals(1,logs.count());
     }
+
+    @Test void concurrentSuperAdminEntriesCreateOnlyOneSession() throws Exception {
+        var actor=user("super-mode-concurrency",Role.SUPER_ADMIN);
+        var ready=new java.util.concurrent.CountDownLatch(2);var start=new java.util.concurrent.CountDownLatch(1);
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.List<java.util.concurrent.Future<String>> results=new java.util.ArrayList<>();
+            for(var target:java.util.List.of(professor,student))results.add(pool.submit(()->{
+                ready.countDown();start.await();
+                try{return service.create(auth(actor),new AdminActingSessionRequest(target.getId(),target.getRole())).id();}
+                catch(AdminApiException error){assertEquals(AdminApiException.Code.ACTING_MODE_ALREADY_ACTIVE,error.code);return "blocked";}
+            }));
+            assertTrue(ready.await(5,java.util.concurrent.TimeUnit.SECONDS));start.countDown();
+            var outcomes=new java.util.ArrayList<String>();for(var result:results)outcomes.add(result.get(15,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(1,outcomes.stream().filter("blocked"::equals).count());assertEquals(1,sessions.count());
+        } finally {start.countDown();pool.shutdownNow();}
+    }
 }

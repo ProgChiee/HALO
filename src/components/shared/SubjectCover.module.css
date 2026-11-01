@@ -1,0 +1,4 @@
+.frame { width: 100%; min-width: 0; aspect-ratio: 16 / 9; overflow: hidden; background: #fff; border-radius: var(--radius-md) var(--radius-md) 0 0; flex-shrink: 0; }
+.frame img { display: block; width: 100%; height: 100%; }
+.defaultCover { object-fit: contain; }
+.custom { object-fit: cover; }

@@ -1,3 +1,4 @@
+import SubjectCover from '../../../components/shared/SubjectCover';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
@@ -7,6 +8,9 @@ import StudentPageShell from './StudentPageShell';
 import Topbar from '../../../components/shared/Topbar';
 import CurriculumPreview from './CurriculumPreview';
 import AcademicProfileNotice from './AcademicProfileNotice';
+import UnenrollSubjectDialog from './UnenrollSubjectDialog';
+import EnrollSubjectDialog from './EnrollSubjectDialog';
+import { notifyStudentEnrollmentChanged } from '../../../utils/studentEnrollmentEvents';
 import styles from '../styles/EnrollmentSubjects.module.css';
 
 export default function EnrollmentSubjects({ browse = false }) {
@@ -18,9 +22,13 @@ function SubjectList({ workflow, browse }) {
  const [rows,setRows]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  const [busy,setBusy]=useState(null),[saveError,setSaveError]=useState(''),[success,setSuccess]=useState('');
  const [curriculumSubject,setCurriculumSubject]=useState(null);
+ const [unenrollSubject,setUnenrollSubject]=useState(null);
+ const [enrollSubject,setEnrollSubject]=useState(null);
+ const successNotice=useRef(null), focusSuccess=useRef(false);
  const locked=useRef(false), mounted=useRef(true);
  const load=browse?workflow.api.getBrowseSubjects:workflow.api.getMySubjects;
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+ useEffect(()=>{if(focusSuccess.current && success && !loading){successNotice.current?.focus();focusSuccess.current=false;}},[success,loading]);
  useEffect(()=>{
   const controller=new AbortController();
   async function fetchSubjects(){setLoading(true);setError('');
@@ -38,42 +46,58 @@ function SubjectList({ workflow, browse }) {
    await enrollInSubject(subject.subjectId);
    if(!mounted.current)return;
    setSuccess(`You are enrolled in ${subject.subjectName}.`);
+   setEnrollSubject(null);focusSuccess.current=true;
    // Always refresh authoritative eligibility/enrollment state after success.
    setRetry(value=>value+1);
+   notifyStudentEnrollmentChanged();
   }catch(failure){if(mounted.current)setSaveError(message(failure));}
   finally{locked.current=false;if(mounted.current)setBusy(null);}
+ }
+ function unenrolled(subject){
+  setUnenrollSubject(null);setSaveError('');setSuccess(`You have unenrolled from ${subject.subjectName}. Your learning history is preserved.`);
+  focusSuccess.current=true;setRetry(value=>value+1);notifyStudentEnrollmentChanged();
  }
  const base=workflow.basePath;
  return <StudentPageShell><Topbar title={browse?'Browse Subjects':'My Subjects'} />
   <main className={styles.page}>
    <nav aria-label="Subject views" className={styles.links}><NavLink end to={`${base}/subjects/my`}>My Subjects</NavLink><NavLink end to={`${base}/subjects/browse`}>Browse Subjects</NavLink></nav>
    {workflow.acting && <p className={styles.muted}>Enrollment is read-only in {workflow.preview?'Preview':'Support'} Mode.</p>}
-   {success && <p role="status" className={styles.notice}>{success} <Link to={`${base}/subjects/my`}>View My Subjects</Link></p>}
-   {saveError && <div role="alert"><p>{saveError === 'PROFILE_INCOMPLETE' ? 'Your academic profile is incomplete. Contact an administrator before enrolling.' : saveError}</p><button type="button" disabled={loading} onClick={()=>setRetry(n=>n+1)}>Refresh subjects</button></div>}
+   {success && <p role="status" tabIndex={-1} ref={successNotice} className={styles.notice}>{success} <Link to={`${base}/subjects/${browse?'my':'browse'}`}>{browse?'View My Subjects':'Browse Subjects'}</Link></p>}
    {loading?<p role="status">Loading subjects...</p>:error==='PROFILE_INCOMPLETE'?<AcademicProfileNotice onRefresh={()=>setRetry(n=>n+1)} />:error?<div role="alert"><p>{error}</p><button type="button" onClick={()=>setRetry(n=>n+1)}>Retry</button></div>:rows.length===0?<div className={styles.empty}><p>{browse?'No subjects are currently available for enrollment.':"You haven't enrolled in any subjects yet."}</p>{!browse && <Link to={`${base}/subjects/browse`}>Browse Subjects</Link>}</div>:<div className={styles.grid}>
     {rows.map(subject=><article key={subject.subjectId} className={styles.card}>
-     <div className={styles.cardHeader}><h2>{subject.subjectName}</h2><span className={styles.badge}>{browse?'Available':'Enrolled'}</span></div>
+     <SubjectCover subjectId={subject.subjectId} load={subject.coverUrl ? workflow.api.getSubjectCover : undefined} />
+     <div className={styles.cardHeader}><h2>{subject.subjectName || 'Subject unavailable'}</h2><span className={styles.badge}>{browse?'Available':'Enrolled'}</span></div>
      <ul className={styles.metadata} aria-label="Subject details">{[
        subject.subjectCode,
        yearLabels[subject.yearLevel] ?? subject.yearLevel,
        subject.totalWeeks != null ? `${subject.totalWeeks} ${subject.totalWeeks === 1 ? 'week' : 'weeks'}` : null
      ].filter(value => value != null && String(value).trim() !== '').map((value,index) => <li key={index}>{value}</li>)}</ul>
-     {!browse && <div className={styles.progress}><label htmlFor={`subject-progress-${subject.subjectId}`}>Learning progress <strong>{subject.progressPercentage}%</strong></label><progress id={`subject-progress-${subject.subjectId}`} max="100" value={subject.progressPercentage} /></div>}
-     {browse?<div className={styles.cardActions}>{!workflow.acting && <button className={styles.primary} type="button" disabled={busy!==null} onClick={()=>enroll(subject)}>{busy===subject.subjectId?'Enrolling...':'Enroll in Subject'}</button>}<button type="button" className={styles.secondary} onClick={()=>setCurriculumSubject(subject.subjectId)}>View Curriculum</button></div>:<Link className={styles.primary} to={`${base}/subjects?subject=${subject.subjectId}`}>{isCompletedSubject(subject) ? 'Review Subject' : 'Continue Learning'}</Link>}
+     {!browse && subject.learningAvailable === false && <div className={styles.unavailable}><span>Currently Unavailable</span><p>{unavailableMessage(subject.learningUnavailableReason)}</p></div>}
+     {!browse && subject.learningAvailable !== false && subject.progressPercentage != null && <div className={styles.progress}><label htmlFor={`subject-progress-${subject.subjectId}`}>Learning progress <strong>{subject.progressPercentage}%</strong></label><progress id={`subject-progress-${subject.subjectId}`} max="100" value={subject.progressPercentage} /></div>}
+     {browse?<div className={styles.cardActions}>{!workflow.acting && <button className={styles.primary} type="button" disabled={busy!==null} onClick={event=>{event.currentTarget.focus();setSaveError('');setEnrollSubject(subject);}}>{busy===subject.subjectId?'Enrolling...':'Enroll in Subject'}</button>}<button type="button" className={styles.secondary} onClick={()=>setCurriculumSubject(subject.subjectId)}>View Curriculum</button></div>:<div className={styles.cardActions}>{subject.learningAvailable !== false && <Link className={styles.primary} to={`${base}/subjects?subject=${subject.subjectId}`}>{isCompletedSubject(subject) ? 'Review Subject' : 'Continue Learning'}</Link>}{!workflow.acting && <button type="button" className={styles.dangerOutline} aria-label={`Unenroll from ${subject.subjectName || 'this subject'}`} onClick={event=>{event.currentTarget.focus();setUnenrollSubject(subject);}}>Unenroll</button>}</div>}
     </article>)}
    </div>}
-   {curriculumSubject !== null && <CurriculumPreview key={curriculumSubject} subjectId={curriculumSubject} load={workflow.api.getSubjectCurriculum} onClose={()=>setCurriculumSubject(null)} />}
+   {curriculumSubject !== null && <CurriculumPreview key={curriculumSubject} subjectId={curriculumSubject} load={workflow.api.getSubjectCurriculum} loadCover={workflow.api.getSubjectCover} onClose={()=>setCurriculumSubject(null)} />}
+   {!workflow.acting && unenrollSubject && <UnenrollSubjectDialog subject={unenrollSubject} onClose={()=>setUnenrollSubject(null)} onSuccess={unenrolled} />}
+   {!workflow.acting && enrollSubject && <EnrollSubjectDialog subject={enrollSubject} busy={busy!==null} error={saveError} onClose={()=>{if(!locked.current){setEnrollSubject(null);setSaveError('');}}} onConfirm={()=>enroll(enrollSubject)} />}
   </main>
  </StudentPageShell>;
 }
 function message(error){
  const status=error?.response?.status,code=error?.response?.data?.code;
  if(code==='PROFILE_INCOMPLETE')return code;
+ if(code==='ENROLLMENT_INTEGRITY_ERROR')return 'An enrollment could not be loaded. Contact an administrator for help.';
  if(status===401)return 'Your session has expired. Please sign in again.';
  if(status===403)return 'You are not authorized to access these subjects.';
  if(status===404)return 'This subject is no longer available. Refresh the list and try again.';
  if(status===409)return 'Enrollment could not be completed. Refresh the list and try again.';
  return error?.response?'HALO could not complete this request. Please try again.':'Could not reach HALO. Check your connection and try again.';
+}
+function unavailableMessage(reason){
+ if(reason==='YEAR_LEVEL_MISMATCH')return 'This subject is not available for your current year level.';
+ if(reason==='NO_PUBLISHED_LESSONS')return 'This subject has no published lessons available right now.';
+ if(reason==='PROFILE_INCOMPLETE')return 'Your academic profile needs attention before learning is available. Contact an administrator.';
+ return 'Learning activities are currently unavailable for this subject.';
 }
 
 // Exact counts follow the existing all-weeks completion presentation. Never infer from a rounded percentage.

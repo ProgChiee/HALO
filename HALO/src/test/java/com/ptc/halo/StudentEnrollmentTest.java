@@ -17,10 +17,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest(properties="spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",showSql=false)
-@Import({StudentCurriculumService.class,StudentEnrollmentService.class,StudentSubjectService.class,StudentLessonAccessService.class,StudentLearningProgressionService.class})
+@Import({LessonStudyService.class,StudentLessonService.class,StudentCurriculumService.class,StudentEnrollmentService.class,StudentSubjectService.class,StudentLessonAccessService.class,StudentLearningProgressionService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class StudentEnrollmentTest {
  @Autowired StudentEnrollmentService service;
+ @Autowired LessonStudyService study;
  @Autowired StudentCurriculumService curriculum;
  @Autowired StudentSubjectService summaries;
  @Autowired StudentLessonAccessService access;
@@ -72,6 +73,36 @@ class StudentEnrollmentTest {
   assertEquals(404,assertThrows(org.springframework.web.server.ResponseStatusException.class,()->curriculum.preview(student,eligible.getId())).getStatusCode().value());
  }
  void enroll(Long id){service.enroll(TestIdentity.auth(student),id);}
+ @Test void activeMembershipSurvivesYearChangeWithoutGrantingLearning(){
+  enroll(eligible.getId());
+  var before=jdbc.queryForMap("select * from student_subject_enrollments where student_id=? and subject_id=?",student.getId(),eligible.getId());
+  var p=profiles.findByUserId(student.getId()).orElseThrow();p.setYearLevel(YearLevel.SECOND_YEAR);profiles.saveAndFlush(p);
+  var mine=service.list(student,true);assertEquals(1,mine.size());assertTrue(mine.get(0).isEnrolled());
+  assertEquals(false,mine.get(0).getLearningAvailable());assertEquals("YEAR_LEVEL_MISMATCH",mine.get(0).getLearningUnavailableReason());assertNull(mine.get(0).getProgressPercentage());
+  assertEquals(before,jdbc.queryForMap("select * from student_subject_enrollments where student_id=? and subject_id=?",student.getId(),eligible.getId()));
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->new TransactionTemplate(manager).executeWithoutResult(tx->progression.validateModuleAccess(module.getId(),student)));
+  service.unenroll(TestIdentity.auth(student),eligible.getId());assertTrue(service.list(student,true).isEmpty());
+  assertFalse(service.list(student,false).stream().anyMatch(s->s.getSubjectId().equals(eligible.getId())));
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->enroll(eligible.getId()));
+ }
+ @Test void activeMembershipSurvivesPublicationAndGenerationChanges(){
+  enroll(eligible.getId());assertEquals(true,service.list(student,true).get(0).getLearningAvailable());
+  for(boolean draftState:List.of(true,false)){
+   new TransactionTemplate(manager).executeWithoutResult(tx->{var m=em.find(AiLearningModuleEntity.class,module.getId());m.setStatus(draftState?LessonStatus.PENDING:LessonStatus.APPROVED);m.setAiGenerationStatus(draftState?AiGenerationStatus.COMPLETED:AiGenerationStatus.FAILED);});
+   var row=service.list(student,true).get(0);assertEquals(eligible.getId(),row.getSubjectId());assertEquals(false,row.getLearningAvailable());assertEquals("NO_PUBLISHED_LESSONS",row.getLearningUnavailableReason());assertNull(row.getProgressPercentage());
+   assertTrue(service.list(student,false).stream().noneMatch(s->s.getSubjectId().equals(eligible.getId())));
+   assertThrows(org.springframework.web.server.ResponseStatusException.class,()->new TransactionTemplate(manager).executeWithoutResult(tx->progression.validateModuleAccess(module.getId(),student)));
+  }
+  service.unenroll(TestIdentity.auth(student),eligible.getId());assertTrue(service.list(student,true).isEmpty());
+ }
+ @Test void missingProfileStillAllowsOwnedEnrollmentManagementAndNoOtherStudentsMembership(){
+  enroll(eligible.getId());var p=profiles.findByUserId(student.getId()).orElseThrow();profiles.delete(p);profiles.flush();
+  var row=service.list(student,true).get(0);assertEquals("PROFILE_INCOMPLETE",row.getLearningUnavailableReason());assertEquals(false,row.getLearningAvailable());
+  var other=new UserEntity();other.setEmail(UUID.randomUUID()+"@example.test");other.setPassword("synthetic");other.setRole(Role.STUDENT);other.setStatus(Status.ACTIVE);other=users.saveAndFlush(other);
+  assertTrue(service.list(other,true).isEmpty());
+  var otherAuth=TestIdentity.auth(other);assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.unenroll(otherAuth,eligible.getId()));
+  service.unenroll(TestIdentity.auth(student),eligible.getId());assertTrue(service.list(student,true).isEmpty());
+ }
  @Test void separatesListsReusesProgressAndKeepsLegacyAccess(){
   assertTrue(service.list(student,true).isEmpty());assertTrue(service.list(student,false).stream().anyMatch(s->s.getSubjectId().equals(eligible.getId())));
   assertTrue(service.list(student,false).stream().noneMatch(s->s.getSubjectId().equals(draft.getId())||s.getSubjectId().equals(foreign.getId())));
@@ -118,7 +149,68 @@ class StudentEnrollmentTest {
   var candidates=jdbc.queryForList(review).stream().filter(row->((Number)row.get("student_id")).longValue()==student.getId()).toList();
   assertEquals(1,candidates.size());assertEquals("ASSESSMENT_ATTEMPT,COMPLETED_PROGRESS,LESSON_STUDY_DAY,STUDENT_MENTOR_MESSAGE",candidates.get(0).get("evidence_sources"));
   var before=snapshot();enroll(eligible.getId());assertEquals(before,snapshot());assertEquals(100,service.list(student,true).get(0).getProgressPercentage());
+  service.unenroll(TestIdentity.auth(student),eligible.getId());assertEquals(before,snapshot());assertTrue(service.list(student,true).isEmpty());
+  enroll(eligible.getId());assertEquals(before,snapshot());assertEquals(100,service.list(student,true).get(0).getProgressPercentage());
  }
  List<?> snapshot(){return List.of(jdbc.queryForList("select * from lesson_study_days"),jdbc.queryForList("select * from user_entity"),jdbc.queryForList("select * from assessment_attempts"),jdbc.queryForList("select * from assessments"),jdbc.queryForList("select * from student_module_progress"),jdbc.queryForList("select * from mentor_sessions"),jdbc.queryForList("select * from mentor_messages"),jdbc.queryForList("select * from student_badges"));}
+
+ @Test void unenrollmentIsIdempotentAndReenrollmentReusesOriginalIdentityAndProvenance(){
+  enroll(eligible.getId());
+  var before=jdbc.queryForMap("select id,student_id,subject_id,recorded_at_epoch_ms,source from student_subject_enrollments where student_id=?",student.getId());
+  org.mockito.Mockito.clearInvocations(activity);
+  service.unenroll(TestIdentity.auth(student),eligible.getId());
+  var timestamp=jdbc.queryForObject("select unenrolled_at_epoch_ms from student_subject_enrollments where student_id=?",Long.class,student.getId());assertNotNull(timestamp);
+  service.unenroll(TestIdentity.auth(student),eligible.getId());
+  assertEquals(timestamp,jdbc.queryForObject("select unenrolled_at_epoch_ms from student_subject_enrollments where student_id=?",Long.class,student.getId()));
+  org.mockito.Mockito.verify(activity,org.mockito.Mockito.times(1)).createLog(org.mockito.Mockito.any(),org.mockito.Mockito.eq(ActivityType.ACCOUNT),org.mockito.Mockito.anyString());
+  assertTrue(service.list(student,true).isEmpty());assertTrue(service.list(student,false).stream().anyMatch(row->row.getSubjectId().equals(eligible.getId())));
+  assertEquals("ENROLLMENT_REQUIRED",assertThrows(org.springframework.web.server.ResponseStatusException.class,()->progression.validateModuleAccess(module.getId(),student)).getReason());
+  enroll(eligible.getId());
+  assertEquals(before,jdbc.queryForMap("select id,student_id,subject_id,recorded_at_epoch_ms,source from student_subject_enrollments where student_id=?",student.getId()));
+  assertTrue(enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(student.getId(),eligible.getId()));
+  assertNull(jdbc.queryForObject("select unenrolled_at_epoch_ms from student_subject_enrollments where student_id=?",Long.class,student.getId()));
+  progression.validateModuleAccess(module.getId(),student);
+ }
+ @Test void unenrollmentChecksOwnershipAndReenrollmentRechecksEligibility(){
+  enroll(eligible.getId());var other=new UserEntity();other.setName("Other");other.setEmail(UUID.randomUUID()+"@example.test");other.setRole(Role.STUDENT);other.setStatus(Status.ACTIVE);other=users.saveAndFlush(other);
+  var auth=TestIdentity.auth(other);
+  assertEquals(404,assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.unenroll(auth,eligible.getId())).getStatusCode().value());
+  assertTrue(enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(student.getId(),eligible.getId()));
+  assertEquals(400,assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.unenroll(TestIdentity.auth(student),0L)).getStatusCode().value());
+  var profile=profiles.findByUserId(student.getId()).orElseThrow();profile.setYearLevel(YearLevel.SECOND_YEAR);profiles.saveAndFlush(profile);
+  service.unenroll(TestIdentity.auth(student),eligible.getId()); // Leaving does not require continuing eligibility.
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->enroll(eligible.getId()));
+  assertFalse(enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(student.getId(),eligible.getId()));
+ }
+ @Test void failedAuditRollsBackDeactivation(){
+  enroll(eligible.getId());org.mockito.Mockito.doThrow(new IllegalStateException("Synthetic audit failure")).when(activity).createLog(org.mockito.Mockito.any(),org.mockito.Mockito.any(),org.mockito.Mockito.startsWith("Unenrolled"));
+  assertThrows(IllegalStateException.class,()->service.unenroll(TestIdentity.auth(student),eligible.getId()));
+  assertTrue(enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(student.getId(),eligible.getId()));
+ }
+ @Test void concurrentUnenrollRetriesHaveOneTransitionAndOneAudit() throws Exception {
+  enroll(eligible.getId());org.mockito.Mockito.clearInvocations(activity);
+  var start=new CountDownLatch(1);var pool=Executors.newFixedThreadPool(2);
+  try{Callable<Boolean> task=()->{start.await();service.unenroll(TestIdentity.auth(student),eligible.getId());return true;};var a=pool.submit(task);var b=pool.submit(task);start.countDown();assertTrue(a.get(15,TimeUnit.SECONDS));assertTrue(b.get(15,TimeUnit.SECONDS));}
+  finally{pool.shutdownNow();}
+  assertFalse(enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(student.getId(),eligible.getId()));
+  org.mockito.Mockito.verify(activity,org.mockito.Mockito.times(1)).createLog(org.mockito.Mockito.any(),org.mockito.Mockito.eq(ActivityType.ACCOUNT),org.mockito.Mockito.anyString());
+ }
+ @Test void protectedStudyWriteAndUnenrollmentSerializeInBothOrders() throws Exception {
+  enroll(eligible.getId());var weekId=module.getWeek().getId();var pool=Executors.newFixedThreadPool(2);
+  try{
+   for(boolean writerFirst:List.of(true,false)){
+    enroll(eligible.getId());var held=new CountDownLatch(1);var release=new CountDownLatch(1);var secondStarted=new CountDownLatch(1);
+    var first=pool.submit(()->new TransactionTemplate(manager).executeWithoutResult(tx->{
+     if(writerFirst)study.record(weekId,student);else service.unenroll(TestIdentity.auth(student),eligible.getId());
+     held.countDown();try{assertTrue(release.await(10,TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}
+    }));
+    assertTrue(held.await(10,TimeUnit.SECONDS));
+    var second=pool.submit(()->{secondStarted.countDown();try{if(writerFirst)service.unenroll(TestIdentity.auth(student),eligible.getId());else study.record(weekId,student);return "OK";}catch(org.springframework.web.server.ResponseStatusException e){return e.getReason();}});
+    try{assertTrue(secondStarted.await(10,TimeUnit.SECONDS));assertThrows(TimeoutException.class,()->second.get(200,TimeUnit.MILLISECONDS));}finally{release.countDown();}
+    first.get(15,TimeUnit.SECONDS);assertEquals(writerFirst?"OK":"ENROLLMENT_REQUIRED",second.get(15,TimeUnit.SECONDS));
+    var count=jdbc.queryForObject("select count(*) from lesson_study_days where student_id=?",Long.class,student.getId());assertEquals(1L,count);
+   }
+  }finally{pool.shutdownNow();}
+ }
 }
 

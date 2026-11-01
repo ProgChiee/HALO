@@ -20,19 +20,24 @@ public class StudentEnrollmentController {
   if(acting!=null)throw new org.springframework.security.access.AccessDeniedException("Enrollment is read-only in acting modes");
   enrollment.enroll(auth,subjectId);return java.util.Map.of("enrolled",true);
  }
- @GetMapping("/api/admin/preview/student/subjects/my") @PreAuthorize("hasRole('ADMIN')")
+ @DeleteMapping("/api/student/subjects/{subjectId}/enrollment") @PreAuthorize("hasRole('STUDENT')")
+ public Object unenroll(Authentication auth,@PathVariable Long subjectId,@RequestHeader(value="X-Acting-Session",required=false) String acting){
+  if(acting!=null)throw new org.springframework.security.access.AccessDeniedException("Enrollment is read-only in acting modes");
+  enrollment.unenroll(auth,subjectId);return java.util.Map.of("enrolled",false);
+ }
+ @GetMapping("/api/admin/preview/student/subjects/my") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object previewMine(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session){return preview.read(auth,session.toString(),s->enrollment.list(s,true));}
- @GetMapping("/api/admin/preview/student/subjects/browse") @PreAuthorize("hasRole('ADMIN')")
+ @GetMapping("/api/admin/preview/student/subjects/browse") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object previewBrowse(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session){return preview.read(auth,session.toString(),s->enrollment.list(s,false));}
- @GetMapping("/api/admin/acting/student/subjects/my") @PreAuthorize("hasRole('ADMIN')")
+ @GetMapping("/api/admin/acting/student/subjects/my") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object supportMine(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session){return support.execute(auth,session.toString(),s->enrollment.list(s.getTarget(),true));}
- @GetMapping("/api/admin/acting/student/subjects/browse") @PreAuthorize("hasRole('ADMIN')")
+ @GetMapping("/api/admin/acting/student/subjects/browse") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object supportBrowse(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session){return support.execute(auth,session.toString(),s->enrollment.list(s.getTarget(),false));}
  @GetMapping("/api/student/subjects/{subjectId}/curriculum") @PreAuthorize("hasRole('STUDENT')")
  public com.ptc.halo.dtoResponse.StudentCurriculumResponse curriculum(Authentication auth,@PathVariable Long subjectId){return curriculum.preview(access.requireStudent(auth),subjectId);}
- @GetMapping("/api/admin/preview/student/subjects/{subjectId}/curriculum") @PreAuthorize("hasRole('ADMIN')")
+ @GetMapping("/api/admin/preview/student/subjects/{subjectId}/curriculum") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object previewCurriculum(Authentication auth,@PathVariable Long subjectId,@RequestHeader("X-Acting-Session") java.util.UUID session){return preview.read(auth,session.toString(),s->curriculum.preview(s,subjectId));}
- @GetMapping("/api/admin/acting/student/subjects/{subjectId}/curriculum") @PreAuthorize("hasRole('ADMIN')")
+ @GetMapping("/api/admin/acting/student/subjects/{subjectId}/curriculum") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object supportCurriculum(Authentication auth,@PathVariable Long subjectId,@RequestHeader("X-Acting-Session") java.util.UUID session){return support.execute(auth,session.toString(),s->curriculum.preview(s.getTarget(),subjectId));}
  @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
  public org.springframework.http.ResponseEntity<?> rejected(org.springframework.web.server.ResponseStatusException e){return org.springframework.http.ResponseEntity.status(e.getStatusCode()).body(java.util.Map.of("code",e.getReason()==null?"REQUEST_REJECTED":e.getReason()));}

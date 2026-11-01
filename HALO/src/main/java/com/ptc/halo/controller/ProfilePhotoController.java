@@ -16,7 +16,7 @@ public class ProfilePhotoController extends StudentLessonExceptionHandler {
     private final AdminStudentModeService support;
     private final AdminStudentPreviewService preview;
     public ProfilePhotoController(ProfilePhotoService photos, com.ptc.halo.repository.UserRepository users, AdminStudentModeService support, AdminStudentPreviewService preview, AdminProfessorModeService professor) { this.photos=photos; this.users=users; this.support=support; this.preview=preview; this.professor=professor; }
-    @GetMapping("/api/admin/acting/professor/profile/photo") @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/admin/acting/professor/profile/photo") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<byte[]> professor(Authentication auth, @RequestHeader("X-Acting-Session") java.util.UUID session) {
         return professor.execute(auth, session.toString(), s -> read(s.getTarget().getId()));
     }
@@ -28,11 +28,11 @@ public class ProfilePhotoController extends StudentLessonExceptionHandler {
             throw new org.springframework.security.access.AccessDeniedException("Account unavailable");
         return user.getId();
     }
-    @GetMapping("/api/admin/acting/student/profile/photo") @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/admin/acting/student/profile/photo") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<byte[]> support(Authentication auth, @RequestHeader("X-Acting-Session") java.util.UUID session) {
         return support.execute(auth, session.toString(), s -> read(s.getTarget().getId()));
     }
-    @GetMapping("/api/admin/preview/student/profile/photo") @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/admin/preview/student/profile/photo") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<byte[]> preview(Authentication auth, @RequestHeader("X-Acting-Session") java.util.UUID session) {
         return preview.read(auth, session.toString(), s -> read(s.getId()));
     }

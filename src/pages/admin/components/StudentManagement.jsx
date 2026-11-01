@@ -1,3 +1,4 @@
+import { useAdminWorkflow } from '../../../context/admin/useAdminWorkflow';
 import Topbar from '../../../components/shared/Topbar';
 import AccountLifecycle, { AccountStateFilters } from '../../../components/shared/AccountLifecycle';
 import Dialog from '../../../components/shared/Dialog';
@@ -9,7 +10,6 @@ import PageShell from '../../../components/shared/PageShell';
 import { useToast } from '../../../context/notifications/useToast';
 import { useAuth } from '../../../context/login/useAuth';
 import { ADMIN_NAV_ITEMS, SUPERADMIN_NAV_ITEMS } from '../../../data/navigationData';
-import { getStudents, setStudentStatus, archiveStudent, restoreStudent } from '../../../services/admin/adminService';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import { STATUS_LABELS } from '../../../utils/backendContract';
 import styles from '../styles/StudentManagement.module.css';
@@ -21,9 +21,11 @@ function yearLevelLabel(value) {
 }
 
 export default function StudentManagement() {
+  const adminWorkflow=useAdminWorkflow();
+  const { getStudents, setStudentStatus, archiveStudent, restoreStudent }=adminWorkflow.api;
   const { showToast } = useToast();
   const { role } = useAuth();
-  const isSuperAdmin = role === 'superadmin';
+  const isSuperAdmin = role === 'superadmin' && !adminWorkflow.acting;
 
   const { data: students, setData: setStudents, isLoading, error: loadError, reload: loadStudents } = useRemoteData(getStudents, []);
   const toggleLock = useRef(false);

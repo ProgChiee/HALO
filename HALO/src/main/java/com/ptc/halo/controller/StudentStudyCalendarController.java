@@ -9,9 +9,9 @@ public class StudentStudyCalendarController extends StudentLessonExceptionHandle
  public StudentStudyCalendarController(StudentStudyActivityService activity,StudentLessonAccessService access,AdminStudentModeService support,AdminStudentPreviewService preview){this.activity=activity;this.access=access;this.support=support;this.preview=preview;}
  @GetMapping("/api/student/study-calendar") @PreAuthorize("hasRole('STUDENT')")
  public Object calendar(Authentication auth,@RequestParam(required=false) String month){return activity.calendar(access.requireStudent(auth),month);}
- @GetMapping("/api/admin/acting/student/study-calendar") @PreAuthorize("hasRole('ADMIN')")
+ @GetMapping("/api/admin/acting/student/study-calendar") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object support(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session,@RequestParam(required=false) String month){return support.execute(auth,session.toString(),s->activity.calendar(s.getTarget(),month));}
- @GetMapping("/api/admin/preview/student/study-calendar") @PreAuthorize("hasRole('ADMIN')")
+ @GetMapping("/api/admin/preview/student/study-calendar") @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
  public Object preview(Authentication auth,@RequestHeader("X-Acting-Session") java.util.UUID session,@RequestParam(required=false) String month){return preview.read(auth,session.toString(),s->activity.calendar(s,month));}
 
  @ExceptionHandler(AdminApiException.class)

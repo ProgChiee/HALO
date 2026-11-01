@@ -84,4 +84,14 @@ class StudentEnrollmentHttpTest {
   for(String base:List.of("/api/admin/preview/student","/api/admin/acting/student"))mvc.perform(get(base+"/subjects/15/curriculum").header("Authorization","Bearer test-token").header("X-Acting-Session",session)).andExpect(status().isConflict());
   verify(service,never()).enroll(any(),any());
  }
+
+ @Test void unenrollUsesAuthenticatedIdentityAndRejectsOtherRolesAndModes() throws Exception {
+  mvc.perform(delete("/api/student/subjects/15/enrollment").header("Authorization","Bearer test-token").param("studentId","999")).andExpect(status().isOk()).andExpect(jsonPath("$.enrolled").value(false));
+  verify(service).unenroll(argThat(a->((CustomUserDetails)a.getPrincipal()).getUserId().equals(5L)),eq(15L));clearInvocations(service);
+  mvc.perform(delete("/api/student/subjects/15/enrollment")).andExpect(status().isUnauthorized());
+  mvc.perform(delete("/api/student/subjects/15/enrollment").header("Authorization","Bearer test-token").header("X-Acting-Session",UUID.randomUUID())).andExpect(status().isForbidden());
+  for(String role:List.of("PROFESSOR","ADMIN","SUPER_ADMIN")){role(role);mvc.perform(delete("/api/student/subjects/15/enrollment").header("Authorization","Bearer test-token")).andExpect(status().isForbidden());}
+  role("ADMIN");for(String base:List.of("/api/admin/preview/student","/api/admin/acting/student"))mvc.perform(delete(base+"/subjects/15/enrollment").header("Authorization","Bearer test-token").header("X-Acting-Session",UUID.randomUUID())).andExpect(status().isNotFound());
+  verify(service,never()).unenroll(any(),any());
+ }
 }
