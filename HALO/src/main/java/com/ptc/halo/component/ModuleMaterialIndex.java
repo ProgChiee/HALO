@@ -90,7 +90,9 @@ public class ModuleMaterialIndex {
                 List<Chunk> chunks = new ArrayList<>();
                 for (int i = 0; i < files.size(); i++) {
                     int before = chunks.size();
-                    try { extract(files.get(i), contents.get(i), chunks); }
+                    // Fingerprinting is complete. Do not retain already processed originals
+                    // through later PDF/OCR/AI work for the remaining files.
+                    try { extract(files.get(i), contents.set(i, null), chunks); }
                     catch (Exception error) {
                         logFailure(module.getId(), files.get(i).getId(), "extract", error);
                         throw error;

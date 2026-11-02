@@ -58,3 +58,14 @@ mvn -Dtest=StartupBootstrapBenchmarkTest -Dhalo.startup.benchmark=true -Dhalo.st
 ```
 
 Repeat with `mode=deferred`. Never use this harness to bootstrap live Aiven or Supabase. Do not treat these results as production load tests: native MySQL queries, cloud latency, real AI, PDF processing concurrency, process peak RSS and exact container throttling remain unverified. More CPU and memory remain the appropriate next step if the deployed service is resource-bound; avoiding essential validation is not an acceptable substitute.
+
+## Final verification for this experiment
+
+- Environment: Windows 11, Eclipse Adoptium Java 17.0.20.1; isolated H2 and synthetic fixtures. No live database or Supabase access.
+- Complete backend suite: 862 total, 850 passed, zero failures/errors, 12 skipped. This includes the existing 11 skips plus the explicitly opt-in benchmark test; the six benchmark samples were executed separately and passed.
+- Both malformed-query tests passed: DEFAULT and DEFERRED reject invalid query metadata during context refresh with schema validation enabled.
+- Logging bridge regression passed. The final packaged JAR contains spring-jcl and no commons-logging JAR. An initial run correctly failed this regression when the Google HTTP client still supplied a second dependency path; both paths are now excluded and the complete suite was rerun successfully.
+- Production Spring Boot JAR compilation/package passed. No application was started against production configuration. Git whitespace verification passed.
+- No production bootstrap, readiness, authentication, authorization, database validation, AI or storage behavior was relaxed. No Render deployment or resource settings were changed. DEFAULT remains in effect.
+
+Files changed in this follow-up: `HALO/pom.xml`, `HALO/src/test/java/com/ptc/halo/LoggingBridgeTest.java`, `HALO/src/test/java/com/ptc/halo/RepositoryBootstrapValidationTest.java`, `HALO/src/test/java/com/ptc/halo/StartupBootstrapBenchmarkTest.java`, `HALO/src/test/java/com/ptc/startupprobe/StartupProbe.java`, `HALO/src/test/java/com/ptc/startupprobe/BrokenStartupRepository.java`, and this document. The synthetic probe package is outside HALO's application scan. The unrelated untracked `tatus --short` file was left untouched.

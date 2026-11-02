@@ -13,6 +13,16 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(OutputCaptureExtension.class)
 class StartupTimingTest {
+    @Test void readinessMemoryDiagnosticsContainOnlyNumericTotals(CapturedOutput output) {
+        var timings = new StartupTimingConfiguration.StartupTiming();
+        var context = mock(org.springframework.context.ConfigurableApplicationContext.class);
+        timings.onApplicationEvent(new org.springframework.boot.context.event.ApplicationReadyEvent(
+                new org.springframework.boot.SpringApplication(), new String[]{"sensitive-marker"}, context,
+                java.time.Duration.ofMillis(12)));
+        assertThat(output.getOut()).contains("startup_memory heap_used_bytes=", "heap_committed_bytes=", "heap_max_bytes=", "nonheap_used_bytes=", "live_threads=")
+                .doesNotContain("sensitive-marker");
+        verifyNoInteractions(context);
+    }
     @Test void diagnosticsAreOptIn() {
         var runner = new ApplicationContextRunner().withUserConfiguration(StartupTimingConfiguration.class);
         runner.run(context -> assertThat(context).doesNotHaveBean(StartupTimingConfiguration.StartupTiming.class));

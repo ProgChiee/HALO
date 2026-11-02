@@ -51,8 +51,14 @@ public class StartupTimingConfiguration {
         public void onApplicationEvent(ApplicationEvent event) {
             if (event instanceof ApplicationStartedEvent started)
                 log.info("startup_timing phase=context_started elapsed_ms={}", started.getTimeTaken().toMillis());
-            else if (event instanceof ApplicationReadyEvent ready)
+            else if (event instanceof ApplicationReadyEvent ready) {
                 log.info("startup_timing phase=ready elapsed_ms={}", ready.getTimeTaken().toMillis());
+                var memory = java.lang.management.ManagementFactory.getMemoryMXBean();
+                var heap = memory.getHeapMemoryUsage();
+                log.info("startup_memory heap_used_bytes={} heap_committed_bytes={} heap_max_bytes={} nonheap_used_bytes={} live_threads={}",
+                        heap.getUsed(), heap.getCommitted(), heap.getMax(), memory.getNonHeapMemoryUsage().getUsed(),
+                        java.lang.management.ManagementFactory.getThreadMXBean().getThreadCount());
+            }
             else if (event instanceof ApplicationFailedEvent)
                 log.info("startup_timing phase=failed");
         }

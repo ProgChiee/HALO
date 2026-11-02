@@ -129,6 +129,17 @@ class ModuleScopedMentorTest {
         var answer = mentor.sendMessage(21L, student, "How do front office and food and beverage work together?").getHaloMessage();
         assertEquals("Front office and restaurant teams coordinate guest service.", answer);
     }
+    @Test void allTenMaterialsSurviveSequentialExtractionAndCacheReuse() throws Exception {
+        for (long id = 1; id <= 10; id++) files.add(pdf(id, "Educational material number " + id + ".", module));
+        var built = index.getOrBuild(module);
+        assertEquals(10, built.chunks().size());
+        for (int i = 0; i < 10; i++) {
+            assertEquals(Long.valueOf(i + 1), built.chunks().get(i).fileId());
+            assertTrue(built.chunks().get(i).text().contains("number " + (i + 1) + "."));
+        }
+        assertEquals(built, index.getOrBuild(module));
+        assertEquals(10, files.size());
+    }
     @Test void changedAndRemovedFilesCannotReuseOldScope() throws Exception {
         var first = pdf(1, "Front office handles guest arrivals.", module); files.add(first); files.add(pdf(2, "Food service.", module));
         var before = index.getOrBuild(module);
