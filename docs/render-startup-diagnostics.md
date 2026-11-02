@@ -23,3 +23,38 @@ At 512 MiB, a 60% heap cap is approximately 307 MiB when the container limit is 
 Use an explicitly disposable MySQL 8.4 database and synthetic accounts for cold-start tests; the SuperAdmin bootstrap runner may create an account in an empty database. Keep local password-reset profiles disabled. Preserve ddl-auto=validate and the established private Supabase configuration. No production database, bucket, credential, or platform setting was changed by these code changes.
 
 Measure repeated cold starts at the actual resource limits and a larger comparison size. Check schema validation failures remain fatal, repositories validate before readiness, `/healthz` stays unavailable before readiness and public afterward, JWT/role restrictions remain intact, and shutdown refuses readiness. Exercise enrollment, reporting queries, private attachment access, AI generation/indexing and concurrent material requests on isolated services. H2/mocked tests do not establish native MySQL query performance, Render port detection or production memory sufficiency.
+
+## DEFAULT versus DEFERRED experiment (November 2, 2026)
+
+No Docker or Podman CLI was available, including the standard Docker Desktop CLI path. Instead, six sequential fresh JVMs started the full HALO web application against disposable H2 fixtures. Each used `-Xmx307m -XX:+UseSerialGC -XX:ActiveProcessorCount=1`, schema validation, synthetic JWT/AI/bootstrap values, local storage, and a loopback ephemeral HTTP port. Three alternating samples per mode were recorded. These are desktop Java measurements, not Render/container results; ActiveProcessorCount does not impose a 0.1 CPU quota, and Xmx does not cap total process memory. Maven/JVM launch overhead is excluded from the timing window. Shared-host scheduling, file caches and background activity introduce noise.
+
+| Mode/sample | Readiness ms | Listener event ms | Process CPU ms | Heap used bytes | Nonheap used bytes |
+|---|---:|---:|---:|---:|---:|
+| DEFAULT 1 | 12742 | 12503 | 24984 | 188618256 | 136566872 |
+| DEFAULT 2 | 15809 | 15510 | 30421 | 195959600 | 136815704 |
+| DEFAULT 3 | 20273 | 19971 | 38578 | 149305512 | 136946888 |
+| DEFERRED 1 | 12409 | 6079 | 26312 | 165193504 | 135804696 |
+| DEFERRED 2 | 14168 | 6529 | 29843 | 209156592 | 136121880 |
+| DEFERRED 3 | 14472 | 7276 | 30859 | 119969584 | 135965944 |
+
+Readiness medians: DEFAULT 15809 ms, DEFERRED 14168 ms. CPU medians: 30421 versus 29843 ms (about 2% less). DEFERRED moved listener initialization substantially earlier, but repository validation still consumed work afterward. The readiness ranges overlap, heap snapshots vary with GC, and nonheap usage is almost unchanged. These results do not establish a reliable CPU/memory benefit at Render's limits. **DEFAULT remains the production behavior; DEFERRED was not adopted.** No health-success-before-readiness or blanket lazy initialization was introduced.
+
+The benchmark captures readiness after SpringApplication.run returns and checks the actual HealthController reports OK. A separate regression deliberately declares an invalid repository query outside HALO's production scan; both DEFAULT and DEFERRED must fail context refresh with schema validation enabled. Existing health tests cover refusal before readiness and unauthenticated endpoint boundaries.
+
+## Targeted dependency cleanup
+
+Startup emitted a warning about duplicate Commons Logging. Dependency inspection identified paths through PDFBox and Google GenAI's Apache HTTP client. The POM excludes `commons-logging:commons-logging` on both paths, retaining Spring Framework 6's `spring-jcl` API/bridge and the existing logging backend. No PDF, Gemini or authentication implementation is removed. A regression checks exactly one LogFactory class resource and verifies PDFBox can acquire a logger. See [Spring Framework logging guidance](https://docs.spring.io/spring/reference/6.2/core/spring-jcl.html).
+
+This removes redundant logging classes and discovery ambiguity. It is a small cleanup, not a demonstrated solution to the port-scan timeout. No percentage speedup is claimed for it.
+
+## Reproducing the benchmark safely
+
+`StartupBootstrapBenchmarkTest` is opt-in and skipped by the ordinary suite. Use an isolated checkout/test copy with H2 test dependencies and a reviewed synthetic properties file; do not supply production properties. The fixture must contain an in-memory H2 URL, H2 driver, and file-based schema initialization scripts for a synthetic database matching HALO's mappings. Use temporary local lesson/cache paths. The harness overrides service credentials with synthetic values and retains `ddl-auto=validate`.
+
+Run each sample in a new Maven/Surefire process, changing only the mode:
+
+```text
+mvn -Dtest=StartupBootstrapBenchmarkTest -Dhalo.startup.benchmark=true -Dhalo.startup.benchmark.mode=default -Dhalo.startup.benchmark.config=/absolute/path/to/synthetic.properties "-DargLine=-Xmx307m -XX:+UseSerialGC -XX:ActiveProcessorCount=1" test
+```
+
+Repeat with `mode=deferred`. Never use this harness to bootstrap live Aiven or Supabase. Do not treat these results as production load tests: native MySQL queries, cloud latency, real AI, PDF processing concurrency, process peak RSS and exact container throttling remain unverified. More CPU and memory remain the appropriate next step if the deployed service is resource-bound; avoiding essential validation is not an acceptable substitute.
