@@ -53,6 +53,6 @@ RUN printf '%s\n' \
     > /app/start.sh \
     && chmod +x /app/start.sh
 
-EXPOSE 8081
+EXPOSE 10000
 
 ENTRYPOINT ["/app/start.sh"]

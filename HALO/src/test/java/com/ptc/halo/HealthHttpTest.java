@@ -14,6 +14,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import org.springframework.boot.availability.ApplicationAvailability;
+import org.springframework.boot.availability.ReadinessState;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -23,12 +26,21 @@ class HealthHttpTest {
     @Autowired MockMvc mvc;
     @MockBean CustomUserDetailsService users;
     @MockBean JwtService jwt;
+    @MockBean ApplicationAvailability availability;
 
     @Test void anonymousHealthReturnsOnlyPublicStatusWithoutAccountLookup() throws Exception {
+        when(availability.getReadinessState()).thenReturn(ReadinessState.ACCEPTING_TRAFFIC);
         mvc.perform(get("/healthz"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("application/json"))
                 .andExpect(content().string("{\"status\":\"ok\"}"));
+        verifyNoInteractions(users, jwt);
+    }
+
+    @Test void healthDoesNotAdvertiseReadinessBeforeStartupOrDuringShutdown() throws Exception {
+        when(availability.getReadinessState()).thenReturn(ReadinessState.REFUSING_TRAFFIC);
+        mvc.perform(get("/healthz")).andExpect(status().isServiceUnavailable())
+                .andExpect(content().string("{\"status\":\"not_ready\"}"));
         verifyNoInteractions(users, jwt);
     }
 
