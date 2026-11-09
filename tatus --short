@@ -1,0 +1,43 @@
+warning: in the working copy of 'HALO/src/main/java/com/ptc/halo/component/ModuleMaterialIndex.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'HALO/src/main/java/com/ptc/halo/config/SecurityConfig.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'HALO/src/main/java/com/ptc/halo/service/AiGenerationService.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'HALO/src/main/java/com/ptc/halo/service/FileUploadService.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'HALO/src/main/java/com/ptc/halo/service/LessonStoragePaths.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'HALO/src/main/java/com/ptc/halo/service/StudentLessonService.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'HALO/src/test/java/com/ptc/halo/LessonMaterialRelevanceTest.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'HALO/src/test/java/com/ptc/halo/UploadStreamLifecycleTest.java', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/student/components/LessonChat.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/services/student/studentService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/fixtures/backend-contract.json', LF will be replaced by CRLF the next time Git touches it
+ .../ptc/halo/component/ModuleMaterialIndex.java    |  22 [32m++[m[31m---[m
+ .../halo/config/LessonStorageConfiguration.java    |   8 [32m++[m
+ .../java/com/ptc/halo/config/SecurityConfig.java   |  11 [32m++[m[31m-[m
+ .../controller/LessonAttachmentController.java     |  62 [32m++++++++++++[m
+ .../halo/dtoResponse/AiLearningFileResponse.java   |   3 [32m+[m[31m-[m
+ .../com/ptc/halo/service/AiGenerationService.java  |  35 [32m++[m[31m-----[m
+ .../com/ptc/halo/service/FileUploadService.java    |  44 [32m++++[m[31m-----[m
+ .../ptc/halo/service/LessonAttachmentService.java  |  48 [32m+++++++++[m
+ .../ptc/halo/service/LessonMaterialRetention.java  |  37 [32m+++++++[m
+ .../ptc/halo/service/LessonMaterialStorage.java    |  12 [32m+++[m
+ .../com/ptc/halo/service/LessonObjectKeys.java     |  22 [32m+++++[m
+ .../com/ptc/halo/service/LessonStoragePaths.java   |  21 [32m+++[m[31m-[m
+ .../com/ptc/halo/service/StudentLessonService.java |   8 [32m++[m
+ .../service/SupabaseLessonMaterialStorage.java     |  76 [32m++++++++++++++[m
+ HALO/src/main/resources/application.properties     |   3 [32m+[m
+ .../com/ptc/halo/LessonAttachmentAccessTest.java   |  21 [32m++++[m
+ .../com/ptc/halo/LessonAttachmentHttpTest.java     |  34 [32m+++++++[m
+ .../com/ptc/halo/LessonMaterialRelevanceTest.java  |   2 [32m+[m[31m-[m
+ .../com/ptc/halo/PrivateMaterialStorageTest.java   |  65 [32m++++++++++++[m
+ .../com/ptc/halo/UploadStreamLifecycleTest.java    |   4 [32m+[m[31m-[m
+ docs/private-learning-materials-verification.md    |  78 [32m+++++++++++++++[m
+ docs/private-learning-materials.md                 |  63 [32m++++++++++++[m
+ scripts/migrate-learning-materials.mjs             | 110 [32m+++++++++++++++++++++[m
+ src/pages/student/components/LessonAttachments.jsx |  63 [32m++++++++++++[m
+ src/pages/student/components/LessonChat.jsx        |   2 [32m+[m
+ .../student/styles/LessonAttachments.module.css    |  19 [32m++++[m
+ src/services/student/studentService.js             |   6 [32m+[m[31m-[m
+ tests/fixtures/backend-contract.json               |  30 [32m++++++[m
+ tests/lesson-attachments.test.mjs                  |  33 [32m+++++++[m
+ tests/material-migration.test.mjs                  |  19 [32m++++[m
+ vercel.json                                        |   9 [32m++[m
+ 31 files changed, 896 insertions(+), 74 deletions(-)

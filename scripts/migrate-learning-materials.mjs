@@ -82,8 +82,19 @@ export async function applyMigration(plan, { url, secret, confirmBucket, journal
     if (hash(bytes) !== entry.sha256) throw Error('BACKUP_CHANGED');
     const object = BUCKET + '/' + entry.key.split('/').map(encodeURIComponent).join('/');
     let remote = await request('object/authenticated/' + object);
-    if (remote.status === 404) {
-      await remote.body?.cancel();
+
+let missing = remote.status === 404;
+
+if (remote.status === 400) {
+  const error = await remote.json().catch(() => ({}));
+
+  missing =
+    String(error.statusCode ?? error.code) === '404' &&
+    error.error === 'not_found';
+}
+
+if (missing) {
+  if (!remote.bodyUsed) await remote.body?.cancel();
       await privateBucket();
       const response = await request('object/' + object, { method: 'POST', headers: { 'Content-Type': entry.type, 'x-upsert': 'false' }, body: bytes });
       // A concurrent create is safe only if the subsequent read has identical bytes.
@@ -107,4 +118,10 @@ async function main() {
   console.log(JSON.stringify({ mode: options.apply ? 'apply' : 'dry-run', objects: plan.entries.length, references: plan.referenceCount, revisions: plan.revisionCount, historicalSnapshots: plan.historyCount }));
   if (options.apply) console.log(JSON.stringify(await applyMigration(plan, { url: process.env.SUPABASE_URL, secret: process.env.SUPABASE_SECRET_KEY, confirmBucket: options['confirm-bucket'], journal: options.journal })));
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) main().catch(() => { console.error('Migration stopped. Check the inventory, backup, private bucket, configuration and checksums. No remote objects are overwritten or deleted.'); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch(error => {
+    console.error('Migration error code:', error.code || 'N/A');
+    console.error('Migration error message:', error.message);
+    process.exitCode = 1;
+  });
+}
