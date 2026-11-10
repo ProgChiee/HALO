@@ -3,7 +3,7 @@ export const registrationHints = {
  name: "Letters, spaces, hyphens, apostrophes, periods and commas are welcome.",
  email: 'Use your @paterostechnologicalcollege.edu.ph school email.',
  studentId: 'Required format: 2 digits + AHRT + hyphen + 4 digits, for example 29AHRT-0168. Include the hyphen.',
- section: 'For example, BSHM 1A (up to 50 characters).',
+ section: 'For example, AHRT 1A.',
  yearLevel: 'Select your current year level.',
  password: 'At least 8 characters; maximum 72 UTF-8 bytes. Spaces count as characters.',
  confirmPassword: 'Enter the same password again.',

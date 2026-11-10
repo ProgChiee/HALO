@@ -24,7 +24,7 @@ test('registration shows field errors, retains values and blocks duplicate submi
   const submit=()=>host.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
   await act(async()=>{submit();await new Promise(r=>setTimeout(r,1));});
   assert.equal(calls,0);assert.equal(host.querySelectorAll('[aria-invalid="true"]').length,7);
-  for(const [key,value] of Object.entries({name:'Talidong, Archie V.',email:'archie@paterostechnologicalcollege.edu.ph',studentId:'29AHRT-0168',section:'BSHM 1A',yearLevel:'FIRST_YEAR',password:'password-123',confirmPassword:'password-123'})){
+  for(const [key,value] of Object.entries({name:'Talidong, Archie V.',email:'archie@paterostechnologicalcollege.edu.ph',studentId:'29AHRT-0168',section:'AHRT 1A',yearLevel:'FIRST_YEAR',password:'password-123',confirmPassword:'password-123'})){
    await act(async()=>{const input=host.querySelector('#register-'+key);Object.getOwnPropertyDescriptor(key==='yearLevel'?window.HTMLSelectElement.prototype:window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event(key==='yearLevel'?'change':'input',{bubbles:true}));});
   }
   await act(async()=>{submit();submit();});assert.equal(calls,1);assert.equal(host.querySelector('[type="submit"]').disabled,true);

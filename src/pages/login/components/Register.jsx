@@ -1,6 +1,7 @@
+import PasswordInput from '../../../components/shared/PasswordInput';
 import { useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import { register as registerService } from '../../../services/authService';
@@ -23,8 +24,6 @@ export default function Register() {
   const [studentId, setStudentId] = useState('');
   const [section, setSection] = useState('');
   const [yearLevel, setYearLevel] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -135,7 +134,7 @@ export default function Register() {
                   id="register-section" aria-invalid={!!errors.section} aria-describedby="register-section-hint" disabled={isLoading}
                   value={section}
                   onChange={(e) => { setSection(e.target.value); clearField('section'); }}
-                  placeholder="e.g. BSHM 1A"
+                  placeholder="e.g. AHRT 1A"
                 />
               </div>
               <p id="register-section-hint" className={errors.section ? styles.fieldError : styles.hint}>{errors.section || registrationHints.section}</p>
@@ -158,47 +157,27 @@ export default function Register() {
 <div className={styles.field}>
               <label className={styles.label} htmlFor="register-password">Password</label>
               <div className={styles.inputWrapper}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
+                <PasswordInput
                   className={styles.input}
                   id="register-password" autoComplete="new-password" aria-invalid={!!errors.password} aria-describedby="register-password-hint" disabled={isLoading}
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); clearField('password'); }}
                   placeholder="Password"
                 />
-                <button
-                  type="button"
-                  className={styles.eyeToggle}
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-controls="register-password" aria-pressed={showPassword} disabled={isLoading}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
               </div>
-              <p id="register-password-hint" className={errors.password ? styles.fieldError : styles.hint}>{errors.password || registrationHints.password}</p>
+              <p id="register-password-hint" className={errors.password ? styles.fieldError : styles.hint}>{errors.password || 'Password must be at least 8 characters long.'}</p>
             </div>
 
             <div className={styles.field}>
               <label className={styles.label} htmlFor="register-confirmPassword">Confirm password</label>
               <div className={styles.inputWrapper}>
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
+                <PasswordInput
                   className={styles.input}
                   id="register-confirmPassword" autoComplete="new-password" aria-invalid={!!errors.confirmPassword} aria-describedby="register-confirmPassword-hint" disabled={isLoading}
                   value={confirmPassword}
                   onChange={(e) => { setConfirmPassword(e.target.value); clearField('confirmPassword'); }}
                   placeholder="Repeat your password"
                 />
-                <button
-                  type="button"
-                  className={styles.eyeToggle}
-                  onClick={() => setShowConfirmPassword((v) => !v)}
-                  aria-controls="register-confirmPassword" aria-pressed={showConfirmPassword} disabled={isLoading}
-                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
               </div>
               <p id="register-confirmPassword-hint" className={errors.confirmPassword ? styles.fieldError : styles.hint}>{errors.confirmPassword || registrationHints.confirmPassword}</p>
             </div>

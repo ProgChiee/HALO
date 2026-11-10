@@ -1,3 +1,4 @@
+import PasswordInput from '../../../components/shared/PasswordInput';
 import { useAdminWorkflow } from '../../../context/admin/useAdminWorkflow';
 import Topbar from '../../../components/shared/Topbar';
 import AccountLifecycle, { AccountStateFilters } from '../../../components/shared/AccountLifecycle';
@@ -342,8 +343,7 @@ export default function ProfessorManagement() {
 
               <div className={styles.field}>
                 <label htmlFor="professor-password" className={styles.label}>Initial password</label>
-                <input
-                  type="password"
+                <PasswordInput
                   className={styles.input}
                   id="professor-password"
                   value={password}

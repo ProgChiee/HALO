@@ -8,6 +8,7 @@ import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp, Flame } from 'lu
 import StudentPageShell from './StudentPageShell';
 import Button from '../../../components/shared/Button';
 import { useAuth } from '../../../context/login/useAuth';
+import { studentGreeting } from '../../../utils/studentGreeting';
 import { selectContinueLesson } from '../../../utils/continueLearning';
 import { onStudentEnrollmentChanged } from '../../../utils/studentEnrollmentEvents';
 import styles from '../styles/StudentDashboard.module.css';
@@ -16,9 +17,9 @@ import styles from '../styles/StudentDashboard.module.css';
 export default function StudentDashboard() {
   const workflow = useStudentWorkflow();
   const { getDashboardData, getSubjectsData, getSubjectWeeks } = workflow.api;
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const firstName = (workflow.target ?? user)?.name?.split(' ')[0] ?? 'there';
+  const greeting = studentGreeting(user, workflow, authLoading);
 
   const [summary, setSummary] = useState(null);
   const [subjects, setSubjects] = useState([]);
@@ -100,8 +101,8 @@ export default function StudentDashboard() {
         </Topbar>
 
         <main className={styles.main}>
-          <h1 className={styles.greeting}>Welcome back, {firstName}! 👋</h1>
-          <p className={styles.subtext}>Here's your learning overview for today</p>
+          <h1 className={styles.greeting}>{greeting.title}</h1>
+          <p className={styles.subtext}>{greeting.subtitle}</p>
 
           {statsStatus === 'loading' && <p role="status">Loading dashboard statistics...</p>}
           {statsStatus === 'error' && <div role="alert"><p>Couldn't load your dashboard statistics.</p><Button onClick={() => { setStatsStatus('loading'); setStatsRetry(value => value + 1); }}>Retry statistics</Button></div>}

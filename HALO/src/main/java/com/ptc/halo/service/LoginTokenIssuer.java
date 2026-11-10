@@ -38,7 +38,15 @@ public class LoginTokenIssuer {
         response.setName(user.getName());
         response.setEmail(user.getEmail());
         response.setRole(user.getRole());
-        response.setToken(jwt.generateToken(user));
+        if (user.getRole() == com.ptc.halo.enums.Role.STUDENT) {
+            // Capture before mutation; the account lock serializes concurrent logins.
+            Boolean firstLogin = user.getHasSuccessfulLogin() == null ? null : !user.getHasSuccessfulLogin();
+            response.setFirstLogin(firstLogin);
+            user.setHasSuccessfulLogin(true);
+            response.setToken(jwt.generateToken(user, firstLogin));
+        } else {
+            response.setToken(jwt.generateToken(user));
+        }
         response.setMustChangePassword(user.isMustChangePassword());
         return response;
     }

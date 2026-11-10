@@ -1,7 +1,8 @@
+import PasswordInput from '../../../components/shared/PasswordInput';
 import Dialog from '../../../components/shared/Dialog';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Mail, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Mail, KeyRound } from 'lucide-react';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
 import {
@@ -24,7 +25,6 @@ export default function ForgotPassword() {
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   const [error, setError] = useState('');
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -233,33 +233,25 @@ export default function ForgotPassword() {
                 </div>
 
                 <div className={styles.field}>
-                  <label className={styles.label}>New password</label>
+                  <label className={styles.label} htmlFor="reset-new-password">New password</label>
                   <div className={styles.inputWrapper}>
                     <KeyRound size={18} className={styles.inputIcon} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
+                    <PasswordInput
+                      id="reset-new-password" autoComplete="new-password"
                       className={styles.input}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Password"
                     />
-                    <button
-                      type="button"
-                      className={styles.eyeToggle}
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
                   </div>
                 </div>
 
                 <div className={styles.field}>
-                  <label className={styles.label}>Confirm Password</label>
+                  <label className={styles.label} htmlFor="reset-confirm-password">Confirm Password</label>
                   <div className={styles.inputWrapper}>
                     <KeyRound size={18} className={styles.inputIcon} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
+                    <PasswordInput
+                      id="reset-confirm-password" autoComplete="new-password"
                       className={styles.input}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}

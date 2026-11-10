@@ -12,6 +12,10 @@ public class UserEntity {
     private String name;
     private String email;
     private String password;
+    @Column(name = "has_successful_login")
+    private Boolean hasSuccessfulLogin;
+    public Boolean getHasSuccessfulLogin() { return hasSuccessfulLogin; }
+    public void setHasSuccessfulLogin(Boolean value) { hasSuccessfulLogin = value; }
     @Column(nullable = false, columnDefinition = "bigint default 0")
     private long tokenVersion = 0;
     @Column(nullable = false, columnDefinition = "boolean default false")

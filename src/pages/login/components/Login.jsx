@@ -1,7 +1,8 @@
+import PasswordInput from '../../../components/shared/PasswordInput';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+
 import { useAuth } from '../../../context/login/useAuth';
 import { useToast } from '../../../context/notifications/useToast';
 import { login as loginService } from '../../../services/authService';
@@ -15,7 +16,6 @@ import styles from '../styles/Login.module.css';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -76,23 +76,13 @@ export default function Login() {
             <div className={styles.field}>
               <label htmlFor="login-password" className={styles.label}>Password</label>
               <div className={styles.inputWrapper}>
-              <input
+              <PasswordInput
                 id="login-password" name="password" autoComplete="current-password" disabled={isLoading}
-                type={showPassword ? 'text' : 'password'}
                 className={styles.input}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
               />
-              <button
-                type="button"
-                className={styles.eyeToggle}
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                aria-controls="login-password" aria-pressed={showPassword} disabled={isLoading}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
               </div>
             </div>
 

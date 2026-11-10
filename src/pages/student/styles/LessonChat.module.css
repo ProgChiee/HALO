@@ -272,7 +272,9 @@
 .bubbleAi { background: var(--color-surface); border-color: var(--color-border); }
 .bubbleUser { background: var(--color-primary-soft); border-color: var(--color-primary-border); }
 .messageSender { font-weight: var(--font-weight-medium); }
-.speakBtn { gap: var(--space-2); }
+.speakBtn { gap: var(--space-1); min-height: 32px; padding: var(--space-1) var(--space-2); color: var(--color-text-secondary); background: var(--color-surface); font-weight: var(--font-weight-medium); }
+.speakBtn svg { flex-shrink: 0; }
+.speakBtn:hover, .speakBtnActive { background: var(--color-primary-soft); color: var(--color-accent-active); border-color: var(--color-primary-border); }
 .bubbleTyping { min-height: var(--space-12); align-items: center; }
 .typingDot { background: var(--color-text-muted); }
 .inputRow { background: var(--color-surface); align-items: center; }
@@ -289,14 +291,45 @@
 @media (max-width: 768px) { .bubble { padding: var(--space-4); } .contentArea > [role="alert"] { padding-inline: var(--space-4); } }
 
 /* Shared Student, Preview and Support chat presentation. */
-.conversation { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
-.chatArea { scrollbar-gutter: stable; overscroll-behavior: contain; }
+.conversation { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.conversation .bubble { padding: var(--space-3) var(--space-4); }
+.chatArea { scrollbar-gutter: stable; overscroll-behavior: contain; padding-bottom: var(--space-6); }
 .chatArea:focus-visible, .chatInput:focus-visible, .speakBtn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
 .messageSender { margin: 0; }
-.bubble { line-height: 1.65; }
+.bubble { line-height: 1.6; }
 .bubbleUser { border-bottom-right-radius: var(--radius-sm); }
 .bubbleAi { border-bottom-left-radius: var(--radius-sm); }
 .inputRow { gap: var(--space-3); padding-bottom: max(var(--space-4), env(safe-area-inset-bottom)); }
 .sendBtn { background: var(--color-primary); }
 @media (prefers-reduced-motion: reduce) { .typingDot { animation: none; } }
 @media (max-width: 640px) { .messageBlockUser { max-width: 90%; } .inputRow { gap: var(--space-2); } }
+
+/* Voice input only: existing composer and message submission remain shared. */
+.inputRow { flex-wrap: wrap; gap: var(--space-2); padding-top: var(--space-3); }
+.chatInput, .voiceButton, .sendBtn { height: 44px; min-height: 44px; box-sizing: border-box; }
+.chatInput { padding-block: var(--space-2); }
+.sendBtn { width: 44px; }
+.voiceButton { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; height: 44px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-primary); }
+.voiceButton:hover:not(:disabled), .voiceActive { background: var(--color-primary-soft); border-color: var(--color-primary); }
+.voiceButton:disabled { opacity: 0.6; cursor: not-allowed; }
+.voiceButton:focus-visible, .voiceLanguage select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.voiceDetails { order: -1; flex: 1 0 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); color: var(--color-text-muted); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.voiceLanguage { order: 2; margin-left: auto; display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.voiceLanguage select { min-height: 32px; max-width: 100%; padding: var(--space-1) var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-primary); }
+.voiceHelp { min-width: 0; }
+.voicePrivacy { position: relative; display: inline-flex; }
+.voicePrivacy button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; color: var(--color-text-muted); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); }
+.voicePrivacy button:hover { color: var(--color-text-primary); border-color: var(--color-border); }
+.voicePrivacy button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.voicePrivacy [role="tooltip"] { visibility: hidden; position: absolute; bottom: calc(100% + 8px); left: 0; width: min(240px, 65vw); padding: var(--space-2) var(--space-3); background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: var(--radius-md); z-index: 2; line-height: 1.5; }
+.voicePrivacy:hover [role="tooltip"], .voicePrivacy:focus-within [role="tooltip"] { visibility: visible; }
+.voiceStatus { order: 3; color: var(--color-text-primary); font-weight: var(--font-weight-semibold); }
+.voiceStatus:empty { display: none; }
+.voiceInterim, .voiceError { order: 4; flex-basis: 100%; }
+.voiceError { color: var(--color-danger-text); }
+@media (max-width: 640px) {
+  .voiceLanguage { order: 0; margin-left: 0; margin-right: auto; }
+  .voiceHelp { order: 2; flex-basis: 100%; }
+  .voicePrivacy [role="tooltip"] { left: auto; right: 0; }
+  .chatInput { padding-inline: var(--space-3); }
+}

@@ -51,6 +51,9 @@ test('Student Settings uses the labeled Dialog with focus handling and safe Esca
     assert.equal(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent, 'Change Password');
     assert.equal(document.activeElement.id, 'current-password');
     await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+    assert.equal(document.activeElement.getAttribute('aria-label'), 'Show password');
+    assert.equal(document.activeElement.getAttribute('aria-controls'), 'current-password');
+    await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
     assert.equal(document.activeElement.id, 'new-password');
     await act(async () => dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     assert.ok(document.querySelector('[role="dialog"]'));

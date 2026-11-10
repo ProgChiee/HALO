@@ -3,7 +3,10 @@ import LessonAttachments from './LessonAttachments';
 import Topbar from '../../../components/shared/Topbar';
 import VideoLearning from '../../../components/shared/VideoLearning';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import LessonVoiceInput from './LessonVoiceInput';
+import { appendTranscript } from '../../../utils/voiceInput';
+import { useAuth } from '../../../context/login/useAuth';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Bot, Send, Volume2, VolumeX } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
@@ -19,7 +22,8 @@ import { logStudentError } from '../../../utils/studentDiagnostics';
 export default function LessonChat() {
   const { topicId, weekId } = useParams();
   const { identity } = useStudentWorkflow();
-  return <ModuleLessonChat key={identity + ':' + String(topicId) + ':' + String(weekId)} topicId={topicId} weekId={weekId} />;
+  const { user } = useAuth();
+  return <ModuleLessonChat key={identity + ':' + String(user?.email) + ':' + String(topicId) + ':' + String(weekId)} topicId={topicId} weekId={weekId} />;
 }
 
 function ModuleLessonChat({ topicId, weekId }) {
@@ -41,6 +45,8 @@ function ModuleLessonChat({ topicId, weekId }) {
   const olderLock = useRef(false);
   const prepending = useRef(false);
   const [draft, setDraft] = useState('');
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const appendVoice = useCallback(text => setDraft(current => appendTranscript(current, text)), []);
   const draftError = draft.length > 4000
     ? 'Your message is too long. Shorten it to 4,000 characters or fewer.'
     : draft.length > 0 && !draft.trim() ? 'Enter a message; spaces alone cannot be sent.' : '';
@@ -112,6 +118,7 @@ function ModuleLessonChat({ topicId, weekId }) {
   }
 
   function retryLesson() {
+    setVoiceBusy(false);
     setBeforeId(null);
     setOlderLoading(false);
     setOlderError('');
@@ -169,7 +176,7 @@ function ModuleLessonChat({ topicId, weekId }) {
 
   async function handleSend(e) {
     e.preventDefault();
-    if (sendLock.current) return;
+    if (sendLock.current || voiceBusy) return;
 
     const text = draft.trim();
     if (!text || draft.length > 4000) {
@@ -331,7 +338,8 @@ function ModuleLessonChat({ topicId, weekId }) {
             onChange={(e) => setDraft(e.target.value)}
             disabled={isAiTyping || !sessionId}
           />
-          <button type="submit" className={styles.sendBtn} aria-label="Send message" disabled={isAiTyping || !sessionId || !draft.trim() || draft.length > 4000}>
+          <LessonVoiceInput disabled={isAiTyping || !sessionId} onFinal={appendVoice} onBusyChange={setVoiceBusy} onStart={stop} />
+          <button type="submit" className={styles.sendBtn} aria-label="Send message" disabled={voiceBusy || isAiTyping || !sessionId || !draft.trim() || draft.length > 4000}>
             <Send size={18} />
           </button>
         </form>

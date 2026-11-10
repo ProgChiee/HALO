@@ -38,7 +38,7 @@ public final class StudentRegistrationValidator {
  }
  public static String validateSection(String section) {
   section = section == null ? "" : section.strip().replaceAll("\\s+", " ");
-  if (section.isEmpty() || section.length()>50 || !section.matches("[\\p{L}\\p{M}\\p{N} .'-]+")) throw new RegistrationValidationException(java.util.Map.of("section","Enter a section of up to 50 characters, for example BSHM 1A."),400);
+  if (section.isEmpty() || section.length()>50 || !section.matches("[\\p{L}\\p{M}\\p{N} .'-]+")) throw new RegistrationValidationException(java.util.Map.of("section","Enter a valid section, for example AHRT 1A."),400);
   return section;
  }
 }

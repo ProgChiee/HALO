@@ -1,3 +1,4 @@
+import PasswordInput from '../../../components/shared/PasswordInput';
 import Topbar from '../../../components/shared/Topbar';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState, useRef, useEffect } from 'react';
@@ -317,10 +318,9 @@ export default function Admins() {
 
               <div className={styles.field}>
                 <label htmlFor="admin-password" className={styles.label}>Initial password</label>
-                <input
+                <PasswordInput
                   id="admin-password"
                   disabled={isSubmitting}
-                  type="password"
                   className={styles.input}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

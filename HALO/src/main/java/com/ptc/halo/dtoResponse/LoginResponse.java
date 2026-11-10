@@ -7,6 +7,9 @@ public class LoginResponse {
 
     private String name;
     private String email;
+    private Boolean firstLogin;
+    public Boolean getFirstLogin() { return firstLogin; }
+    public void setFirstLogin(Boolean value) { firstLogin = value; }
 
     private boolean mustChangePassword;
     public boolean isMustChangePassword() { return mustChangePassword; }

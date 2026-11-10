@@ -22,8 +22,12 @@ public class JwtService {
         key = Keys.hmacShaKeyFor(bytes);
     }
     public String generateToken(UserEntity user) {
+        return generateToken(user, null);
+    }
+    public String generateToken(UserEntity user, Boolean firstLogin) {
         if (user.getId() == null || user.getId() <= 0) throw new IllegalArgumentException("Persisted account required");
         return Jwts.builder().subject(user.getId().toString()).claim("identity", "user-id-v1").claim("ver", user.getTokenVersion())
+                .claim("firstLogin", user.getRole() == com.ptc.halo.enums.Role.STUDENT ? firstLogin : null)
                 .issuedAt(new Date()).expiration(new Date(System.currentTimeMillis() + 86400000L))
                 .signWith(key, Jwts.SIG.HS256).compact();
     }

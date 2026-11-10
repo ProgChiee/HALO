@@ -77,6 +77,7 @@ public class AuthService {
         );
 
         user.setRole(Role.STUDENT);
+        user.setHasSuccessfulLogin(false);
         user.setStatus(Status.ACTIVE);
 
 

@@ -1,3 +1,4 @@
+import PasswordInput from './PasswordInput';
 import { useAuth } from '../../context/login/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { apiErrorMessage } from '../../utils/apiErrors';
@@ -101,8 +102,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
             <label htmlFor="current-password" className={styles.label}>Current password</label>
-            <input
-              type="password"
+            <PasswordInput
               className={styles.input}
               id="current-password"
               value={currentPassword}
@@ -113,8 +113,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
 
           <div className={styles.field}>
             <label htmlFor="new-password" className={styles.label}>New password</label>
-            <input
-              type="password"
+            <PasswordInput
               className={styles.input}
               id="new-password"
               value={newPassword}
@@ -125,8 +124,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
 
           <div className={styles.field}>
             <label htmlFor="confirm-password" className={styles.label}>Confirm new password</label>
-            <input
-              type="password"
+            <PasswordInput
               className={styles.input}
               id="confirm-password"
               value={confirmNewPassword}
