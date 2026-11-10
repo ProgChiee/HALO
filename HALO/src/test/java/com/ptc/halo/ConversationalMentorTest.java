@@ -13,6 +13,44 @@ import static org.mockito.Mockito.*;
 
 // Reuse the real PDF/index fixture and existing ownership setup.
 class ConversationalMentorTest extends ModuleScopedMentorTest {
+    @Test void intentDiagnosticsAreFixedAndNeverIncludeSensitiveDetails() {
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(MentorService.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start(); logger.addAppender(appender);
+        try {
+            String[] replies = {null, "  ", "SECRET not JSON", "[]", "null", "{}", "{\"intent\":7}", "{\"intent\":\"SECRET\"}", "{\"intent\":\"greeting\"}"};
+            String[] reasons = {"EMPTY_RESPONSE", "EMPTY_RESPONSE", "JSON_PARSE", "INVALID_RESPONSE_SHAPE", "INVALID_RESPONSE_SHAPE", "MISSING_INTENT", "MISSING_INTENT", "UNKNOWN_INTENT", "UNKNOWN_INTENT"};
+            for (int i = 0; i < replies.length; i++) {
+                when(intentSpec.call().content()).thenReturn(replies[i]);
+                appender.list.clear();
+                var error = assertThrows(ResponseStatusException.class, () -> mentor.sendMessage(21L, student, "SECRET question"));
+                assertEquals(502, error.getStatusCode().value());
+                assertEquals("MENTOR_PROVIDER_UNAVAILABLE", error.getReason());
+                assertEquals(1, appender.list.size());
+                var event = appender.list.get(0);
+                assertTrue(event.getFormattedMessage().startsWith("mentor_intent_failure reason=" + reasons[i] + " exceptionType="));
+                assertFalse(event.getFormattedMessage().contains("SECRET"));
+                assertFalse(event.getFormattedMessage().contains("providerHttpStatus"));
+                assertNull(event.getThrowableProxy());
+            }
+            for (int code : new int[]{429, 700}) {
+                var call = intentSpec.call();
+                doThrow(new IllegalArgumentException("SECRET wrapper", new com.google.genai.errors.ApiException(code, "SECRET status", "SECRET body")))
+                        .when(call).content();
+                appender.list.clear();
+                var error = assertThrows(ResponseStatusException.class, () -> mentor.sendMessage(21L, student, "SECRET question"));
+                assertEquals(502, error.getStatusCode().value());
+                assertEquals("MENTOR_PROVIDER_UNAVAILABLE", error.getReason());
+                assertEquals(1, appender.list.size());
+                var event = appender.list.get(0);
+                assertEquals("mentor_intent_failure reason=PROVIDER_CALL exceptionType=IllegalArgumentException" + (code == 429 ? " providerHttpStatus=429" : ""), event.getFormattedMessage());
+                assertNull(event.getThrowableProxy());
+            }
+            verify(messages, never()).save(any());
+            verify(gateSpec, never()).user(anyString());
+            verify(replySpec, never()).user(anyString());
+        } finally { logger.detachAppender(appender); appender.stop(); }
+    }
     @Test void socialMessagesNeedNoRetrievalAndStillSaveAnExchange() {
         for (String question : List.of("hello", "hi", "thank you", "okay", "oh okay", "how are you?")) {
             clearInvocations(chat, messages);
