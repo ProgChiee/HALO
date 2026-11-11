@@ -296,6 +296,19 @@
 .chatArea { scrollbar-gutter: stable; overscroll-behavior: contain; padding-bottom: var(--space-6); }
 .chatArea:focus-visible, .chatInput:focus-visible, .speakBtn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
 .messageSender { margin: 0; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p, .markdown ul, .markdown ol, .markdown pre, .markdown blockquote { margin: 0.5em 0; }
+.markdown ul, .markdown ol { padding-left: 1.5em; }
+.markdown ul { list-style: disc; }
+.markdown ol { list-style: decimal; }
+.markdown li + li { margin-top: 0.2em; }
+.markdown li > p { margin: 0.2em 0; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4, .markdown h5, .markdown h6 { font-size: inherit; line-height: inherit; margin: 0.65em 0 0.3em; }
+.markdown code { font-size: 0.95em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.markdown pre { white-space: pre-wrap; max-width: 100%; }
+.markdown a { color: var(--color-primary); text-decoration: underline; overflow-wrap: anywhere; }
+.markdown a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .bubble { line-height: 1.6; }
 .bubbleUser { border-bottom-right-radius: var(--radius-sm); }
 .bubbleAi { border-bottom-left-radius: var(--radius-sm); }

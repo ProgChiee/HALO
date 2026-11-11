@@ -27,6 +27,46 @@ before(async () => {
 });
 after(async () => { await server.close(); dom.window.close(); });
 
+test('assistant Markdown is safe and consistent for new, restored and older messages; students stay plain text', async () => {
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  const text = '**check-in** and *care* with `code`\nnext line\n\nSecond paragraph\n\n1. First\n2. Second\n\n- One\n- Two\n\n<script>secret()</script>\n\n[bad](javascript:alert%281%29) [safe](https://example.test) ![image](https://example.test/tracker.png)';
+  const saved = [{ id: 2, sender: 'HALO', message: text }, { id: 3, sender: 'STUDENT', message: '**plain**' }];
+  const api = {
+    getWeekLesson: async () => ({ id: 2, subjectId: 1, weekId: 2, weekNumber: 1, status: 'APPROVED', aiGenerationStatus: 'COMPLETED', files: [] }),
+    openSession: async () => ({ moduleId: 2, sessionId: 1, messages: saved, hasOlder: true, nextBeforeId: 2 }),
+    recordLessonStudy: async () => {},
+    getConversation: async () => ({ moduleId: 2, sessionId: 1, messages: [{ id: 1, sender: 'HALO', message: '**older**' }], nextBeforeId: null }),
+    sendMessage: async () => ({ haloMessage: '**new reply**' }),
+  };
+  const render = key => root.render(React.createElement(MemoryRouter, { initialEntries: ['/lesson/1/2'] },
+    React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, role: 'student', logout() {} } },
+      React.createElement(ToastContext.Provider, { value: { showToast() {} } },
+        React.createElement(Workflow.Provider, { value: { api, identity: 'student', basePath: '/student' } },
+          React.createElement(Routes, null, React.createElement(Route, { path: '/lesson/:topicId/:weekId', element: React.createElement(Chat, { key }) })))))));
+  try {
+    for (const key of ['initial', 'restored']) {
+      await act(async () => render(key));
+      const log = host.querySelector('[role="log"]');
+      assert.equal(log.querySelector('strong').textContent, 'check-in');
+      assert.equal(log.querySelector('em').textContent, 'care');
+      assert.equal(log.querySelector('code').textContent, 'code');
+      assert.equal(log.querySelectorAll('ol li').length, 2); assert.equal(log.querySelectorAll('ul li').length, 2);
+      assert.ok(log.querySelector('br')); assert.ok(log.textContent.includes('Second paragraph'));
+      assert.ok(log.textContent.includes('**plain**')); assert.equal(log.querySelectorAll('strong').length, 1);
+      assert.equal(log.querySelector('script,img'), null);
+      assert.equal(log.querySelectorAll('a').length, 1);
+      assert.equal(log.querySelector('a').href, 'https://example.test/');
+      assert.equal(log.querySelector('a').rel, 'noopener noreferrer');
+    }
+    await act(async () => [...host.querySelectorAll('button')].find(b => b.textContent === 'Load older messages').click());
+    assert.ok([...host.querySelectorAll('strong')].some(el => el.textContent === 'older'));
+    await act(async () => { const input = host.querySelector('[aria-label="Message AI Mentor"]'); Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '**typed**'); input.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => host.querySelector('[aria-label="Send message"]').click());
+    assert.ok([...host.querySelectorAll('strong')].some(el => el.textContent === 'new reply'));
+    assert.ok(host.querySelector('[role="log"]').textContent.includes('**typed**'));
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
 for (const mode of ['student', 'preview', 'support']) test(`${mode}: dictation only edits the composer; explicit Send uses existing workflow`, async () => {
   window.SpeechRecognition = Recognition;
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);

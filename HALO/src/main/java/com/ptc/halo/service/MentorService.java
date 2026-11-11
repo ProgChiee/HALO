@@ -264,7 +264,7 @@ public class MentorService {
                     mentorSessionRepository.save(session);
 
 
-            String haloMessage = "Hi! I'm HALO. I'm here to help you understand this lesson. You can ask for an explanation, a practical example, or help with anything that feels confusing.";
+            String haloMessage = "Hi! I'm HALO. What would you like to work on in this lesson?";
 
             MentorMessageEntity message =
                     new MentorMessageEntity();
@@ -332,10 +332,15 @@ public class MentorService {
         if (Set.of("i don't understand", "i do not understand", "what do you mean", "explain that again", "explain it again", "make it simpler").contains(text))
             return Intent.CLARIFICATION;
         if (Set.of("why", "how", "what happens next", "and then").contains(text)) return Intent.FOLLOW_UP;
+        if (Set.of("kumusta", "kamusta", "magandang umaga", "magandang hapon", "magandang gabi").contains(text)) return Intent.GREETING;
+        if (Set.of("salamat", "salamat po", "maraming salamat", "thank you po", "sige", "gets ko na").contains(text)) return Intent.ACKNOWLEDGEMENT;
+        if (Set.of("hindi ko maintindihan", "di ko gets", "pakiulit").contains(text)) return Intent.CLARIFICATION;
+        if (Set.of("bakit", "paano").contains(text)) return Intent.FOLLOW_UP;
+        if (Set.of("another example", "isa pang halimbawa").contains(text)) return Intent.EXAMPLE_REQUEST;
         String reason = "PROVIDER_CALL";
         try {
             String input = objectMapper.writeValueAsString(Map.of("message", message, "recentConversation", tail(history, 6000)));
-            String response = chatClient.prompt().system("Classify HALO conversational intent from the meaning of the ENTIRE message and recent conversation. "
+            String response = chatClient.prompt().system("Classify HALO conversational intent from the meaning of the ENTIRE message and recent conversation, including English, Filipino and Taglish. "
                     + "Do not infer a request from isolated words such as example, explanation, scenario or lesson. "
                     + "Priority for pure intents: GREETING/SOCIAL; ACKNOWLEDGEMENT (thanks or understanding); CLARIFICATION (confusion); "
                     + "FOLLOW_UP (contextual why/how); EXAMPLE_REQUEST/SCENARIO_REQUEST/EXPLANATION_REQUEST; LESSON_QUESTION; CLEARLY_OUT_OF_SCOPE. "
@@ -380,23 +385,27 @@ public class MentorService {
         return null;
     }
 
+    // Wording only: this heuristic never determines lesson scope or access.
+    private boolean usesFilipino(String question) {
+        return java.util.regex.Pattern.compile("(?iu)\\b(kumusta|kamusta|salamat|po|opo|sige|paano|bakit|ano|hindi|ko|ako|naman|ulit|halimbawa|magandang|gets)\\b")
+                .matcher(question).find();
+    }
+
+    private String clarificationReply(String question) {
+        return usesFilipino(question) ? "Aling bahagi ng lesson ang gusto mong linawin? Puwede natin itong himayin."
+                : "Which part of this lesson would you like me to explain?";
+    }
+
     private String conversationalReply(Intent intent, String question) {
         return switch (intent) {
-            case GREETING -> """
-        Hey there! 👋 I'm HALO, your learning buddy for this lesson.
-
-        What would you like to work on today?
-        - 📖 Understand a difficult concept
-        - 💡 Explore a practical example
-        - 🔍 Break down something confusing
-        - 🎯 Try a quick practice challenge
-
-        Where are you currently getting stuck?
-        """;
-            case ACKNOWLEDGEMENT -> question.toLowerCase(java.util.Locale.ROOT).contains("thank")
-                    ? "You're welcome! I'm glad it helped. If you want to go over any part of the lesson again, just let me know."
-                    : "Got it. We can continue whenever you're ready.";
-            case SOCIAL -> "I'm here whenever you need help with this lesson. We can take it one small step at a time.";
+            case GREETING -> usesFilipino(question)
+                    ? "Kumusta! Ako si HALO. Ano ang gusto mong linawin sa lesson?"
+                    : "Hi! I'm HALO. What would you like to work on in this lesson?";
+            case ACKNOWLEDGEMENT -> question.toLowerCase(java.util.Locale.ROOT).matches("(?s).*(thank|salamat).*")
+                    ? (usesFilipino(question) ? "Walang anuman!" : "You're welcome!")
+                    : (usesFilipino(question) ? "Sige, tuloy tayo kapag handa ka na." : "Got it. We can continue when you're ready.");
+            case SOCIAL -> usesFilipino(question) ? "Nandito ako para tumulong sa lesson. Dahan-dahan lang tayo."
+                    : "I'm here to help with the lesson. We can take it one step at a time.";
             default -> null;
         };
     }
@@ -408,7 +417,7 @@ public class MentorService {
         if (social != null) return social;
         if (history.isBlank() && (intent == Intent.FOLLOW_UP || intent == Intent.CLARIFICATION)
                 && question.strip().split("\\s+").length <= 5) {
-            return "We can take it slowly. Which part of this lesson would you like me to explain?";
+            return clarificationReply(question);
         }
 
         ModuleMaterialIndex.Index index = materialIndex.getOrBuild(module);
@@ -425,7 +434,7 @@ public class MentorService {
                     + "The conversational intent has already been resolved; do not reinterpret a request from isolated keywords. "
                     + "For substantive requests, the catalog describes ONLY this module's uploaded source materials. Determine whether the question "
                     + "is semantically about those specific topics. First interpret conversational intent and resolve the current concept from recentConversation. "
-                    + "Never match a short follow-up such as why/how against literal PDF words. Allow prerequisite explanations needed to understand "
+                    + "Resolve short follow-ups such as why/how, bakit/paano, and another example using recentConversation, including Filipino and Taglish. Never match these against literal PDF words. Allow prerequisite explanations needed to understand "
                     + "an existing concept, beginner/informal wording, synonyms, practical applications, discussions, reflections and scenarios. "
                     + "Allow explanations, examples, synonyms, terminology and follow-up questions "
                     + "even when the exact answer is absent from the files. General knowledge may clarify an existing topic, not expand it. "
@@ -438,7 +447,7 @@ public class MentorService {
             if (!selection.path("inScope").isBoolean()) throw new IllegalStateException("Invalid scope decision");
             if (!selection.path("inScope").booleanValue()) return OUT_OF_SCOPE;
             if (selection.path("needsClarification").asBoolean(false))
-                return "Which part of this lesson do you mean? I can explain it more simply or give a practical example.";
+                return clarificationReply(question);
             Set<String> ids = selectedIds(selection, "chunkIds");
             var evidence = index.chunks().stream().filter(c -> ids.contains(c.id())).toList();
             if (evidence.size() != ids.size()) throw new IllegalStateException("Unknown source selected");
@@ -461,7 +470,9 @@ JsonNode reply = json(chatClient.prompt().system("""
 
         - Be patient, encouraging, approachable, and knowledgeable.
         - Speak naturally, like ChatGPT having a helpful conversation with a student.
-        - Use simple, beginner-friendly English.
+        - Match the student's language: English, Filipino, or natural Taglish. Do not translate unnecessarily.
+        - For a short ambiguous follow-up, use recent conversation to maintain language and topic.
+        - Keep technical terms accurate. Language preferences never override scope or JSON output rules.
         - Be sharp and informative without sounding robotic or overly formal.
         - Encourage curiosity and independent thinking.
         - Use light humor occasionally when appropriate, but remain educational.
@@ -472,7 +483,8 @@ JsonNode reply = json(chatClient.prompt().system("""
         2. RESPONSE STRUCTURE
         ==============================
 
-        Make responses easy and enjoyable to read.
+        Answer the actual question first in short, natural paragraphs. Use plain prose by default.
+        Do not automatically add headings, lists, praise, greetings, or a closing question.
 
         - Answer the student's actual question first.
         - Break complicated explanations into smaller sections.

@@ -15,7 +15,7 @@ test('ordinary learning content and unrecognized references are never broadly st
 });
 test('chat renders only answer text, retains user text, and exposes accessible conversation/composer states', async () => {
  const source=await readFile(new URL('../src/pages/student/components/LessonChat.jsx',import.meta.url),'utf8');
- assert.ok(source.includes("msg.sender === 'ai' ? mentorAnswerText(msg.text) : msg.text"));
+ assert.ok(source.includes("msg.sender === 'ai' ? <MentorMarkdown>{mentorAnswerText(msg.text)}</MentorMarkdown> : msg.text"));
  assert.ok(source.includes('speak(msg.id, mentorAnswerText(msg.text))'));
  assert.match(source,/role="log"/);assert.match(source,/aria-label="Message composer"/);assert.match(source,/aria-label="AI Mentor is responding"/);
  assert.doesNotMatch(source,/Sources<|citationFooter|sourcePanel/);

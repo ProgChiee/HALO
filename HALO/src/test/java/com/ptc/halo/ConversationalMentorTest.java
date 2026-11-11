@@ -13,6 +13,30 @@ import static org.mockito.Mockito.*;
 
 // Reuse the real PDF/index fixture and existing ownership setup.
 class ConversationalMentorTest extends ModuleScopedMentorTest {
+    @Test void briefFilipinoAndTaglishRepliesUseNoProviderOrRetrieval() {
+        clearInvocations(chat);
+        for (var example : Map.of("kumusta", "Kumusta!", "salamat po", "Walang anuman!",
+                "thank you po", "Walang anuman!", "sige", "Sige,", "di ko gets", "Aling bahagi").entrySet()) {
+            assertTrue(mentor.sendMessage(21L, student, example.getKey()).getHaloMessage().startsWith(example.getValue()));
+        }
+        verifyNoInteractions(chat);
+        assertFalse(mentor.sendMessage(21L, student, "hello").getHaloMessage().contains("\n-"));
+    }
+
+    @Test void bilingualFollowUpsKeepHistoryAndSourceValidation() throws Exception {
+        files.add(pdf(1, "Food contamination transfers bacteria between foods.", module));
+        var previous = new MentorMessageEntity(); previous.setSender(MessageSender.HALO);
+        previous.setMessage("Ang cross-contamination ay paglipat ng bacteria sa pagkain.");
+        when(messages.findTop10BySessionIdOrderByCreatedAtDesc(21L)).thenReturn(List.of(previous));
+        decision(true, ids(), "Maaaring mailipat ang bacteria gamit ang maruming kutsilyo.");
+        for (String question : List.of("why?", "paano?", "another example", "isa pang halimbawa")) {
+            clearInvocations(chat, gateSpec, replySpec, intentSpec);
+            assertTrue(mentor.sendMessage(21L, student, question).getHaloMessage().startsWith("Maaaring"));
+            verify(intentSpec, never()).user(anyString());
+            var input = ArgumentCaptor.forClass(String.class); verify(gateSpec).user(input.capture());
+            assertTrue(mapper.readTree(input.getValue()).path("recentConversation").asText().contains("cross-contamination"));
+        }
+    }
     @Test void intentDiagnosticsAreFixedAndNeverIncludeSensitiveDetails() {
         var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(MentorService.class);
         var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();

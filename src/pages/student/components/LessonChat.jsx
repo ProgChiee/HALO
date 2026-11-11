@@ -1,4 +1,5 @@
 import { mentorAnswerText } from '../../../utils/mentorAnswerText';
+import MentorMarkdown from './MentorMarkdown';
 import LessonAttachments from './LessonAttachments';
 import Topbar from '../../../components/shared/Topbar';
 import VideoLearning from '../../../components/shared/VideoLearning';
@@ -292,8 +293,8 @@ function ModuleLessonChat({ topicId, weekId }) {
               className={`${styles.messageBlock} ${msg.sender === 'user' ? styles.messageBlockUser : ''}`}
             >
               <p className={styles.messageSender}>{msg.sender === 'ai' ? 'AI Mentor' : 'You'}</p>
-              <div style={{ whiteSpace: 'pre-wrap' }} className={`${styles.bubble} ${msg.sender === 'user' ? styles.bubbleUser : styles.bubbleAi}`}>
-                {msg.sender === 'ai' ? mentorAnswerText(msg.text) : msg.text}
+              <div style={{ whiteSpace: msg.sender === 'user' ? 'pre-wrap' : 'normal' }} className={`${styles.bubble} ${msg.sender === 'user' ? styles.bubbleUser : `${styles.bubbleAi} ${styles.markdown}`}`}>
+                {msg.sender === 'ai' ? <MentorMarkdown>{mentorAnswerText(msg.text)}</MentorMarkdown> : msg.text}
               </div>
 
               {msg.sender === 'ai' && ttsSupported && (
