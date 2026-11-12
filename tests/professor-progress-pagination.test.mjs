@@ -17,6 +17,34 @@ before(async () => {
 });
 after(async () => { await server?.close(); dom?.window.close(); });
 
+test('dedicated routes redirect legacy URL, expand navigation and fetch only their own table',async()=>{
+ const Component=(await server.ssrLoadModule('/src/pages/professor/components/ProfessorProgressRoutes.jsx')).default;
+ const adapter=api.defaults.adapter,calls=[];
+ api.defaults.adapter=async config=>{calls.push(config);return {status:200,headers:{},config,data:{...page(0,[]),last:true}};};
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);let navigate;
+ function Probe(){navigate=Router.useNavigate();return React.createElement('output',null,Router.useLocation().pathname);}
+ try{
+  await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Professor'},logout(){}}},React.createElement(Router.MemoryRouter,{initialEntries:['/professor/progress']},
+   React.createElement(Probe),React.createElement(Router.Routes,null,React.createElement(Router.Route,{path:'/professor/progress/*',element:React.createElement(Component)}))))));
+  assert.equal(host.querySelector('output').textContent,'/professor/progress/account-status');
+  assert.ok(calls.every(c=>c.url.endsWith('/progress-summaries')));
+  const group=()=>host.querySelector('[data-navigation-group]');assert.equal(group().getAttribute('aria-expanded'),'true');
+  await act(async()=>group().click());assert.equal(group().getAttribute('aria-expanded'),'false');
+  await act(async()=>group().click());
+  calls.length=0;
+  await act(async()=>host.querySelector('a[href="/professor/progress/learning-engagement"]').click());
+  assert.ok(calls.length);assert.ok(calls.every(c=>c.url.endsWith('/engagement')));
+  assert.equal(host.querySelector('a[aria-current="page"]').textContent,'Learning Engagement');
+  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent==='Former / Archived').click());
+  assert.equal(calls.at(-1).params.view,'FORMER');
+  await act(async()=>{const select=host.querySelector('#engagement-enrollment-filter');select.value='PREVIOUS';select.dispatchEvent(new Event('change',{bubbles:true}));});
+  assert.equal(calls.at(-1).params.enrollment,'PREVIOUS');
+  assert.equal(calls.at(-1).params.page,0);
+  await act(async()=>navigate(-1));assert.match(host.querySelector('output').textContent,/account-status$/);
+  await act(async()=>navigate(1));assert.match(host.querySelector('output').textContent,/learning-engagement$/);
+ }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=adapter;}
+});
+
 test('module panel scrolls into view, receives focus, switches students and restores trigger focus', async () => {
  const adapter=api.defaults.adapter, previousScroll=HTMLElement.prototype.scrollIntoView, scrolled=[];
  HTMLElement.prototype.scrollIntoView=function(options){scrolled.push({element:this,options});};
@@ -69,7 +97,7 @@ test('one request per page, clears previous rows while loading, renders zero cou
   await act(async()=>button(ui.host,'Next').click());
   assert.match(ui.host.textContent,/Loading student progress/);assert.ok(!ui.host.textContent.includes('Student A'));
   await act(async()=>resolveNext());assert.match(ui.host.textContent,/Student B/);assert.equal(button(ui.host,'Next').disabled,true);
-  assert.deepEqual(calls,[{url:'/professor/students/progress-summaries',params:{view:'CURRENT',page:0,size:20}},{url:'/professor/students/progress-summaries',params:{view:'CURRENT',page:1,size:20}}]);
+  assert.deepEqual(calls,[{url:'/professor/students/progress-summaries',params:{view:'CURRENT',page:0,size:5}},{url:'/professor/students/progress-summaries',params:{view:'CURRENT',page:1,size:5}}]);
   await act(async()=>button(ui.host,'Previous').click());assert.match(ui.host.textContent,/Student A/);assert.equal(calls.length,3);
  }finally{await ui.close();api.defaults.adapter=adapter;}
 });
@@ -118,8 +146,8 @@ test('current and former filters reset pages and share population with read-only
   assert.match(ui.host.textContent,/Current Student/);
   await act(async()=>button(ui.host,'Former / Archived').click());
   assert.match(ui.host.textContent,/Former Student/);assert.match(ui.host.textContent,/Archived/);assert.match(ui.host.textContent,/Read-only history/);
-  await act(async()=>[...ui.host.querySelectorAll('button')].find(b=>b.textContent==='View module activity').click());
-  const formerCalls=calls.filter(c=>c.params.view==='FORMER');assert.equal(formerCalls.length,3);assert.ok(formerCalls.every(c=>c.params.page===0&&c.method==='get'));
+  assert.equal([...ui.host.querySelectorAll('button')].find(b=>b.textContent==='View module activity'),undefined);
+  const formerCalls=calls.filter(c=>c.params.view==='FORMER');assert.equal(formerCalls.length,1);assert.ok(formerCalls.every(c=>c.params.page===0&&c.method==='get'));
   await act(async()=>button(ui.host,'Current Students').click());assert.doesNotMatch(ui.host.textContent,/Former Student|Close module activity/);
   assert.equal(calls.at(-1).params.view,'CURRENT');
  }finally{await ui.close();api.defaults.adapter=original;}
@@ -172,13 +200,64 @@ test('enrollment filters reset pagination and filter monitoring and engagement i
   for(const value of ['ACTIVE','NEVER','PREVIOUS']){
    await choose(value);
    const requests=calls.filter(c=>c.params.enrollment===value);
-   assert.equal(requests.length,2);assert.ok(requests.every(c=>c.params.page===0&&c.params.view==='CURRENT'));
-   assert.ok(requests.some(c=>c.url.endsWith('/engagement')));
+   assert.equal(requests.length,1);assert.ok(requests.every(c=>c.params.page===0&&c.params.view==='CURRENT'));
+   assert.ok(requests.every(c=>c.url.endsWith('/progress-summaries')));
   }
   assert.match(ui.host.textContent,/No students match these account and enrollment filters/);
   await act(async()=>button(ui.host,'Former / Archived').click());
-  assert.ok(calls.slice(-2).every(c=>c.params.view==='FORMER'&&c.params.enrollment==='PREVIOUS'));
-  await choose('ALL');assert.ok(calls.slice(-2).every(c=>!('enrollment' in c.params)));
+  assert.ok(calls.slice(-1).every(c=>c.params.view==='FORMER'&&c.params.enrollment==='PREVIOUS'));
+  await choose('ALL');assert.ok(calls.slice(-1).every(c=>!('enrollment' in c.params)));
   assert.ok(calls.every(c=>c.method==='get'));
  }finally{await ui.close();api.defaults.adapter=original;}
 });
+
+for (const component of ['StudentProgress', 'LearningEngagementPage']) {
+ for (const total of [0, 1, 5, 6, 10, 21]) test(`${component}: server pagination for ${total} students`, async () => {
+  const original=api.defaults.adapter,calls=[];let count=total;
+  api.defaults.adapter=async config=>{
+   calls.push(config.params);const {page:p,size}=config.params;
+   const students=Array.from({length:count},(_,i)=>row(i+1,`Record ${i+1}`));
+   return {status:200,headers:{},config,data:{content:students.slice(p*size,(p+1)*size),number:p,size,totalElements:count,totalPages:Math.ceil(count/size),first:p===0,last:(p+1)*size>=count}};
+  };
+  const ui=await mount(component);
+  const nav=()=>ui.host.querySelector('nav[aria-label$="pagination"]');
+  const click=async label=>act(async()=>[...nav().querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||b.textContent)===label).click());
+  const names=()=>[...ui.host.querySelectorAll('tbody tr')].map(r=>r.textContent.match(/Record \d+/)?.[0]).filter(Boolean);
+  try {
+   assert.equal(calls.length,1);assert.equal(calls[0].size,5);
+   assert.equal(names().length,Math.min(5,total));
+   assert.ok(nav().textContent.includes(`Showing ${total?1:0}\u2013${Math.min(5,total)} of ${total} students`));
+   assert.equal(nav().querySelector('button').disabled,true);
+   if(total>5){
+    await click('Next');assert.deepEqual(names(),Array.from({length:Math.min(5,total-5)},(_,i)=>`Record ${i+6}`));
+    await click('Previous');assert.equal(names()[0],'Record 1');
+    const last=Math.ceil(total/5);await click(`Page ${last}`);assert.equal(names()[0],`Record ${(last-1)*5+1}`);
+    assert.equal([...nav().querySelectorAll('button')].at(-1).disabled,true);
+   }
+   for(const size of [10,20,5]){
+    await act(async()=>{const select=nav().querySelector('select');select.value=String(size);select.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.equal(calls.at(-1).page,0);assert.equal(calls.at(-1).size,size);assert.equal(names().length,Math.min(size,total));
+   }
+   if(total===21){
+    // Results disappear between requests: out-of-range API page requires one corrective fetch.
+    count=1;const before=calls.length;await click('Page 5');
+    assert.deepEqual(calls.slice(before).map(c=>c.page),[4,0]);
+    assert.deepEqual(names(),['Record 1']);assert.match(nav().textContent,/Showing 1\u20131 of 1 students/);
+   }
+  } finally {await ui.close();api.defaults.adapter=original;}
+ });
+ test(`${component}: filters reset server page independently`,async()=>{
+  const original=api.defaults.adapter,calls=[];
+  api.defaults.adapter=async config=>{calls.push(config.params);return {status:200,headers:{},config,data:{...page(config.params.page,[row(1,'Record')]),size:config.params.size}};};
+  const ui=await mount(component);
+  const next=async()=>act(async()=>[...ui.host.querySelectorAll('button')].find(b=>b.textContent==='Next').click());
+  try{
+   await next();assert.equal(calls.at(-1).page,1);
+   await act(async()=>[...ui.host.querySelectorAll('button')].find(b=>b.textContent==='Former / Archived').click());
+   assert.equal(calls.at(-1).page,0);assert.equal(calls.at(-1).view,'FORMER');
+   await next();
+   await act(async()=>{const select=ui.host.querySelector('select[id$="enrollment-filter"]');select.value='ACTIVE';select.dispatchEvent(new Event('change',{bubbles:true}));});
+   assert.equal(calls.at(-1).page,0);assert.equal(calls.at(-1).enrollment,'ACTIVE');
+  }finally{await ui.close();api.defaults.adapter=original;}
+ });
+}

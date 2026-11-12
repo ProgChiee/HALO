@@ -50,7 +50,10 @@ export const ADMIN_NAV_ITEMS = [
 export const PROFESSOR_NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutGrid, path: '/professor', end: true, section: 'Main' },
   { label: 'Subjects', icon: BookOpen, path: '/professor/subjects', section: 'Main' },
-  { label: 'Student Progress', icon: TrendingUp, path: '/professor/progress', section: 'Main' },
+  { label: 'Student Progress', icon: TrendingUp, path: '/professor/progress', section: 'Main', children: [
+    { label: 'Account Status', icon: Users, path: '/professor/progress/account-status' },
+    { label: 'Learning Engagement', icon: Activity, path: '/professor/progress/learning-engagement' },
+  ] },
   { label: 'Profile', icon: UserIcon, path: '/professor/profile', section: 'Account' },
   { label: 'Settings', icon: Settings, path: '/professor/settings', section: 'Account' },
 ];

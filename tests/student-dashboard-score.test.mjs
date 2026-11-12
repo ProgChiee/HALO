@@ -19,6 +19,33 @@ before(async () => {
 });
 after(async () => { await server.close(); dom.window.close(); });
 
+test('Dashboard paginates enrolled subjects only without altering authoritative progress', async () => {
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+  let calls=0;
+  const workflow={basePath:'/student',api:{getDashboardData:async()=>({}),getSubjectWeeks:async()=>[],getSubjectsData:async()=>{
+    calls++;return Array.from({length:22},(_,i)=>({subjectId:i,subjectName:`Subject ${i}`,subjectCode:`AHRT${i}`,enrolled:i!==0,progressPercentage:100}));
+  }}};
+  try{
+    await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Student'},logout(){}}},
+      React.createElement(Workflow.Provider,{value:workflow},React.createElement(Router.MemoryRouter,null,React.createElement(Dashboard))))));
+    const nav=host.querySelector('[aria-label="Enrolled Subjects pagination"]');
+    assert.match(nav.textContent,/Showing 1–5 of 21 subjects/);
+    assert.equal(host.querySelectorAll('progress').length,5);
+    await act(async()=>nav.querySelector('[aria-label="Page 5"]').click());
+    assert.match(nav.textContent,/Showing 21–21 of 21/);
+    assert.equal(host.querySelectorAll('progress').length,1);assert.equal(host.querySelector('progress').value,100);
+    const section=host.querySelector('[aria-labelledby="enrolled-subjects-title"]');
+    assert.ok(section.contains(nav));
+    const search=async value=>act(async()=>{const input=section.querySelector('input[type="search"]');Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});
+    await search('  ahrt21  ');assert.match(nav.textContent,/Showing 1–1 of 1/);assert.match(section.textContent,/Subject 21/);
+    await search('sUBjECT 1');assert.match(nav.textContent,/Showing 1–5 of 11/);
+    await search('AHRT0');assert.match(section.textContent,/No subjects found/);assert.match(nav.textContent,/Showing 0–0 of 0/);
+    await act(async()=>[...section.querySelectorAll('button')].find(b=>b.textContent==='Clear search').click());
+    assert.match(nav.textContent,/Showing 1–5 of 21/);assert.equal(document.activeElement,section.querySelector('input'));
+    assert.equal(calls,1);
+  }finally{await act(async()=>root.unmount());host.remove();}
+});
+
 test('Continue resumes persisted recent module after remount and navigates to its subject/week', async () => {
   const workflow = { acting: false, basePath: '/student', api: {
     getDashboardData: async () => ({}),

@@ -1,3 +1,4 @@
+import StudentTablePagination from './StudentTablePagination';
 import { professorEnrollmentLabel } from '../../../utils/professorEnrollment';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
@@ -8,7 +9,8 @@ import AssessmentAttemptHistory from './AssessmentAttemptHistory';
 
 export default function LearningEngagement({ view = 'CURRENT', enrollment = 'ALL' }) {
   const [page, setPage] = useState(0);
-  return <EngagementPage key={`${view}-${enrollment}-${page}`} enrollment={enrollment} view={view} page={page} changePage={setPage} />;
+  const [size, setSize] = useState(5);
+  return <EngagementPage size={size} onSizeChange={next => { setSize(next); setPage(0); }} key={`${view}-${enrollment}-${page}-${size}`} enrollment={enrollment} view={view} page={page} changePage={setPage} />;
 }
 
 function ModuleActivity({ student, onClose, view, panelId }) {
@@ -47,18 +49,19 @@ function ModuleActivityPage({ studentId, page, setPage, view }) {
   </>;
 }
 
-function EngagementPage({ page, changePage, view, enrollment }) {
+function EngagementPage({ size, onSizeChange, page, changePage, view, enrollment }) {
   const { api } = useProfessorWorkflow();
   const [selected, setSelected] = useState(null);
   const panelPrefix = useId();
   const trigger = useRef(null);
-  const load = useCallback(config => api.getLearningEngagement(page, 20, { ...config, params: { view, ...(enrollment === 'ALL' ? {} : { enrollment }) } }), [api, page, view, enrollment]);
+  const load = useCallback(config => api.getLearningEngagement(page, size, { ...config, params: { view, ...(enrollment === 'ALL' ? {} : { enrollment }) } }), [api, page, size, view, enrollment]);
   const { data, isLoading, error, reload } = useRemoteData(load);
   return <section aria-labelledby="learning-engagement-title" className={styles.engagement}>
     <h2 id="learning-engagement-title">Learning Engagement</h2>
     <p className={styles.engagementHelp}>Academically eligible students matching the account and enrollment filters. Historical activity is retained after unenrollment. Study days include lesson opens, assessments, completions, and Mentor messages. Lesson-open history starts when tracking is deployed.</p>
     {isLoading ? <p role="status">Loading engagement...</p> : error ? <div role="alert"><p>{professorErrorMessage(error, 'Could not load learning engagement. Please try again.')}</p><button onClick={reload}>Retry engagement</button></div> : <>
 
+      <div className={styles.tableContainer}>
       <div className={styles.tableCard} role="region" aria-label="Learning engagement table, scroll horizontally" tabIndex={0}>
         <table className={styles.progressTable} aria-label="Learning engagement">
           <thead><tr className={styles.tableHeaderRow}><th scope="col">Student</th><th scope="col">Active Study Days<br />This Week</th><th scope="col">Active Study Days<br />This Month</th><th scope="col">AI Mentor Sessions<br />This Week</th><th scope="col">AI Mentor Sessions<br />This Month</th></tr></thead>
@@ -67,11 +70,12 @@ function EngagementPage({ page, changePage, view, enrollment }) {
           </tbody>
         </table>
       </div>
+      <StudentTablePagination label="Learning engagement pagination" data={data} page={page} size={size} onPageChange={changePage} onSizeChange={onSizeChange} />
+      </div>
       <details className={styles.metricNotes}><summary>About dates and consistency labels</summary>
       <p className={styles.engagementHelp}>Weeks start Monday. Dates use {data?.timezone || 'the server timezone'}. Mentor sessions count once per period when the Student sends a message.</p>
       <p className={styles.engagementHelp}>Learning Consistency: weekly 3+ active days = Consistent, 2 = Moderate, 0-1 = Low Activity. Monthly 8+ = Consistent, 4-7 = Moderate, 0-3 = Low Activity. These labels describe activity so far, not a score.</p>
       </details>
-      <nav aria-label="Learning engagement pagination"><button disabled={!data || data.first} onClick={() => changePage(page - 1)}>Previous</button><span> Page {page + 1} of {Math.max(1, data?.totalPages ?? 0)} </span><button disabled={!data || data.last} onClick={() => changePage(page + 1)}>Next</button></nav>
       {selected && <ModuleActivity panelId={`${panelPrefix}-${selected.userId}`} view={view} key={selected.userId} student={selected} onClose={() => { setSelected(null); trigger.current?.focus(); }} />}
     </>}
   </section>;

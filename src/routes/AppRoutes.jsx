@@ -27,7 +27,7 @@ const ProfessorDashboard = lazy(() => import('../pages/professor/components/Prof
 const SubjectManagement = lazy(() => import('../pages/admin/components/SubjectManagement'));
 const ProfessorSubjectManagement = lazy(() => import('../pages/professor/components/SubjectManagement'));
 const LessonEditor = lazy(() => import('../pages/professor/components/LessonEditor'));
-const StudentProgress = lazy(() => import('../pages/professor/components/StudentProgress'));
+const StudentProgress = lazy(() => import('../pages/professor/components/ProfessorProgressRoutes'));
 const ProfessorProfile = lazy(() => import('../pages/professor/components/ProfessorProfile'));
 const StudentDashboard = lazy(() => import('../pages/student/components/StudentDashboard'));
 const EnrollmentSubjects = lazy(() => import('../pages/student/components/EnrollmentSubjects'));
@@ -128,7 +128,7 @@ export default function AppRoutes() {
         <Route index element={<ProfessorDashboard />} />
         <Route path="subjects" element={<ProfessorSubjectManagement />} />
         <Route path="subjects/:subjectId/week/:weekId" element={<LessonEditorRoute />} />
-        <Route path="progress" element={<StudentProgress />} />
+        <Route path="progress/*" element={<StudentProgress />} />
         <Route path="profile" element={<ProfessorProfile />} />
         <Route path="*" element={<Navigate to="subjects" replace />} />
       </Route>
@@ -137,7 +137,7 @@ export default function AppRoutes() {
         <Route index element={<ProfessorDashboard />} />
         <Route path="subjects" element={<ProfessorSubjectManagement />} />
         <Route path="subjects/:subjectId/week/:weekId" element={<LessonEditorRoute />} />
-        <Route path="progress" element={<StudentProgress />} />
+        <Route path="progress/*" element={<StudentProgress />} />
         <Route path="profile" element={<ProfessorProfile />} />
         <Route path="*" element={<Navigate to="subjects" replace />} />
       </Route>
@@ -176,7 +176,7 @@ export default function AppRoutes() {
         <Route index element={<ProfessorDashboard />} />
         <Route path="subjects" element={<ProfessorSubjectManagement />} />
         <Route path="subjects/:subjectId/week/:weekId" element={<LessonEditorRoute />} />
-        <Route path="progress" element={<StudentProgress />} />
+        <Route path="progress/*" element={<StudentProgress />} />
         <Route path="profile" element={<ProfessorProfile />} />
         <Route path="*" element={<Navigate to="subjects" replace />} />
       </Route>
@@ -185,7 +185,7 @@ export default function AppRoutes() {
         <Route index element={<ProfessorDashboard />} />
         <Route path="subjects" element={<ProfessorSubjectManagement />} />
         <Route path="subjects/:subjectId/week/:weekId" element={<LessonEditorRoute />} />
-        <Route path="progress" element={<StudentProgress />} />
+        <Route path="progress/*" element={<StudentProgress />} />
         <Route path="profile" element={<ProfessorProfile />} />
         <Route path="*" element={<Navigate to="subjects" replace />} />
       </Route>
@@ -271,7 +271,7 @@ export default function AppRoutes() {
       />
 
       <Route
-        path="/professor/progress"
+        path="/professor/progress/*"
         element={
           <ProtectedRoute allowedRoles={[ROLES.PROFESSOR]}>
             <StudentProgress />

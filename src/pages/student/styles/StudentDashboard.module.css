@@ -129,6 +129,7 @@
   flex-direction: column;
   gap: var(--space-sm);
 }
+.subjectCode { display: block; margin-top: var(--space-1); font-size: var(--font-size-sm); font-weight: 400; color: var(--color-text-secondary); overflow-wrap: anywhere; }
 
 .subjectRow {
   display: flex;

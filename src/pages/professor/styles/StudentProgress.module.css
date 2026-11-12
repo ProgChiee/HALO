@@ -203,3 +203,23 @@
 .enrollmentFilter select { min-height: 44px; max-width: 100%; padding: var(--space-2) var(--space-3); background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: var(--radius-md); font: inherit; }
 .enrollmentFilter select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 @media (max-width: 480px) { .enrollmentFilter { align-items: stretch; flex-direction: column; } .enrollmentFilter select { width: 100%; } }
+.monitoringCard { min-width: 0; padding: var(--space-5); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.monitoringCard nav { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.monitoringCard nav button { padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text-primary); }
+.monitoringCard nav button:disabled { opacity: .5; }
+.monitoringCard nav button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.monitoringCard .engagement { margin-top: var(--space-4); }
+@media (max-width: 640px) { .monitoringCard { padding: var(--space-3); } }
+.tableContainer { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+.tableContainer .tableCard { border: 0; border-radius: 0; }
+.monitoringCard .studentPagination { margin: 0; padding: var(--space-3); border-top: 1px solid var(--color-border); gap: var(--space-3); }
+.studentPagination p { flex: 1 1 100%; margin: 0; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+.studentPagination label { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); font-size: var(--font-size-sm); }
+.studentPagination select { min-height: 40px; padding: var(--space-2); background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: var(--radius-sm); font: inherit; }
+.pageButtons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.pageButtons > span { display: inline-flex; align-items: center; gap: var(--space-2); }
+.studentPagination button { min-height: 40px; min-width: 40px; }
+.monitoringCard .studentPagination button[aria-current="page"] { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-text-primary); font-weight: 700; }
+.studentPagination select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.studentPagination button:not(:disabled):hover { border-color: var(--color-primary); }
+@media (max-width: 480px) { .pageButtons { gap: 4px; } .monitoringCard .studentPagination { padding: var(--space-2); } }

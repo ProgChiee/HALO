@@ -19,6 +19,14 @@ import { lessonErrorMessage } from '../../../utils/lessonErrors';
 import styles from '../styles/LessonChat.module.css';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 
+const welcome = "Hey there! 👋 I'm HALO, your learning buddy for this lesson. What would you like to explore today?";
+const suggestions = [
+  ['📖 Understand a Concept', 'Help me understand a key concept from this lesson.'],
+  ['💡 Explore Practical Examples', 'Show me a practical example of a concept from this lesson.'],
+  ['🔍 Explain Simply', 'Explain a key concept from this lesson in simple terms.'],
+  ['🎯 Practice Challenge', 'Give me a short practice challenge based on this lesson.'],
+];
+
 // Route weekId resolves to the approved module ID before opening its mentor session.
 export default function LessonChat() {
   const { topicId, weekId } = useParams();
@@ -40,6 +48,7 @@ function ModuleLessonChat({ topicId, weekId }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [beforeId, setBeforeId] = useState(null);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState('');
@@ -75,6 +84,7 @@ function ModuleLessonChat({ topicId, weekId }) {
   useEffect(() => {
     const controller = new AbortController();
     requestScope.current = controller;
+    const openedAt = Date.now();
     sendLock.current = false;
     loadLessonChat({
       subjectId: topicId, weekId, signal: controller.signal, getLesson: getWeekLesson, openMentor: openSession,
@@ -85,12 +95,19 @@ function ModuleLessonChat({ topicId, weekId }) {
         setMentorLoading(true);
       },
       onMentor: (conversation) => {
+        const first = conversation.messages[0];
+        // Normal/Support timestamps are Manila wall time; Preview uses server-local time.
+        // Do not guess freshness for Preview or for missing timestamps.
+        const createdAt = first?.createdAt && !workflow.preview
+          ? Date.parse(first.createdAt + (/[zZ]|[+-]\d\d:\d\d$/.test(first.createdAt) ? '' : '+08:00')) : NaN;
+        const fresh = !conversation.hasOlder && (conversation.messages.length === 0
+          || (conversation.messages.length === 1 && first.sender === 'HALO' && createdAt >= openedAt && createdAt <= Date.now()));
+        setShowSuggestions(fresh);
         setBeforeId(conversation.hasOlder ? conversation.nextBeforeId : null);
         setSessionId(conversation.sessionId);
         setMentorLoading(false);
-        setMessages(conversation.messages.map((m) => ({
-          id: m.id, sender: m.sender === 'STUDENT' ? 'user' : 'ai', text: m.message,
-        })));
+        setMessages(fresh ? [{ id: first?.id ?? 'welcome', sender: 'ai', text: welcome }]
+          : conversation.messages.map((m) => ({ id: m.id, sender: m.sender === 'STUDENT' ? 'user' : 'ai', text: m.message })));
       },
       onError: (error, stage) => {
         setEnrollmentRequired(error?.response?.data?.code === 'ENROLLMENT_REQUIRED');
@@ -100,7 +117,7 @@ function ModuleLessonChat({ topicId, weekId }) {
       },
     });
     return () => { controller.abort(); };
-  }, [topicId, weekId, reloadKey, navigate, workflow.basePath, getWeekLesson, openSession]);
+  }, [topicId, weekId, reloadKey, navigate, workflow.basePath, workflow.preview, getWeekLesson, openSession]);
 
   useEffect(() => {
     if (prepending.current) { prepending.current = false; return; }
@@ -132,6 +149,7 @@ function ModuleLessonChat({ topicId, weekId }) {
     setLesson(null);
     setSessionId(null);
     setMessages([]);
+    setShowSuggestions(false);
     setReloadKey((key) => key + 1);
   }
 
@@ -175,12 +193,12 @@ function ModuleLessonChat({ topicId, weekId }) {
     }
   }
 
-  async function handleSend(e) {
+  async function handleSend(e, suggestedText) {
     e.preventDefault();
     if (sendLock.current || voiceBusy) return;
 
-    const text = draft.trim();
-    if (!text || draft.length > 4000) {
+    const text = (suggestedText ?? draft).trim();
+    if (!text || (suggestedText ?? draft).length > 4000) {
       showToast(draftError || 'Enter a message before sending.', 'error');
       return;
     }
@@ -189,6 +207,7 @@ function ModuleLessonChat({ topicId, weekId }) {
     const scope = requestScope.current;
     if (!scope || scope.signal.aborted) return;
     sendLock.current = true;
+    setShowSuggestions(false);
     if (!pendingSend.current || pendingSend.current.text !== text || pendingSend.current.sessionId !== sessionId) {
       pendingSend.current = { text, sessionId, requestId: crypto.randomUUID() };
     }
@@ -310,6 +329,13 @@ function ModuleLessonChat({ topicId, weekId }) {
               )}
             </div>
           ))}
+
+          {showSuggestions && !mentorLoading && !loadError && sessionId && (
+            <div className={styles.suggestions} role="group" aria-label="Explore this lesson">
+              {suggestions.map(([label, prompt]) => <button key={label} type="button"
+                disabled={isAiTyping || voiceBusy} onClick={event => handleSend(event, prompt)}>{label}</button>)}
+            </div>
+          )}
 
           {isAiTyping && (
             <div className={styles.messageBlock}>

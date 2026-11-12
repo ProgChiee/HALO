@@ -25,7 +25,7 @@ function Group({ label, Icon, childrenItems, active }) {
   const [open, setOpen] = useState(active), id = useId();
   return <div><button type="button" data-navigation-group className={styles.navItem + ' ' + styles.groupButton} aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
     <Icon size={18} />{label}<ChevronDown size={16} className={open ? styles.chevronOpen : styles.chevron} />
-  </button><div id={id} hidden={!open} className={styles.submenu}>{childrenItems.map(child => <NavLink key={child.path} to={child.path} className={({ isActive }) => styles.navItem + (isActive ? ' ' + styles.navItemActive : '')}>{child.label}</NavLink>)}</div></div>;
+  </button><div id={id} hidden={!open} className={styles.submenu}>{childrenItems.map(child => <NavLink key={child.path} to={child.path} className={({ isActive }) => styles.navItem + (isActive ? ' ' + styles.navItemActive : '')}>{child.icon && <child.icon size={16} aria-hidden="true" />}{child.label}</NavLink>)}</div></div>;
 }
 export default function Sidebar({ navItems = [], progress, sectionLabel = 'Overview', roleBadge }) {
   const { user } = useAuth();

@@ -6,6 +6,9 @@ import { CheckCircle2, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import StudentPageShell from './StudentPageShell';
 import styles from '../styles/Progress.module.css';
+import sectionStyles from '../styles/SubjectSection.module.css';
+import SubjectPagination from '../../../components/shared/SubjectPagination';
+import { useSubjectPagination } from '../../../hooks/useSubjectPagination';
 
 // Module totals and completion counts use the same eligible-subject summaries.
 export default function Progress() {
@@ -16,6 +19,10 @@ export default function Progress() {
 
   const [subjects, setSubjects] = useState([]);
   const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const visibleSubjects = subjects.filter(subject =>
+    [subject.subjectName, subject.subjectCode].some(value => (value ?? '').toLowerCase().includes(query)));
+  const subjectPages = useSubjectPagination(visibleSubjects, search);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,9 +72,6 @@ export default function Progress() {
   const completedModules = subjects.reduce((sum, s) => sum + s.completedWeeks, 0);
   const overall = totalModules > 0 ? Math.round((completedModules / totalModules) * 100) : 0;
 
-  const query = search.trim().toLowerCase();
-  const visibleSubjects = subjects.filter(subject =>
-    [subject.subjectName, subject.subjectCode].some(value => (value ?? '').toLowerCase().includes(query)));
 
   return (
     <StudentPageShell>
@@ -115,8 +119,9 @@ export default function Progress() {
             </div>
           </div>
 
+          <section className={sectionStyles.container} aria-labelledby="subject-progress-title">
           <div className={styles.sectionHeaderRow}>
-            <h2 className={styles.sectionTitle}>Subject Progress</h2>
+            <h2 id="subject-progress-title" className={styles.sectionTitle}>Subject Progress</h2>
             <Link to={workflow.basePath + '/subjects/my'} className={styles.viewAllLink}>View all subjects</Link>
           </div>
           <div className={styles.searchBar}>
@@ -129,7 +134,7 @@ export default function Progress() {
             </div>
           </div>
           <div className={styles.rowsList}>
-            {visibleSubjects.map((subject) => (
+            {subjectPages.items.map((subject) => (
               <div key={subject.subjectId} className={styles.subjectRow}>
                 <div className={styles.subjectInfo}><h3 className={styles.subjectName}>{subject.subjectName}</h3>
                   {subject.subjectCode && <p className={styles.subjectCode}>{subject.subjectCode}</p>}</div>
@@ -142,6 +147,8 @@ export default function Progress() {
               <p className={styles.emptyState}>No subjects enrolled yet.</p>
             )}
           </div>
+          <SubjectPagination pagination={subjectPages} label="Subject Progress pagination" />
+          </section>
         </main>
       </div>
     </StudentPageShell>

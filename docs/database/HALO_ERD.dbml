@@ -1,0 +1,400 @@
+  // Actual LOCAL halo_db metadata, 2026-11-12. Documentation only, not migration SQL.
+  Project HALO {
+    database_type: 'MySQL'
+    Note: 'MariaDB 10.4.32 local schema. Only verified database foreign keys are drawn.'
+  }
+
+  Table halo_db.activity_log_entity {
+    Note: 'Security and academic activity audit events.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    action varchar(255) [null, note: 'Original audit description; no values inspected. Metadata default: NULL.']
+    created_at datetime(6) [null, note: 'Timestamp for created. Metadata default: NULL.']
+    user_id bigint(20) [null, note: 'Reference to user_entity.id. Metadata default: NULL.']
+    activity_type "enum('ACCOUNT','ASSESSMENT','AUTH','BADGE','MODULE','PROGRESS')" [null, note: 'Audit activity category. Metadata default: NULL.']
+    acting_target_id bigint(20) [null, note: 'Reference to user_entity.id. Metadata default: NULL.']
+    acting_target_role varchar(32) [null, note: 'Audited target role. Metadata default: NULL.']
+    acting_session_id varchar(36) [null, note: 'Reference to admin_acting_session.id. Metadata default: NULL.']
+    auth_event varchar(64) [null, note: 'Structured authentication or acting event type. Metadata default: NULL.']
+    auth_display varchar(512) [null, note: 'Authentication audit display metadata; no values inspected. Metadata default: NULL.']
+    auth_event_key varchar(64) [null, note: 'Authentication audit deduplication key. Metadata default: NULL.']
+    indexes {
+      (auth_event_key) [unique, name: 'uk_activity_auth_event_key']
+    }
+  }
+
+  Table halo_db.admin_acting_session {
+    Note: 'Time-limited administrator acting context and target identity.'
+    id varchar(36) [not null, pk, note: 'Row identifier.']
+    admin_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    target_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    target_role varchar(32) [not null, note: 'Acting target role captured at entry.']
+    admin_token_version bigint(20) [not null, note: 'Original actor token version captured at entry.']
+    target_token_version bigint(20) [not null, note: 'Target token version captured at entry.']
+    created_at datetime(6) [not null, note: 'Timestamp for created.']
+    expires_at datetime(6) [not null, note: 'Timestamp for expires.']
+    revoked_at datetime(6) [null, note: 'Timestamp for revoked. Metadata default: NULL.']
+  }
+
+  Table halo_db.ai_learning_files {
+    Note: 'Learning attachment metadata and storage references, not original file bytes.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    file_path varchar(255) [not null, note: 'Storage object reference or historical local path; values not inspected.']
+    file_type varchar(255) [not null, note: 'Learning material MIME type.']
+    original_file_name varchar(255) [not null, note: 'Original upload filename.']
+    stored_file_name varchar(255) [not null, note: 'Storage-assigned filename.']
+    ai_learning_module_id bigint(20) [not null, note: 'Reference to ai_learning_modules.id.']
+  }
+
+  Table halo_db.ai_learning_modules {
+    Note: 'Week-scoped generated and approved lesson content.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    ai_notes longtext [null, note: 'Professor-provided AI generation notes. Metadata default: NULL.']
+    generated_examples longtext [null, note: 'Generated lesson examples. Metadata default: NULL.']
+    generated_knowledge longtext [null, note: 'Generated lesson knowledge content. Metadata default: NULL.']
+    generated_objectives longtext [null, note: 'Generated learning objectives. Metadata default: NULL.']
+    generated_summary longtext [null, note: 'Generated lesson summary. Metadata default: NULL.']
+    lesson_text longtext [null, note: 'Generated/published lesson body. Metadata default: NULL.']
+    status "enum('APPROVED','DECLINED','PENDING')" [null, note: 'Record lifecycle state; see enum type if constrained. Metadata default: NULL.']
+    uploaded_pdf longtext [null, note: 'Legacy PDF-related field absent from current entity; precise meaning unverified. Metadata default: NULL.']
+    youtube_link varchar(255) [null, note: 'Supplementary video URL. Metadata default: NULL.']
+    week_id bigint(20) [not null, note: 'Reference to weeks.id.']
+    ai_generation_status "enum('COMPLETED','DECLINED','FAILED','PENDING')" [null, note: 'AI generation lifecycle status. Metadata default: NULL.']
+    generation_token varchar(36) [null, note: 'AI generation ownership/correlation identifier; values not inspected. Metadata default: NULL.']
+    version bigint(20) [not null, note: 'Optimistic concurrency version.']
+    assessment_needs_review tinyint(1) [not null, note: 'Flags quiz review after lesson changes. Metadata default: 0.']
+    indexes {
+      (week_id) [unique, name: 'UKnsb9jv0dl6yqg7x7warv9vehs']
+    }
+  }
+
+  Table halo_db.assessments {
+    Note: 'Versioned module quizzes and approval lifecycle.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    created_at datetime(6) [not null, note: 'Timestamp for created.']
+    passing_score int(11) [not null, note: 'Assessment passing threshold.']
+    status varchar(20) [not null, note: 'Record lifecycle state; see enum type if constrained.']
+    title varchar(255) [not null, note: 'Display title.']
+    module_id bigint(20) [not null, note: 'Reference to ai_learning_modules.id.']
+    quiz_version int(11) [not null, note: 'Assessment version within module. Metadata default: 1.']
+    source_module_version bigint(20) [null, note: 'Module version used for assessment generation. Metadata default: NULL.']
+    approved_at datetime(6) [null, note: 'Timestamp for approved. Metadata default: NULL.']
+    current_module_id bigint(20) [null, note: 'Generated key for current assessment uniqueness; not an independent FK. STORED GENERATED: case when `status` in (\'AVAILABLE\',\'INACTIVE\') then `module_id` else NULL end. Metadata default: NULL.']
+    indexes {
+      (current_module_id) [unique, name: 'uk_assessment_current_module']
+      (module_id, quiz_version) [unique, name: 'uk_assessment_module_version']
+    }
+  }
+
+  Table halo_db.assessment_attempts {
+    Note: 'Student attempts, submission timestamps and results.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    passed bit(1) [not null, note: 'Assessment pass/fail result.']
+    score int(11) [not null, note: 'Recorded assessment score.']
+    started_at datetime(6) [not null, note: 'Timestamp for started.']
+    submitted_at datetime(6) [null, note: 'Timestamp for submitted. Metadata default: NULL.']
+    assessment_id bigint(20) [not null, note: 'Reference to assessments.id.']
+    student_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+  }
+
+  Table halo_db.assessment_questions {
+    Note: 'Ordered multiple-choice assessment questions.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    correct_answer varchar(1) [not null, note: 'Correct option identifier; no values inspected.']
+    optiona varchar(255) [not null, note: 'Answer option A.']
+    optionb varchar(255) [not null, note: 'Answer option B.']
+    optionc varchar(255) [not null, note: 'Answer option C.']
+    optiond varchar(255) [not null, note: 'Answer option D.']
+    question_number int(11) [not null, note: 'Question ordering number.']
+    question_text longtext [not null, note: 'Question body.']
+    assessment_id bigint(20) [not null, note: 'Reference to assessments.id.']
+  }
+
+  Table halo_db.lesson_revisions {
+    Note: 'Current working revision slot per module.'
+    module_id bigint(20) [not null, pk, note: 'Reference to ai_learning_modules.id.']
+    version bigint(20) [not null, note: 'Optimistic concurrency version.']
+    base_version bigint(20) [not null, note: 'Base module version for a revision.']
+    revision_number int(11) [not null, note: 'Revision number within module.']
+    state varchar(16) [not null, note: 'Working-revision lifecycle state.']
+    payload longtext [not null, note: 'Serialized lesson snapshot including attachment metadata.']
+    revised_by bigint(20) [not null, note: 'Revising user ID; application-level reference without a database FK.']
+    revised_at datetime(6) [not null, note: 'Timestamp for revised.']
+    published_by bigint(20) [null, note: 'Publishing user ID; application-level reference without a database FK. Metadata default: NULL.']
+    published_at datetime(6) [null, note: 'Timestamp for published. Metadata default: NULL.']
+  }
+
+  Table halo_db.lesson_revision_history {
+    Note: 'Immutable published revision snapshots.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    module_id bigint(20) [not null, note: 'Reference to ai_learning_modules.id.']
+    revision_number int(11) [not null, note: 'Revision number within module.']
+    snapshot_kind varchar(24) [not null, note: 'Revision snapshot classification.']
+    revision_version bigint(20) [null, note: 'Captured working-revision version. Metadata default: NULL.']
+    base_version bigint(20) [null, note: 'Base module version for a revision. Metadata default: NULL.']
+    published_module_version bigint(20) [null, note: 'Published module version in snapshot. Metadata default: NULL.']
+    payload longtext [not null, note: 'Serialized lesson snapshot including attachment metadata.']
+    revised_by bigint(20) [null, note: 'Revising user ID; application-level reference without a database FK. Metadata default: NULL.']
+    revised_at datetime(6) [null, note: 'Timestamp for revised. Metadata default: NULL.']
+    published_by bigint(20) [null, note: 'Publishing user ID; application-level reference without a database FK. Metadata default: NULL.']
+    published_at datetime(6) [null, note: 'Timestamp for published. Metadata default: NULL.']
+    recorded_at datetime(6) [not null, note: 'Timestamp for recorded.']
+    indexes {
+      (module_id, revision_number) [unique, name: 'uq_lesson_history_version']
+    }
+  }
+
+  Table halo_db.lesson_study_days {
+    Note: 'Per-student/module/calendar-day study and review counters.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    student_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    module_id bigint(20) [not null, note: 'Reference to ai_learning_modules.id.']
+    study_date date [not null, note: 'Calendar study date.']
+    last_opened_at datetime(6) [null, note: 'Timestamp for last opened. Metadata default: NULL.']
+    review_count bigint(20) [not null, note: 'Lesson review count. Metadata default: 0.']
+    indexes {
+      (student_id, module_id, study_date) [unique, name: 'uk_lesson_study_day']
+    }
+  }
+
+  Table halo_db.mentor_messages {
+    Note: 'Student and HALO conversation messages and request reconciliation.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    created_at datetime(6) [not null, note: 'Timestamp for created.']
+    message longtext [not null, note: 'Mentor message text; no values inspected.']
+    sender "enum('HALO','STUDENT')" [not null, note: 'HALO or STUDENT speaker.']
+    session_id bigint(20) [not null, note: 'Reference to mentor_sessions.id.']
+    request_id varchar(36) [null, note: 'Message-exchange reconciliation request ID. Metadata default: NULL.']
+    indexes {
+      (session_id, request_id, sender) [unique, name: 'uk_mentor_request_sender']
+    }
+  }
+
+  Table halo_db.mentor_sessions {
+    Note: 'Student conversations scoped to a module.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    last_activity_at datetime(6) [null, note: 'Timestamp for last activity. Metadata default: NULL.']
+    started_at datetime(6) [not null, note: 'Timestamp for started.']
+    ai_learning_module_id bigint(20) [not null, note: 'Reference to ai_learning_modules.id.']
+    student_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    covered_concepts longtext [null, note: 'Legacy concept field absent from current entity; precise meaning unverified. Metadata default: NULL.']
+    progress_status "enum('COMPLETED','LEARNING','NOT_STARTED','READY_FOR_ASSESSMENT')" [not null, note: 'Mentor learning lifecycle status.']
+  }
+
+  Table halo_db.password_reset_otps {
+    Note: 'Password-reset verifier, expiry and attempt tracking.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    created_at datetime(6) [not null, note: 'Timestamp for created.']
+    expires_at datetime(6) [not null, note: 'Timestamp for expires.']
+    otp varchar(255) [not null, note: 'Versioned keyed reset-code verifier (entity comment); no values inspected.']
+    user_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    failed_attempts int(11) [not null, note: 'Failed reset-verification counter. Metadata default: 0.']
+    indexes {
+      (user_id) [unique, name: 'UK54nf04xn0b2a3xxlysc84u9d7']
+    }
+  }
+
+  Table halo_db.password_reset_rate_limits {
+    Note: 'Password-reset admission-throttling buckets.'
+    bucket_key varchar(64) [not null, pk, note: 'Throttle bucket identifier; no values inspected.']
+    window_started_at datetime(6) [not null, note: 'Timestamp for window started.']
+    event_count int(11) [not null, note: 'Rate-limit event counter.']
+    next_allowed_at datetime(6) [null, note: 'Timestamp for next allowed. Metadata default: NULL.']
+  }
+
+  Table halo_db.professor_entity {
+    Note: 'Professor identity linked to a user account.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    professor_id varchar(255) [null, note: 'Institutional professor identifier when not a foreign key. Metadata default: NULL.']
+    user_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    professor_id_normalized varbinary(1020) [null, note: 'Generated binary normalized professor identifier for uniqueness. VIRTUAL GENERATED: convert(trim(`professor_id`) using binary). Metadata default: NULL.']
+    indexes {
+      (user_id) [unique, name: 'UKpo9e1orfoqpgh1tlsvm7imw3j']
+      (professor_id_normalized) [unique, name: 'uk_professor_id_normalized']
+    }
+  }
+
+  Table halo_db.professor_profile_entity {
+    Note: 'Professor-profile-shaped table; no current JPA mapping, current purpose unverified.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    professor_id varchar(255) [null, note: 'Institutional professor identifier when not a foreign key. Metadata default: NULL.']
+    user_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    indexes {
+      (user_id) [unique, name: 'UKnst7732k7s5wqidj5eo69mn93']
+    }
+  }
+
+  Table halo_db.student_answers {
+    Note: 'Student-selected answers within assessment attempts.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    answer varchar(1) [not null, note: 'Student-selected option; no values inspected.']
+    attempt_id bigint(20) [not null, note: 'Reference to assessment_attempts.id.']
+    question_id bigint(20) [not null, note: 'Reference to assessment_questions.id.']
+    indexes {
+      (attempt_id, question_id) [unique, name: 'uk_student_answer_attempt_question']
+    }
+  }
+
+  Table halo_db.student_badges {
+    Note: 'Earned student badges.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    badge_name varchar(255) [not null, note: 'Earned badge display label.']
+    badge_type "enum('ASSESSMENT_ACE','COMEBACK_STRONGER','DEDICATED_LEARNER','FIRST_STEP','FIRST_TRY','GETTING_STARTED','MODULE_FINISHER','HALO_ACHIEVER','KNOWLEDGE_SEEKER','NEVER_GIVE_UP','PERFECT_SCORE','SUBJECT_MASTER')" [not null, note: 'Badge classification.']
+    description varchar(255) [not null, note: 'Descriptive text for the record.']
+    earned_at datetime(6) [not null, note: 'Timestamp for earned.']
+    student_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    indexes {
+      (student_id, badge_type) [unique, name: 'UKfetyiscxxfddulx4a41fsq4x0']
+    }
+  }
+
+  Table halo_db.student_module_progress {
+    Note: 'Student module completion records.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    completed bit(1) [not null, note: 'Module completion flag.']
+    completed_at datetime(6) [null, note: 'Timestamp for completed. Metadata default: NULL.']
+    module_id bigint(20) [not null, note: 'Reference to ai_learning_modules.id.']
+    student_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+  }
+
+  Table halo_db.student_profile_entity {
+    Note: 'Student academic ID, section and year level.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    section varchar(255) [null, note: 'Student academic section. Metadata default: NULL.']
+    student_id varchar(255) [not null, note: 'Institutional student identifier when not a foreign key.']
+    year_level "enum('FIRST_YEAR','SECOND_YEAR')" [null, note: 'Academic year-level classification. Metadata default: NULL.']
+    user_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    indexes {
+      (user_id) [unique, name: 'UK9b80un6g4jv3asn4qjxohx626']
+      (student_id) [unique, name: 'UKp07cbiv7jbfpf78stw4x5hx44']
+    }
+  }
+
+  Table halo_db.student_subject_enrollments {
+    Note: 'Active/inactive student-subject membership lifecycle.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    student_id bigint(20) [not null, note: 'Reference to user_entity.id.']
+    subject_id bigint(20) [not null, note: 'Reference to subjects.id.']
+    recorded_at_epoch_ms bigint(20) [not null, note: 'Enrollment recording time in epoch milliseconds.']
+    source varchar(32) [not null, note: 'Enrollment provenance label.']
+    active tinyint(1) [not null, note: 'Active enrollment membership flag. Metadata default: 1.']
+    unenrolled_at_epoch_ms bigint(20) [null, note: 'Unenrollment time in epoch milliseconds. Metadata default: NULL.']
+    indexes {
+      (student_id, subject_id) [unique, name: 'uk_student_subject_enrollment']
+    }
+  }
+
+  Table halo_db.subjects {
+    Note: 'Subject catalogue, academic eligibility and professor ownership.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    description text [null, note: 'Descriptive text for the record. Metadata default: NULL.']
+    subject_code varchar(255) [not null, note: 'Subject catalogue code.']
+    subject_name varchar(255) [not null, note: 'Subject display name.']
+    year_level "enum('FIRST_YEAR','SECOND_YEAR')" [null, note: 'Academic year-level classification. Metadata default: NULL.']
+    professor_id bigint(20) [null, note: 'Reference to professor_entity.id. Metadata default: NULL.']
+    indexes {
+      (subject_code) [unique, name: 'UKqt734ivq9gq4yo4p1j1lhhk8l']
+    }
+  }
+
+  Table halo_db.user_entity {
+    Note: 'Shared account identity, authentication state and role.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    email varchar(255) [null, note: 'Account email address. Metadata default: NULL.']
+    name varchar(255) [null, note: 'Account display name. Metadata default: NULL.']
+    password varchar(255) [null, note: 'Account password hash field; no values inspected. Metadata default: NULL.']
+    role "enum('ADMIN','PROFESSOR','STUDENT','SUPER_ADMIN')" [null, note: 'Authorization role. Metadata default: NULL.']
+    status "enum('ACTIVE','BLOCKED','INACTIVE','ARCHIVED')" [null, note: 'Record lifecycle state; see enum type if constrained. Metadata default: NULL.']
+    must_change_password tinyint(1) [not null, note: 'Mandatory password-change flag. Metadata default: 0.']
+    token_version bigint(20) [not null, note: 'Account token revocation version. Metadata default: 0.']
+    email_normalized varchar(255) [null, note: 'Generated normalized account email for uniqueness. VIRTUAL GENERATED: lcase(trim(`email`)). Metadata default: NULL.']
+    previous_status_before_archive varchar(16) [null, note: 'Account status retained for restoration. Metadata default: NULL.']
+    has_successful_login tinyint(1) [null, note: 'Nullable successful-login marker; NULL is legacy/unknown. Metadata default: NULL.']
+    indexes {
+      (email_normalized) [unique, name: 'uk_user_email_normalized']
+    }
+  }
+
+  Table halo_db.weeks {
+    Note: 'Ordered subject curriculum weeks.'
+    id bigint(20) [not null, pk, increment, note: 'Row identifier.']
+    title varchar(255) [null, note: 'Display title. Metadata default: NULL.']
+    week_number int(11) [null, note: 'Week ordering within subject. Metadata default: NULL.']
+    subject_id bigint(20) [not null, note: 'Reference to subjects.id.']
+    indexes {
+      (subject_id, week_number) [unique, name: 'uk_week_subject_number']
+    }
+  }
+
+  Ref FKc76fyqm3ut7w9l3vsoio4mm9f: halo_db.activity_log_entity.user_id >? halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref fk_activity_acting_session: halo_db.activity_log_entity.acting_session_id >? halo_db.admin_acting_session.id [update: restrict, delete: restrict]
+  Ref fk_activity_acting_target: halo_db.activity_log_entity.acting_target_id >? halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref fk_acting_admin: halo_db.admin_acting_session.admin_id > halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref fk_acting_target: halo_db.admin_acting_session.target_id > halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref FK4tiy1ggtx63iix6dpall6bt0t: halo_db.ai_learning_files.ai_learning_module_id > halo_db.ai_learning_modules.id [update: restrict, delete: restrict]
+  Ref FKbiiwyh1qbureppsl4mw7jnpka: halo_db.weeks.id - halo_db.ai_learning_modules.week_id [update: restrict, delete: restrict]
+  Ref FK2g2urk3okif3wciala8tas1ex: halo_db.assessments.module_id > halo_db.ai_learning_modules.id [update: restrict, delete: restrict]
+  Ref FK16b7ni1t3ynt7na31ng2ujett: halo_db.assessment_attempts.student_id > halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref FK82558btrx0bb6s1ryii2106ya: halo_db.assessment_attempts.assessment_id > halo_db.assessments.id [update: restrict, delete: restrict]
+  Ref FKljemcscn19ij7kysiqewaqp88: halo_db.assessment_questions.assessment_id > halo_db.assessments.id [update: restrict, delete: restrict]
+  Ref fk_lesson_revision_module: halo_db.ai_learning_modules.id - halo_db.lesson_revisions.module_id [update: restrict, delete: restrict]
+  Ref fk_lesson_history_module: halo_db.lesson_revision_history.module_id > halo_db.ai_learning_modules.id [update: restrict, delete: restrict]
+  Ref fk_study_module: halo_db.lesson_study_days.module_id > halo_db.ai_learning_modules.id [update: restrict, delete: cascade]
+  Ref fk_study_student: halo_db.lesson_study_days.student_id > halo_db.user_entity.id [update: restrict, delete: cascade]
+  Ref FK9l1g2i28xpihrb8ev40ke28ej: halo_db.mentor_messages.session_id > halo_db.mentor_sessions.id [update: restrict, delete: restrict]
+  Ref FKewiirvaq8gs1050s6824oa98l: halo_db.mentor_sessions.ai_learning_module_id > halo_db.ai_learning_modules.id [update: restrict, delete: restrict]
+  Ref FKq7dvujqbyl7evsyqxhhnoiucm: halo_db.mentor_sessions.student_id > halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref FKay9wnwgaawpg5d1ho62kam7vb: halo_db.user_entity.id - halo_db.password_reset_otps.user_id [update: restrict, delete: restrict]
+  Ref FKper8aj2lpm7ax4at5m0wv4a7b: halo_db.user_entity.id - halo_db.professor_entity.user_id [update: restrict, delete: restrict]
+  Ref FK3mwu7ebon4vu6khiacuc7ycdr: halo_db.user_entity.id - halo_db.professor_profile_entity.user_id [update: restrict, delete: restrict]
+  Ref FKl7pippsbiipty7wacay6ikn7u: halo_db.student_answers.attempt_id > halo_db.assessment_attempts.id [update: restrict, delete: restrict]
+  Ref FKso8bp2swsm46ynsqo4ci7a28k: halo_db.student_answers.question_id > halo_db.assessment_questions.id [update: restrict, delete: restrict]
+  Ref FKsskpnt4roiyft93pu0iw608f6: halo_db.student_badges.student_id > halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref FKltnys2bmlwhpdd8y09sg5ea81: halo_db.student_module_progress.module_id > halo_db.ai_learning_modules.id [update: restrict, delete: restrict]
+  Ref FKot2615mwq7jlbwdxa0t5doe9p: halo_db.student_module_progress.student_id > halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref FKem7pmm34qui17c7l3nibgu0qq: halo_db.user_entity.id - halo_db.student_profile_entity.user_id [update: restrict, delete: restrict]
+  Ref fk_enrollment_student: halo_db.student_subject_enrollments.student_id > halo_db.user_entity.id [update: restrict, delete: restrict]
+  Ref fk_enrollment_subject: halo_db.student_subject_enrollments.subject_id > halo_db.subjects.id [update: restrict, delete: restrict]
+  Ref fk_subject_professor: halo_db.subjects.professor_id >? halo_db.professor_entity.id [update: restrict, delete: restrict]
+  Ref FKnkrtyffpeq8ykfnw5myn8raco: halo_db.weeks.subject_id > halo_db.subjects.id [update: restrict, delete: restrict]
+
+  TableGroup Users_and_Accounts {
+    halo_db.user_entity
+    halo_db.student_profile_entity
+    halo_db.professor_entity
+    halo_db.professor_profile_entity
+    halo_db.admin_acting_session
+    halo_db.password_reset_otps
+    halo_db.password_reset_rate_limits
+  }
+
+  TableGroup Subjects_and_Enrollment {
+    halo_db.subjects
+    halo_db.student_subject_enrollments
+  }
+
+  TableGroup Lessons_and_Learning_Materials {
+    halo_db.weeks
+    halo_db.ai_learning_modules
+    halo_db.ai_learning_files
+    halo_db.lesson_revisions
+    halo_db.lesson_revision_history
+  }
+
+  TableGroup Assessments_and_Results {
+    halo_db.assessments
+    halo_db.assessment_questions
+    halo_db.assessment_attempts
+    halo_db.student_answers
+  }
+
+  TableGroup AI_Mentor_and_Conversations {
+    halo_db.mentor_sessions
+    halo_db.mentor_messages
+  }
+
+  TableGroup Progress_Badges_and_Activity_Logs {
+    halo_db.student_module_progress
+    halo_db.student_badges
+    halo_db.lesson_study_days
+    halo_db.activity_log_entity
+  }

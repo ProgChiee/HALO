@@ -27,6 +27,48 @@ before(async () => {
 });
 after(async () => { await server.close(); dom.window.close(); });
 
+test('fresh welcome suggestions share send locking and never appear on restored history', async () => {
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  let resolveSend, calls = [], history = [], freshTimestamp = false;
+  const api = {
+    getWeekLesson: async () => ({ id: 2, subjectId: 1, weekId: 2, weekNumber: 1, status: 'APPROVED', aiGenerationStatus: 'COMPLETED', files: [] }),
+    openSession: async () => ({ moduleId: 2, sessionId: 1, messages: freshTimestamp
+      ? [{ id: 1, sender: 'HALO', message: 'Server welcome', createdAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace('Z', '') }]
+      : history }),
+    recordLessonStudy: async () => {},
+    sendMessage: (...args) => { calls.push(args); return new Promise(resolve => { resolveSend = resolve; }); },
+  };
+  const render = key => root.render(React.createElement(MemoryRouter, { initialEntries: ['/lesson/1/2'] },
+    React.createElement(AuthContext.Provider, { value: { user: { name: 'Student' }, role: 'student', logout() {} } },
+      React.createElement(ToastContext.Provider, { value: { showToast() {} } },
+        React.createElement(Workflow.Provider, { value: { api, identity: 'student', basePath: '/student' } },
+          React.createElement(Routes, null, React.createElement(Route, { path: '/lesson/:topicId/:weekId', element: React.createElement(Chat, { key }) })))))));
+  try {
+    const labels = ['📖 Understand a Concept','💡 Explore Practical Examples','🔍 Explain Simply','🎯 Practice Challenge'];
+    for (let index = 0; index < 4; index++) {
+      await act(async () => render(index));
+      const buttons = host.querySelectorAll('[aria-label="Explore this lesson"] button');
+      assert.deepEqual([...buttons].map(b => b.textContent), labels);
+      assert.ok(host.textContent.includes("Hey there! 👋 I'm HALO, your learning buddy for this lesson. What would you like to explore today?"));
+      assert.equal(buttons[index].type, 'button'); buttons[index].focus(); assert.equal(document.activeElement, buttons[index]);
+      const before = calls.length;
+      await act(async () => { buttons[index].click(); buttons[index].click(); });
+      assert.equal(calls.length, before + 1); assert.equal(calls.at(-1)[0], 1);
+      assert.match(calls.at(-1)[1], /this lesson/); assert.ok(calls.at(-1)[2].requestId);
+      assert.equal(host.querySelector('[aria-label="Explore this lesson"]'), null);
+      await act(async () => resolveSend({ haloMessage: '**Helpful reply**' }));
+      assert.equal(host.querySelector('[aria-label="Explore this lesson"]'), null);
+    }
+    history = [{ id: 1, sender: 'HALO', message: 'Original greeting', createdAt: '2020-01-01T00:00:00' }];
+    await act(async () => render('restored'));
+    assert.equal(host.querySelector('[aria-label="Explore this lesson"]'), null);
+    assert.ok(host.textContent.includes('Original greeting'));
+    freshTimestamp = true;
+    await act(async () => render('new-server-session'));
+    assert.equal(host.querySelectorAll('[aria-label="Explore this lesson"] button').length, 4);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
 test('assistant Markdown is safe and consistent for new, restored and older messages; students stay plain text', async () => {
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
   const text = '**check-in** and *care* with `code`\nnext line\n\nSecond paragraph\n\n1. First\n2. Second\n\n- One\n- Two\n\n<script>secret()</script>\n\n[bad](javascript:alert%281%29) [safe](https://example.test) ![image](https://example.test/tracker.png)';

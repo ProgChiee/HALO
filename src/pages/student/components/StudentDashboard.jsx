@@ -3,6 +3,8 @@ import StudyCalendar from './StudyCalendar';
 import { useStudentWorkflow } from '../../../context/student/useStudentWorkflow';
 import { logStudentError } from '../../../utils/studentDiagnostics';
 import { useState, useEffect } from 'react';
+import SubjectPagination from '../../../components/shared/SubjectPagination';
+import { useSubjectPagination } from '../../../hooks/useSubjectPagination';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, BookOpen, Award, CheckCircle2, TrendingUp, Flame } from 'lucide-react';
 import StudentPageShell from './StudentPageShell';
@@ -12,6 +14,7 @@ import { studentGreeting } from '../../../utils/studentGreeting';
 import { selectContinueLesson } from '../../../utils/continueLearning';
 import { onStudentEnrollmentChanged } from '../../../utils/studentEnrollmentEvents';
 import styles from '../styles/StudentDashboard.module.css';
+import sectionStyles from '../styles/SubjectSection.module.css';
 
 // Resume persisted activity across eligible subjects, with a stable no-history fallback.
 export default function StudentDashboard() {
@@ -23,6 +26,11 @@ export default function StudentDashboard() {
 
   const [summary, setSummary] = useState(null);
   const [subjects, setSubjects] = useState([]);
+  const [subjectSearch, setSubjectSearch] = useState('');
+  const enrolledSubjects = subjects.filter(subject => subject.enrolled === true);
+  const query = subjectSearch.trim().toLowerCase();
+  const subjectPages = useSubjectPagination(enrolledSubjects.filter(subject =>
+    [subject.subjectName, subject.subjectCode].some(value => (value ?? '').toLowerCase().includes(query))), subjectSearch);
   const [nextLesson, setNextLesson] = useState(null);
   const [statsStatus, setStatsStatus] = useState('loading');
   const [subjectsStatus, setSubjectsStatus] = useState('loading');
@@ -183,21 +191,33 @@ export default function StudentDashboard() {
             )}
           </div>
 
-          <h2 className={styles.sectionTitle}>Enrolled Subjects</h2>
+          <section className={sectionStyles.container} aria-labelledby="enrolled-subjects-title">
+          <h2 id="enrolled-subjects-title" className={styles.sectionTitle}>Enrolled Subjects</h2>
+          <div className={sectionStyles.search}>
+            <label htmlFor="enrolled-subject-search">Search subjects</label>
+            <div className={sectionStyles.controls}>
+              <input id="enrolled-subject-search" type="search" value={subjectSearch}
+                placeholder="Search subjects by name or code..." onChange={event => setSubjectSearch(event.target.value)} />
+              {subjectSearch && <button type="button" onClick={() => { setSubjectSearch(''); document.getElementById('enrolled-subject-search')?.focus(); }}>Clear search</button>}
+            </div>
+          </div>
           {subjectsStatus === 'loading' && <p role="status">Loading subjects...</p>}
           {subjectsStatus === 'error' && <div role="alert"><p>Couldn't load your subjects.</p><Button onClick={() => { setSubjectsStatus('loading'); setContinueStatus('loading'); setNextLesson(null); setSubjectsRetry(value => value + 1); }}>Retry subjects</Button></div>}
           {subjectsStatus === 'ready' && <div className={styles.subjectsList}>
-            {subjects.filter(subject => subject.enrolled === true).map((subject) => (
+            {subjectPages.items.map((subject) => (
               <div key={subject.subjectId} className={styles.subjectRow}>
-                <span className={styles.subjectName}>{subject.subjectName}</span>
+                <span className={styles.subjectName}>{subject.subjectName}{subject.subjectCode && <small className={styles.subjectCode}>{subject.subjectCode}</small>}</span>
                 <span className={styles.subjectProgress}>Progress: {subject.progressPercentage}%</span>
                 <progress className={styles.subjectBar} max="100" value={subject.progressPercentage} aria-label={`${subject.subjectName} progress`} />
               </div>
             ))}
-            {!subjects.some(subject => subject.enrolled === true) && (
+            {enrolledSubjects.length > 0 && subjectPages.total === 0 && <p className={styles.emptyState} role="status">No subjects found. Try another name or code.</p>}
+            {enrolledSubjects.length === 0 && (
               <p className={styles.emptyState}>No subjects enrolled yet.</p>
             )}
           </div>}
+          {subjectsStatus === 'ready' && <SubjectPagination pagination={subjectPages} label="Enrolled Subjects pagination" />}
+          </section>
         </main>
       </div>
     </StudentPageShell>

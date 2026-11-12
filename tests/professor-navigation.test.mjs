@@ -45,12 +45,12 @@ test('all five Professor pages retain navigation during loading at desktop, tabl
       const cleanup = await mount(Page);
       try {
         const toggle = document.querySelector('[aria-label="Open navigation"]');
-        if (width > 1024) { assert.equal(toggle, null); assert.equal(document.querySelectorAll('nav a').length, 5); }
+        if (width > 1024) { assert.equal(toggle, null); assert.equal(document.querySelectorAll('nav a').length, 6); }
         else {
           assert.ok(toggle); assert.equal(document.querySelector('aside'), null);
           await click(toggle);
           assert.equal(toggle.getAttribute('aria-expanded'), 'true');
-          assert.equal(document.querySelectorAll('[role="dialog"] nav a').length, 5);
+          assert.equal(document.querySelectorAll('[role="dialog"] nav a').length, 6);
           await click(document.querySelector('[aria-label="Close navigation"]'));
           assert.equal(document.querySelector('[role="dialog"]'), null);
           assert.equal(document.activeElement, toggle);
@@ -67,13 +67,14 @@ test('compact navigation preserves links, active state, Escape, desktop transiti
     let toggle = document.querySelector('[aria-label="Open navigation"]');
     await click(toggle);
     assert.equal(document.querySelector('nav a[aria-current="page"]').getAttribute('href'), '/professor/subjects');
-    assert.deepEqual([...document.querySelectorAll('nav a')].map(a => a.getAttribute('href')), ['/professor', '/professor/subjects', '/professor/progress', '/professor/profile', '/professor/settings']);
+    assert.deepEqual([...document.querySelectorAll('nav a')].map(a => a.getAttribute('href')), ['/professor', '/professor/subjects', '/professor/progress/account-status', '/professor/progress/learning-engagement', '/professor/profile', '/professor/settings']);
     await act(async () => document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     assert.equal(document.querySelector('[role="dialog"]'), null);
     assert.equal(document.activeElement, toggle);
     await click(toggle);
-    await click(document.querySelector('a[href="/professor/progress"]'));
-    assert.equal(document.querySelector('output').textContent, '/professor/progress');
+    await click(document.querySelector('[data-navigation-group]'));
+    await click(document.querySelector('a[href="/professor/progress/account-status"]'));
+    assert.equal(document.querySelector('output').textContent, '/professor/progress/account-status');
     assert.equal(document.querySelector('[role="dialog"]'), null);
     await click(toggle);
     await act(async () => { width = 1440; listeners.forEach(fn => fn({ matches: false })); });

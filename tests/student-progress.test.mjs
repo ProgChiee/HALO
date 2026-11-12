@@ -37,6 +37,44 @@ async function search(host, value) {
     input.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
 }
+
+for (const count of [0, 1, 5, 6, 10, 21]) test(`pagination defaults to five subjects out of ${count}`, async () => {
+  const page = await mount(Array.from({length:count}, (_,i)=>({...subjects[0],subjectId:i,subjectName:`Subject ${i}`})));
+  try {
+    assert.equal(page.host.querySelectorAll('progress').length,Math.min(5,count));
+    const nav=page.host.querySelector('[aria-label="Subject Progress pagination"]');
+    assert.match(nav.textContent,new RegExp(`of ${count} subjects`));
+    assert.equal(nav.querySelector('button').disabled,true);
+    assert.equal([...nav.querySelectorAll('button')].at(-1).disabled,count<=5);
+  } finally {await page.close();}
+});
+test('pages, size and search combine locally', async () => {
+  const page=await mount(Array.from({length:21},(_,i)=>({...subjects[0],subjectId:i,subjectName:`Subject ${i}`,subjectCode:i<12?'MATCH':'OTHER'})));
+  try {
+    const nav=()=>page.host.querySelector('[aria-label="Subject Progress pagination"]');
+    const click=async label=>act(async()=>[...nav().querySelectorAll('button')].find(b=>b.textContent===label).click());
+    await click('Next');assert.match(nav().textContent,/Showing 6–10 of 21/);
+    await click('Previous');await click('5');assert.match(nav().textContent,/Showing 21–21/);
+    await search(page.host,'MATCH');assert.match(nav().textContent,/Showing 1–5 of 12/);
+    await click('Next');
+    for(const size of [10,20,5]){
+      await act(async()=>{const select=nav().querySelector('select');select.value=String(size);select.dispatchEvent(new Event('change',{bubbles:true}));});
+      assert.match(nav().textContent,/Page 1 of/);assert.equal(page.host.querySelectorAll('progress').length,Math.min(size,12));
+    }
+    await search(page.host,'nothing');assert.match(nav().textContent,/Showing 0–0 of 0/);assert.equal(page.calls(),1);
+  }finally{await page.close();}
+});
+test('data shrink clamps the page without restoring stale pages',async()=>{
+  const {useSubjectPagination}=await server.ssrLoadModule('/src/hooks/useSubjectPagination.js');
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);let state;
+  function Probe({count}){state=useSubjectPagination(Array.from({length:count},(_,i)=>i));return h('p',null,state.page);}
+  try{
+    await act(async()=>root.render(h(Probe,{count:21})));await act(async()=>state.setPage(5));
+    await act(async()=>root.render(h(Probe,{count:6})));assert.equal(state.page,2);assert.deepEqual(state.items,[5]);
+    await act(async()=>root.render(h(Probe,{count:21})));assert.equal(state.page,2);
+    await act(async()=>root.render(h(Probe,{count:0})));assert.equal(state.page,1);
+  }finally{await act(async()=>root.unmount());host.remove();}
+});
 test('overall ring uses unchanged backend count formula and subject bars retain authoritative percentages', async () => {
   const page = await mount(); try {
     const ring = page.host.querySelector('[role="progressbar"]');

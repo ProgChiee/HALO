@@ -1,3 +1,4 @@
+import StudentTablePagination from './StudentTablePagination';
 import { professorEnrollmentOptions, professorEnrollmentLabel } from '../../../utils/professorEnrollment';
 import Topbar from '../../../components/shared/Topbar';
 import { professorErrorMessage } from '../../../utils/professorErrors';
@@ -8,27 +9,28 @@ import { PROFESSOR_NAV_ITEMS } from '../../../data/navigationData';
 import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import { useRemoteData } from '../../../hooks/useRemoteData';
 import styles from '../styles/StudentProgress.module.css';
-import LearningEngagement from './LearningEngagement';
+
 
 export default function StudentProgress() {
   const [page, setPage] = useState(0);
+  const [size, setSize] = useState(5);
   const [view, setView] = useState('CURRENT');
   const [enrollment, setEnrollment] = useState('ALL');
   // A new page unmounts the previous request state immediately.
-  return <StudentProgressPage key={`${view}-${enrollment}-${page}`} enrollment={enrollment} onEnrollmentChange={next => { setEnrollment(next); setPage(0); }} page={page} view={view} onViewChange={next => { setView(next); setPage(0); }} onPageChange={setPage} />;
+  return <StudentProgressPage key={`${view}-${enrollment}-${page}-${size}`} size={size} onSizeChange={next => { setSize(next); setPage(0); }} enrollment={enrollment} onEnrollmentChange={next => { setEnrollment(next); setPage(0); }} page={page} view={view} onViewChange={next => { setView(next); setPage(0); }} onPageChange={setPage} />;
 }
 
-function StudentProgressPage({ page, onPageChange, view, onViewChange, enrollment, onEnrollmentChange }) {
+function StudentProgressPage({ size, onSizeChange, page, onPageChange, view, onViewChange, enrollment, onEnrollmentChange }) {
   const workflow = useProfessorWorkflow();
   const { getStudentProgressSummaries } = workflow.api;
 
-  const loadPage = useCallback((config) => getStudentProgressSummaries(page, 20, { ...config, params: { view, ...(enrollment === 'ALL' ? {} : { enrollment }) } }), [page, view, enrollment, getStudentProgressSummaries]);
+  const loadPage = useCallback((config) => getStudentProgressSummaries(page, size, { ...config, params: { view, ...(enrollment === 'ALL' ? {} : { enrollment }) } }), [page, size, view, enrollment, getStudentProgressSummaries]);
   const { data, isLoading, error: loadError, reload } = useRemoteData(loadPage);
 
   if (isLoading) {
     return (
       <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-      <Topbar title="Student Progress" />
+      <Topbar title="Account Status" />
         <p className={styles.loadingText}>Loading student progress...</p>
       </PageShell>
     );
@@ -37,7 +39,7 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange, enrollmen
   if (loadError) {
     return (
       <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
-      <Topbar title="Student Progress" />
+      <Topbar title="Account Status" />
         <p className={styles.loadingText}>{professorErrorMessage(loadError, "Couldn't load student progress. Please try again.")}</p>
         <button onClick={reload}>Retry</button>
         {page > 0 && <button onClick={() => onPageChange(page - 1)}>Previous page</button>}
@@ -55,11 +57,12 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange, enrollmen
       <Topbar>
         <div className={styles.breadcrumb}>
           <TrendingUp size={16} />
-          Student Progress
+          Account Status
         </div>
       </Topbar>
 
-      <main className={styles.main}>
+      <main className={styles.main}><section className={styles.monitoringCard} aria-label="Account monitoring">
+        <p className={styles.engagementHelp}>Monitor student account status, enrollment membership, and academic summaries within your subject scope.</p>
         <div className={styles.viewControls} role="group" aria-label="Account Status">
           <strong>Account Status</strong>
           <button className={styles.compactButton} aria-pressed={view === 'CURRENT'} onClick={() => onViewChange('CURRENT')}>Current Students</button>
@@ -91,6 +94,7 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange, enrollmen
           </div>
         </div>
 
+        <div className={styles.tableContainer}>
         <div className={styles.tableCard} role="region" aria-label="Student progress table, scroll horizontally to view all columns" tabIndex={0}>
           <table className={styles.progressTable} aria-label="Student progress"><thead><tr className={styles.tableHeaderRow}>
             <th scope="col">Student</th>
@@ -117,12 +121,9 @@ function StudentProgressPage({ page, onPageChange, view, onViewChange, enrollmen
           )}
           </tbody></table>
         </div>
-        <nav aria-label="Student progress pagination">
-          <button disabled={data.first} onClick={() => onPageChange(page - 1)}>Previous</button>
-          <span> Page {data.number + 1} of {Math.max(1, data.totalPages)} </span>
-          <button disabled={data.last} onClick={() => onPageChange(page + 1)}>Next</button>
-        </nav>
-        <LearningEngagement key={`${view}-${enrollment}`} view={view} enrollment={enrollment} />
+        <StudentTablePagination label="Student progress pagination" data={data} page={page} size={size} onPageChange={onPageChange} onSizeChange={onSizeChange} />
+        </div>
+        </section>
       </main>
     </PageShell>
   );
