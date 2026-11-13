@@ -72,3 +72,11 @@ export async function getRecentActivityLogs(config = {}) {
 }
 
 export async function deleteAdmin(id) { await apiClient.delete(`/super-admin/admin/${id}`); }
+
+export async function updateAdminName(id, fullName) {
+  return (await apiClient.patch(`/super-admin/admin/${id}/name`, { fullName })).data;
+}
+
+export async function updateAdminProfile(id, name, email) {
+  return (await apiClient.patch(`/super-admin/admin/${id}/profile`, { name, email })).data;
+}

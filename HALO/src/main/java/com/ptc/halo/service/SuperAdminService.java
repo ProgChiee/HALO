@@ -126,37 +126,7 @@ public class SuperAdminService {
                                             UpdateAdminRequest request,
                                             UserEntity superAdmin){
 
-        UserEntity admin = lockCurrentAdmin(id);
-
-        if(admin.getRole() != Role.ADMIN){
-            throw SuperAdminApiException.notFound();
-        }
-
-        if(userRepository.existsNormalizedEmail(request.getEmail(), id)){
-
-            throw SuperAdminApiException.duplicateEmail();
-        }
-
-        admin.setName(request.getName());
-        admin.setEmail(request.getEmail());
-
-        UserEntity updatedAdmin = userRepository.saveAndFlush(admin);
-
-        activityLogService.createLog(
-                superAdmin,
-                ActivityType.ACCOUNT,
-                "Updated Admin account ID " + updatedAdmin.getId() + ": " + updatedAdmin.getName()
-        );
-
-        AdminListResponse response = new AdminListResponse();
-
-        response.setId(updatedAdmin.getId());
-        response.setName(updatedAdmin.getName());
-        response.setEmail(updatedAdmin.getEmail());
-        response.setRole(updatedAdmin.getRole());
-        response.setStatus(updatedAdmin.getStatus());
-
-        return response;
+        return updateAdminProfile(id, request, superAdmin);
     }
     @Transactional
     public AdminListResponse changeAdminStatus(   Long id, Status status,
@@ -195,6 +165,52 @@ public class SuperAdminService {
 
         return response;
     }
+    @Transactional
+    public AdminListResponse updateAdminName(Long id, String fullName, UserEntity actor) {
+        if (actor == null || actor.getRole() != Role.SUPER_ADMIN || actor.getStatus() != Status.ACTIVE)
+            throw new org.springframework.security.access.AccessDeniedException("Super Admin required");
+        String normalized;
+        try { normalized = FullNameValidator.normalize(fullName); }
+        catch (org.springframework.web.server.ResponseStatusException invalid) {
+            throw new SuperAdminApiException(400, invalid.getReason(), "Please enter a valid full name.");
+        }
+        UserEntity admin = lockCurrentAdmin(id);
+        if (admin.getRole() != Role.ADMIN) throw SuperAdminApiException.notFound();
+        admin.setName(normalized);
+        userRepository.saveAndFlush(admin);
+        activityLogService.createLog(actor, ActivityType.ACCOUNT, "Updated Admin name for account ID " + admin.getId());
+        AdminListResponse response = new AdminListResponse();
+        response.setId(admin.getId()); response.setName(admin.getName()); response.setEmail(admin.getEmail());
+        response.setRole(admin.getRole()); response.setStatus(admin.getStatus());
+        return response;
+    }
+
+    @Transactional
+    public AdminListResponse updateAdminProfile(Long id, UpdateAdminRequest request, UserEntity actor) {
+        if (actor == null || actor.getRole() != Role.SUPER_ADMIN || actor.getStatus() != Status.ACTIVE)
+            throw new org.springframework.security.access.AccessDeniedException("Super Admin required");
+        String name;
+        try { name = FullNameValidator.normalize(request.getName()); }
+        catch (org.springframework.web.server.ResponseStatusException invalid) {
+            throw new SuperAdminApiException(400, invalid.getReason(), "Please enter a valid full name.");
+        }
+        UserEntity admin = lockCurrentAdmin(id);
+        if (admin.getRole() != Role.ADMIN) throw SuperAdminApiException.notFound();
+        if (userRepository.existsNormalizedEmail(request.getEmail(), id)) throw SuperAdminApiException.duplicateEmail();
+        boolean emailChanged = !java.util.Objects.equals(admin.getEmail(), request.getEmail());
+        if (emailChanged) {
+            admin.setTokenVersion(Math.addExact(admin.getTokenVersion(), 1));
+            // Old-address recovery codes must not authorize recovery at the new address.
+            entityManager.createQuery("delete from PasswordResetOtpEntity o where o.user.id = :id")
+                .setParameter("id", id).executeUpdate();
+        }
+        admin.setName(name); admin.setEmail(request.getEmail());
+        userRepository.saveAndFlush(admin);
+        activityLogService.createLog(actor, ActivityType.ACCOUNT,
+            "Updated Admin profile for account ID " + id + (emailChanged ? " (login email changed; sessions revoked)" : " (name update)"));
+        return viewAdminById(id);
+    }
+
     private UserEntity lockCurrentAdmin(Long id) {
         // Serialize these full-entity writes with logout and password changes on
         // the same database row. A lock alone does not refresh an entity that

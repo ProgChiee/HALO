@@ -440,7 +440,10 @@ test('account statuses render compact pills and named actions retain their actua
   const status=row.children[2].querySelector('span');assert.ok(status.className.includes('statusBadge'));
   assert.equal(status.textContent,['Active','Inactive','Blocked','Archived','Not set'][index]);
   assert.equal(status.querySelector('input,select'),null);
-  const [power,remove]=row.querySelectorAll('button');
+  const actions=row.querySelectorAll('button');assert.equal(actions.length,3);
+  const [edit,power,remove]=actions;
+  assert.equal(edit.getAttribute('aria-label'),'Edit Admin Admin '+index);assert.equal(edit.title,'Edit Admin Admin '+index);
+  for(const action of actions){assert.equal(action.type,'button');assert.ok(action.className.includes('actionBtn'));assert.equal(action.parentElement,row.children[3]);}
   assert.equal(power.getAttribute('aria-label'),index===0?'Deactivate':'Activate');
   assert.equal(power.title,(index===0?'Deactivate':'Activate')+' Admin '+index);
   assert.equal(remove.title,'Delete Admin '+index);assert.equal(remove.getAttribute('aria-label'),'Delete Admin '+index);
@@ -469,4 +472,35 @@ test('account loading, safe errors with Retry, and empty state retain the table 
  assert.ok(host.querySelector('[role=alert]'));assert.doesNotMatch(host.textContent,/private SQL/);
  await click(button('Retry'));assert.equal(calls.length,2);await act(async()=>calls[1].resolve([]));
  assert.match(host.querySelector('[role=table]').textContent,/No admins yet/);assert.equal(host.querySelectorAll('[role=rowheader]').length,0);
+});
+
+test('Edit Admin validates both fields, cancels, prevents duplicate saves and updates list',async()=>{
+ await mountAdmins();await act(async()=>calls[0].resolve([{id:7,name:'Original Admin',email:'admin@example.test',role:'ADMIN',status:'ACTIVE'}]));
+ await click(host.querySelector('[aria-label^="Edit Admin"]'));assert.equal(document.querySelector('#edit-admin-full-name').value,'Original Admin');
+ await click(button('Cancel'));assert.equal(calls.length,1);assert.match(host.textContent,/Original Admin/);
+ await click(host.querySelector('[aria-label^="Edit Admin"]'));
+ async function name(value){await act(async()=>{const input=document.querySelector('#edit-admin-full-name');Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});}
+ await name('123');await submitTwice();assert.equal(calls.length,1);assert.ok(document.querySelector('[role=alert]'));
+ assert.equal(document.querySelector('#edit-admin-email').value,'admin@example.test');
+ await act(async()=>{const input=document.querySelector('#edit-admin-email');Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,' NEW@EXAMPLE.TEST ');input.dispatchEvent(new Event('input',{bubbles:true}));});
+ await name('  Correct   Admin  ');await submitTwice();assert.equal(calls.length,2);
+ assert.equal(calls[1].config.url,'/super-admin/admin/7/profile');assert.equal(calls[1].config.method,'patch');
+ assert.deepEqual(JSON.parse(calls[1].config.data),{name:'Correct Admin',email:'new@example.test'});assert.equal(form().querySelector('[type=submit]').disabled,true);
+ await act(async()=>calls[1].resolve({id:7,name:'Correct Admin',email:'new@example.test',role:'ADMIN',status:'ACTIVE'}));
+ assert.equal(document.querySelector('#edit-admin-full-name'),null);assert.match(host.textContent,/Correct Admin/);assert.match(host.textContent,/new@example.test/);assert.equal(feedback.length,1);assert.equal(calls.length,2);
+ await click(host.querySelector('[aria-label^="Edit Admin"]'));assert.equal(document.querySelector('#edit-admin-full-name').value,'Correct Admin');
+ await name('Another Name');await submitTwice();await act(async()=>calls[2].reject({response:{status:503}}));
+ assert.match(host.textContent,/Correct Admin/);assert.equal(document.querySelector('#edit-admin-full-name').value,'Another Name');assert.ok(document.querySelector('[role=alert]'));await click(button('Cancel'));
+});
+
+test('Edit Admin rejects invalid email locally and preserves fields on duplicate-email errors',async()=>{
+ await mountAdmins();await act(async()=>calls[0].resolve([{id:7,name:'Original Admin',email:'admin@example.test',role:'ADMIN',status:'ACTIVE'}]));
+ await click(host.querySelector('[aria-label^="Edit Admin"]'));
+ async function email(value){await act(async()=>{const input=document.querySelector('#edit-admin-email');Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});}
+ await email('invalid');await submitTwice();assert.equal(calls.length,1);assert.match(document.querySelector('[role=alert]').textContent,/valid email/);
+ await email('taken@example.test');await submitTwice();assert.equal(calls.length,2);
+ await act(async()=>calls[1].reject({response:{status:409,data:{code:'EMAIL_ALREADY_EXISTS'}}}));
+ assert.match(document.querySelector('[role=alert]').textContent,/already registered/);
+ assert.equal(document.querySelector('#edit-admin-email').value,'taken@example.test');assert.match(host.textContent,/admin@example.test/);
+ await click(button('Cancel'));assert.equal(calls.length,2);
 });

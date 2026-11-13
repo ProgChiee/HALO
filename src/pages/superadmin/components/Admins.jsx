@@ -1,8 +1,9 @@
+import EditAdminNameDialog from './EditAdminNameDialog';
 import PasswordInput from '../../../components/shared/PasswordInput';
 import Topbar from '../../../components/shared/Topbar';
 import { apiErrorMessage } from '../../../utils/apiErrors';
 import { useState, useRef, useEffect } from 'react';
-import { Users, Plus, Trash2, X, Power } from 'lucide-react';
+import { Users, Plus, Trash2, X, Power, Pencil } from 'lucide-react';
 import PageShell from '../../../components/shared/PageShell';
 import Dialog from '../../../components/shared/Dialog';
 import Button from '../../../components/shared/Button';
@@ -23,7 +24,8 @@ const INSTITUTIONAL_DOMAIN = '@paterostechnologicalcollege.edu.ph';
 export default function Admins() {
   const { showToast } = useToast();
 
-  const { data: admins, isLoading, error: loadError, reload: loadAdmins } = useRemoteData(getAdmins, []);
+  const { data: admins, setData: setAdmins, isLoading, error: loadError, reload: loadAdmins } = useRemoteData(getAdmins, []);
+  const [nameTarget, setNameTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteError, setDeleteError] = useState('');
   const [protectedHistory, setProtectedHistory] = useState(false);
@@ -221,23 +223,31 @@ export default function Admins() {
                     </span>
                   </span>
                   <div className={styles.actionsCell} role="cell">
+                    <button type="button" className={`${styles.actionBtn} ${styles.editAction}`}
+                      disabled={isSubmitting || updatingStatusId !== null || deleting}
+                      onClick={event => { event.currentTarget.focus(); setNameTarget(admin); }}
+                      aria-label={`Edit Admin ${admin.name}`} title={`Edit Admin ${admin.name}`}>
+                      <Pencil size={16} aria-hidden="true" />
+                    </button>
                     <button
+                      type="button"
                       className={`${styles.actionBtn} ${admin.status === 'ACTIVE' ? styles.deactivateAction : styles.activateAction}`}
                       onClick={event => openStatus(admin, event)}
                       disabled={updatingStatusId !== null || isSubmitting}
                       aria-label={admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
                       title={`${admin.status === 'ACTIVE' ? 'Deactivate' : 'Activate'} ${admin.name}`}
                     >
-                      <Power size={15} />
+                      <Power size={16} aria-hidden="true" />
                     </button>
                     <button
+                      type="button"
                       className={`${styles.actionBtn} ${styles.deleteBtn}`}
                       onClick={event => { event.currentTarget.focus(); setDeleteError(''); protectedDelete.current = false; setProtectedHistory(false); setDeleteTarget(admin); }}
                       disabled={isSubmitting || updatingStatusId !== null || deleting}
                       aria-label={`Delete ${admin.name}`}
                       title={`Delete ${admin.name}`}
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={16} aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -251,6 +261,7 @@ export default function Admins() {
           )}
         </main>
 
+      {nameTarget && <EditAdminNameDialog key={nameTarget.id} admin={nameTarget} onClose={() => setNameTarget(null)} onSaved={updated => setAdmins(current => current.map(admin => admin.id === updated.id ? { ...admin, name: updated.name, email: updated.email } : admin))} />}
       {statusTarget && <Dialog labelledBy="admin-status-title" describedBy="admin-status-description" onClose={closeStatus}
         busy={updatingStatusId !== null} initialFocus="button" className={styles.modal}>
         <div className={styles.form}>

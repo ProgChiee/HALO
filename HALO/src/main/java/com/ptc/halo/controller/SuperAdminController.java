@@ -74,7 +74,9 @@ public class SuperAdminController {
     public ResponseEntity<AdminListResponse> updateAdmin(
             @PathVariable @Positive Long id,
             @Valid @RequestBody UpdateAdminRequest request,
-            Authentication authentication) {
+            Authentication authentication,
+            @RequestHeader(value="X-Acting-Session", required=false) String actingSession) {
+        if (actingSession != null) throw new org.springframework.security.access.AccessDeniedException("Exit acting mode first");
 
         UserEntity superAdmin =
                 getCurrentSuperAdmin(authentication);
@@ -129,6 +131,28 @@ public class SuperAdminController {
         return ResponseEntity.ok(
                 superAdminService.getUserReport()
         );
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PatchMapping("/admin/{id}/name")
+    public ResponseEntity<AdminListResponse> updateAdminName(
+            @PathVariable @Positive Long id, @RequestBody java.util.Map<String,Object> body,
+            Authentication authentication,
+            @RequestHeader(value="X-Acting-Session", required=false) String actingSession) {
+        if (actingSession != null) throw new org.springframework.security.access.AccessDeniedException("Exit acting mode first");
+        if (body == null || !body.keySet().equals(java.util.Set.of("fullName")) || !(body.get("fullName") instanceof String))
+            throw new com.ptc.halo.service.SuperAdminApiException(400, "INVALID_PROFILE_UPDATE", "Submit only a full name as text.");
+        return ResponseEntity.ok(superAdminService.updateAdminName(id, (String)body.get("fullName"), getCurrentSuperAdmin(authentication)));
+    }
+
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PatchMapping("/admin/{id}/profile")
+    public ResponseEntity<AdminListResponse> updateAdminProfile(
+            @PathVariable @Positive Long id, @jakarta.validation.Valid @RequestBody com.ptc.halo.dtoRequest.UpdateAdminRequest request,
+            Authentication authentication,
+            @RequestHeader(value="X-Acting-Session", required=false) String actingSession) {
+        if (actingSession != null) throw new org.springframework.security.access.AccessDeniedException("Exit acting mode first");
+        return ResponseEntity.ok(superAdminService.updateAdminProfile(id, request, getCurrentSuperAdmin(authentication)));
     }
 
     private UserEntity getCurrentSuperAdmin(

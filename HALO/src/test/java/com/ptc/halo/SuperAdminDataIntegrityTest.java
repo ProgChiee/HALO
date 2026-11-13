@@ -51,6 +51,67 @@ class SuperAdminDataIntegrityTest {
     AdminRequest create(String email) {
         AdminRequest r = new AdminRequest(); r.setName("  Test Admin  "); r.setEmail(email); r.setPassword("safe-test-password"); return r;
     }
+    @Test void profileUpdateRevokesSessionsAndRecoveryAndIsAtomic() {
+        var target=user("old@example.test",Role.ADMIN);
+        jdbc.update("insert into password_reset_otps (user_id,otp,expires_at,created_at,failed_attempts) values (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)",target.getId(),"synthetic");
+        UpdateAdminRequest r=new UpdateAdminRequest();r.setName("New Name");r.setEmail(" NEW@EXAMPLE.TEST ");
+        admins.updateAdminProfile(target.getId(),r,actor);
+        var saved=users.findById(target.getId()).orElseThrow();
+        assertEquals("new@example.test",saved.getEmail());assertEquals("New Name",saved.getName());
+        assertEquals(1,saved.getTokenVersion());assertEquals("encoded-test-fixture",saved.getPassword());
+        assertEquals(Status.ACTIVE,saved.getStatus());assertEquals(Role.ADMIN,saved.getRole());
+        assertEquals(0,jdbc.queryForObject("select count(*) from password_reset_otps where user_id=?",Integer.class,target.getId()));
+        r.setName("Name Only");admins.updateAdminProfile(target.getId(),r,actor);
+        assertEquals(1,users.findById(target.getId()).orElseThrow().getTokenVersion());
+        user("duplicate@example.test",Role.STUDENT);r.setEmail("DUPLICATE@example.test");
+        assertThrows(SuperAdminApiException.class,()->admins.updateAdminProfile(target.getId(),r,actor));
+        assertEquals("new@example.test",users.findById(target.getId()).orElseThrow().getEmail());
+        r.setEmail("other@example.test");doThrow(new IllegalStateException("audit unavailable")).when(logs).createLog(any(),any(),contains("Updated Admin profile"));
+        assertThrows(IllegalStateException.class,()->admins.updateAdminProfile(target.getId(),r,actor));
+        assertEquals("new@example.test",users.findById(target.getId()).orElseThrow().getEmail());
+        assertEquals(1,users.findById(target.getId()).orElseThrow().getTokenVersion());
+    }
+    @Test void profileRejectsNonAdminsAndSupportsEmailOnlyChange() {
+        var target=user("email-only@example.test",Role.ADMIN);
+        UpdateAdminRequest r=new UpdateAdminRequest();r.setName(target.getName());r.setEmail("corrected@example.test");
+        admins.updateAdminProfile(target.getId(),r,actor);
+        assertEquals(target.getName(),admins.viewAdminById(target.getId()).getName());
+        for(Role role:java.util.List.of(Role.STUDENT,Role.PROFESSOR,Role.SUPER_ADMIN)) {
+            var other=user(role.name()+"@example.test",role);
+            assertEquals(404,assertThrows(SuperAdminApiException.class,()->admins.updateAdminProfile(other.getId(),r,actor)).getStatus());
+        }
+        assertEquals(404,assertThrows(SuperAdminApiException.class,()->admins.updateAdminProfile(999999L,r,actor)).getStatus());
+        r.setName("123");r.setEmail("not-saved@example.test");
+        assertThrows(SuperAdminApiException.class,()->admins.updateAdminProfile(target.getId(),r,actor));
+        assertEquals("corrected@example.test",admins.viewAdminById(target.getId()).getEmail());
+    }
+    @Test void nameOnlyPersistsAndPreservesCredentialsAndSecurityState() {
+        var target=user("rename@example.test",Role.ADMIN);
+        target.setTokenVersion(7); target.setStatus(Status.INACTIVE); target.setMustChangePassword(true);
+        target.setHasSuccessfulLogin(true); users.saveAndFlush(target);
+        var result=admins.updateAdminName(target.getId(), "  Maria   Dela Cruz  ", actor);
+        assertEquals("Maria Dela Cruz",result.getName());
+        var saved=users.findById(target.getId()).orElseThrow();
+        assertEquals(result.getName(),admins.viewAdminById(target.getId()).getName());
+        assertEquals("rename@example.test",saved.getEmail()); assertEquals("encoded-test-fixture",saved.getPassword());
+        assertEquals(Role.ADMIN,saved.getRole()); assertEquals(Status.INACTIVE,saved.getStatus());
+        assertEquals(7,saved.getTokenVersion()); assertTrue(saved.isMustChangePassword()); assertTrue(saved.getHasSuccessfulLogin());
+        verify(logs).createLog(eq(actor),eq(ActivityType.ACCOUNT),contains("Updated Admin name"));
+    }
+    @Test void nameRejectsInvalidValuesTargetsAndActorsAndRollsBackAuditFailure() {
+        var target=user("name-validation@example.test",Role.ADMIN);
+        for(String name:java.util.List.of("", "   ", "123", "<script>", "a".repeat(101)))
+            assertEquals(400,assertThrows(SuperAdminApiException.class,()->admins.updateAdminName(target.getId(),name,actor)).getStatus());
+        assertEquals(404,assertThrows(SuperAdminApiException.class,()->admins.updateAdminName(999999L,"Valid Name",actor)).getStatus());
+        for(Role role:java.util.List.of(Role.STUDENT,Role.PROFESSOR,Role.SUPER_ADMIN)) {
+            var wrong=user(role.name()+"@example.test",role);
+            assertEquals(404,assertThrows(SuperAdminApiException.class,()->admins.updateAdminName(wrong.getId(),"Valid Name",actor)).getStatus());
+        }
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->admins.updateAdminName(target.getId(),"Valid Name",target));
+        doThrow(new IllegalStateException("audit unavailable")).when(logs).createLog(any(),any(),anyString());
+        assertThrows(IllegalStateException.class,()->admins.updateAdminName(target.getId(),"Changed Name",actor));
+        assertEquals("Test Actor",users.findById(target.getId()).orElseThrow().getName());
+    }
     @Test void deleteRemovesAccountAndOtpAndLoginIdentity() {
         var target=user("remove@example.test",Role.ADMIN);
         // Synthetic verifier; deletion must clean up the current challenge schema.
@@ -218,6 +279,6 @@ class SuperAdminDataIntegrityTest {
         assertFalse(jwt.isCurrent(token,new com.ptc.halo.security.CustomUserDetails(replacement)));
         var resolved=new CustomUserDetailsService(users).loadUserById(jwt.extractUserId(token));
         assertEquals("changed@example.test",resolved.getUsername());
-        assertTrue(jwt.isCurrent(token,resolved));
+        assertFalse(jwt.isCurrent(token,resolved));
     }
 }

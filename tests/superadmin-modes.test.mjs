@@ -19,3 +19,20 @@ test('Professor resource denial preserves valid mode and exit controls',async()=
 
 test('Lost preview response discovers active mode and failed exit remains recoverable',async()=>{let active=false,failExit=true;const calls=[];const normal=adapter('PROFESSOR',calls);api.defaults.adapter=async c=>{if(c.url==='/admin/acting/active')return {status:200,config:c,headers:{},data:active?[{session:session('PROFESSOR'),preview:true}]:[]};if(c.method==='post'){active=true;throw {code:'ECONNABORTED'};}if(c.url==='/admin/acting/active/'+id){if(failExit)throw {response:{status:503}};active=false;return {status:204,config:c,headers:{}};}return normal(c);};const close=await mount('PROFESSOR',true,true);try{await click(button('Preview'));assert.ok(document.querySelector('[aria-label="Active mode recovery"]'));assert.match(document.body.textContent,/Selected PROFESSOR/);assert.equal(document.querySelector('a[href*="professor-preview"]').getAttribute('href'),'/superadmin/professor-preview/'+id);await click(button('Return to Super Admin'));assert.match(document.body.textContent,/Could not end the active mode/);assert.equal(active,true);failExit=false;await click(button('Return to Super Admin'));assert.equal(active,false);assert.equal(document.querySelector('output').textContent,'/superadmin');}finally{await close();}});
 test('Failed preview creation without a session never opens a preview',async()=>{const calls=[];const normal=adapter('PROFESSOR',calls);api.defaults.adapter=async c=>{if(c.method==='post')throw {response:{status:503}};return normal(c);};const close=await mount('PROFESSOR',true,true);try{await click(button('Preview'));assert.equal(document.querySelector('output').textContent,'/superadmin/professor-mode');assert.match(document.body.textContent,/Could not start Professor Mode/);assert.equal(document.querySelector('[aria-label="Professor preview mode"]'),null);}finally{await close();}});
+
+test('Admin selector edits only the name and keeps Select Admin confirmation intact',async()=>{
+ const calls=[],normal=adapter('ADMIN',calls);let saved='Selected ADMIN';
+ api.defaults.adapter=async config=>{
+  if(config.url==='/super-admin/admin/7/profile'){calls.push(config);saved=JSON.parse(config.data).name;return {status:200,headers:{},config,data:{id:7,name:saved,email:'synthetic@example.test',role:'ADMIN',status:'ACTIVE'}};}
+  const response=await normal(config);if(config.url==='/admin/acting/targets')response.data.content[0].name=saved;return response;
+ };
+ let close=await mount('ADMIN',true);
+ try{
+  await click(button('Edit Admin'));const input=document.querySelector('#edit-admin-full-name');assert.equal(input.value,'Selected ADMIN');
+  await act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,'Correct Admin');input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await act(async()=>document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  assert.match(document.body.textContent,/Correct Admin/);assert.equal(calls.filter(c=>c.method==='post').length,0);
+  await click(button('Select Admin'));assert.ok(button('Enter Admin Mode'));assert.match(document.querySelector('[role=dialog]').textContent,/Correct Admin/);await click(button('Cancel'));
+ }finally{await close();}
+ close=await mount('ADMIN',true);try{assert.match(document.body.textContent,/Correct Admin/);}finally{await close();}
+});

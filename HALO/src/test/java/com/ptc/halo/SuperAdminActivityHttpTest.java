@@ -31,6 +31,36 @@ class SuperAdminActivityHttpTest {
   when(jwt.isCurrent(eq("test-token"), any())).thenReturn(true);
   when(details.loadUserById(1L)).thenReturn(TestIdentity.details(1L, "test@example.test", role));
  }
+ @Test void nameEndpointEnforcesRoleAndStrictNameOnlyPayload() throws Exception {
+  token("SUPER_ADMIN");
+  var actor=new com.ptc.halo.entity.UserEntity();actor.setId(1L);actor.setRole(Role.SUPER_ADMIN);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+  when(users.findById(1L)).thenReturn(java.util.Optional.of(actor));
+  var response=new com.ptc.halo.dtoResponse.AdminListResponse();response.setId(2L);response.setName("Correct Name");
+  when(admins.updateAdminName(2L,"Correct Name",actor)).thenReturn(response);
+  mvc.perform(patch("/api/super-admin/admin/2/name").header("Authorization","Bearer test-token").contentType("application/json").content("{\"fullName\":\"Correct Name\"}"))
+    .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Correct Name")).andExpect(jsonPath("$.password").doesNotExist()).andExpect(jsonPath("$.token").doesNotExist());
+  for(String body:java.util.List.of("{}","{\"fullName\":null}","{\"fullName\":3}","{\"fullName\":\"Name\",\"email\":\"other@example.test\"}"))
+    mvc.perform(patch("/api/super-admin/admin/2/name").header("Authorization","Bearer test-token").contentType("application/json").content(body)).andExpect(status().isBadRequest());
+  mvc.perform(patch("/api/super-admin/admin/2/name").header("Authorization","Bearer test-token").header("X-Acting-Session","synthetic").contentType("application/json").content("{\"fullName\":\"Correct Name\"}")).andExpect(status().isForbidden());
+  for(String role:java.util.List.of("ADMIN","PROFESSOR","STUDENT")) {
+    token(role);mvc.perform(patch("/api/super-admin/admin/2/name").header("Authorization","Bearer test-token").contentType("application/json").content("{\"fullName\":\"Correct Name\"}")).andExpect(status().isForbidden());
+  }
+  mvc.perform(patch("/api/super-admin/admin/2/name").contentType("application/json").content("{\"fullName\":\"Correct Name\"}")).andExpect(status().isUnauthorized());
+  verify(admins,times(1)).updateAdminName(anyLong(),anyString(),any());
+ }
+ @Test void profileEndpointValidatesAndEnforcesAuthorization() throws Exception {
+  String route="/api/super-admin/admin/2/profile", body="{\"name\":\"Valid Name\",\"email\":\"new@example.test\"}";
+  token("SUPER_ADMIN");
+  var actor=new com.ptc.halo.entity.UserEntity();actor.setId(1L);actor.setRole(Role.SUPER_ADMIN);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);
+  when(users.findById(1L)).thenReturn(java.util.Optional.of(actor));
+  mvc.perform(patch(route).header("Authorization","Bearer test-token").contentType("application/json").content(body)).andExpect(status().isOk());
+  for(String email:java.util.List.of("", "invalid", "a@", "a".repeat(255)+"@example.test"))
+   mvc.perform(patch(route).header("Authorization","Bearer test-token").contentType("application/json").content("{\"name\":\"Valid Name\",\"email\":\""+email+"\"}")).andExpect(status().isBadRequest());
+  mvc.perform(patch(route).header("Authorization","Bearer test-token").header("X-Acting-Session","synthetic").contentType("application/json").content(body)).andExpect(status().isForbidden());
+  for(String role:java.util.List.of("ADMIN","STUDENT","PROFESSOR")){token(role);mvc.perform(patch(route).header("Authorization","Bearer test-token").contentType("application/json").content(body)).andExpect(status().isForbidden());}
+  mvc.perform(patch(route).contentType("application/json").content(body)).andExpect(status().isUnauthorized());
+  verify(admins,times(1)).updateAdminProfile(eq(2L),any(),eq(actor));
+ }
  @Test void deleteIsSuperAdminOnlyAndReturnsNoContent() throws Exception {
   token("SUPER_ADMIN");
   var actor = new com.ptc.halo.entity.UserEntity(); actor.setRole(Role.SUPER_ADMIN); actor.setId(1L);actor.setStatus(com.ptc.halo.enums.Status.ACTIVE);

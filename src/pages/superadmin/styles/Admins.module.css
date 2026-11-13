@@ -42,7 +42,7 @@
 .tableScroll > .tableCard { min-width: 720px; }
 .tableCard {
   composes: surface from "../../../components/shared/UIPrimitives.module.css";
-  --account-columns: minmax(160px, 1.1fr) minmax(240px, 1.8fr) 96px 88px;
+  --account-columns: minmax(160px, 1.1fr) minmax(240px, 1.8fr) 96px 124px;
   overflow: hidden;
 }
 .tableHeaderRow {
@@ -72,7 +72,8 @@
 .tableRow:focus-within { background: var(--color-primary-soft); }
 .adminName { font-weight: var(--font-weight-semibold); color: var(--color-text-primary); overflow-wrap: anywhere; }
 .adminEmail { color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.statusCell { display: flex; align-items: center; }
+.statusCell { display: flex; align-items: center; justify-content: center; }
+.tableHeaderRow > :nth-child(n + 3) { text-align: center; }
 .statusBadge {
   display: inline-flex;
   align-items: center;
@@ -88,7 +89,7 @@
 .status_active { background: var(--color-primary-soft); color: var(--color-success-text); }
 .status_inactive, .status_archived, .status_unknown { background: var(--color-background); color: var(--color-text-secondary); }
 .status_blocked { background: var(--color-danger-soft); color: var(--color-danger-text); }
-.actionsCell { display: flex; align-items: center; gap: var(--space-2); }
+.actionsCell { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: var(--space-2); }
 .actionBtn {
   display: inline-flex;
   align-items: center;
@@ -103,6 +104,8 @@
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
 }
+.editAction { color: var(--color-primary); }
+.editAction:hover:not(:disabled) { background: var(--color-primary-soft); }
 .activateAction { color: var(--color-success-text); }
 .activateAction:hover:not(:disabled) { background: var(--color-primary-soft); }
 .deactivateAction { color: var(--color-warning-text); }
