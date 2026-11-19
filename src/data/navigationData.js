@@ -38,6 +38,7 @@ export const ADMIN_NAV_ITEMS = [
   { label: 'Dashboard', icon: LayoutGrid, path: '/admin', end: true, section: 'Main' },
   { label: 'Professor Management', icon: GraduationCap, path: '/admin/professors', section: 'Main' },
   { label: 'Student Management', icon: Users, path: '/admin/students', section: 'Main' },
+  { label: 'Student Registry', icon: Users, path: '/admin/student-registry', section: 'Main' },
   { label: 'Monitoring', icon: Activity, path: '/admin/monitoring', section: 'Main' },
   { label: 'Professor Mode', icon: GraduationCap, path: '/admin/professor-mode', section: 'Modes' },
   { label: 'Student Mode', icon: Users, path: '/admin/student-mode', section: 'Modes' },

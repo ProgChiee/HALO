@@ -17,6 +17,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class})
 class PasswordChangeValidationHttpTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
  @Test void incorrectPasswordReturnsActionable400() throws Exception {
   var account = new com.ptc.halo.entity.UserEntity();account.setId(1L);account.setRole(com.ptc.halo.enums.Role.PROFESSOR);account.setStatus(com.ptc.halo.enums.Status.ACTIVE);
   org.mockito.Mockito.when(users.findById(1L)).thenReturn(java.util.Optional.of(account));

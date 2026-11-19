@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest({AiLearningModuleController.class, ProfessorAcademicController.class})
 @Import({com.ptc.halo.service.ProfessorModuleService.class,SecurityConfig.class, JwtAuthenticationFilter.class})
 class ProfessorInputValidationTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.LessonSourceScope sourceScopes;
  @Autowired MockMvc mvc;
  @MockBean ProfessorAcademicService academic;
  @MockBean AiLearningModuleRepository modules;

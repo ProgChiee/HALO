@@ -4,6 +4,9 @@ import com.ptc.halo.enums.Status;
 import com.ptc.halo.enums.YearLevel;
 
 public class StudentRequest {
+    private String verificationCode;
+    public String getVerificationCode() { return verificationCode; }
+    public void setVerificationCode(String value) { verificationCode=value; }
     private String name;
     private String email;
     private String password;

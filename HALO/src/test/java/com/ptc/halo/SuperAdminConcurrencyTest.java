@@ -32,6 +32,7 @@ import static org.mockito.Mockito.*;
 @Import({SuperAdminService.class, ActivityLogService.class, AuthService.class, com.ptc.halo.service.LoginTokenIssuer.class, JwtService.class, SuperAdminConcurrencyTest.Config.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class SuperAdminConcurrencyTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
     @TestConfiguration static class Config {
         @Bean PasswordEncoder encoder() { return new BCryptPasswordEncoder(4); }
     }

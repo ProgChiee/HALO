@@ -19,6 +19,7 @@ import java.util.Optional;
 
 @Service
 public class AssessmentService {
+    @org.springframework.beans.factory.annotation.Autowired private LessonSourceScope sourceScopes;
 
     private final AssessmentRepository assessmentRepository;
     private final AssessmentQuestionRepository questionRepository;
@@ -82,9 +83,11 @@ public class AssessmentService {
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public GeneratedAssessment prepareAssessment(AiLearningModuleEntity module) {
+        if(LessonSourceScope.isExpansion(module.getSourceScope()))sourceScopes.requireExpansionReview(module);
         var generated =
                 assessmentAiService.generateAssessment(
-                        module.getLessonText(),
+                        // Scoped lessons assess the reviewed generated instruction, not unselected legacy text.
+                        module.getSourceScope()==null ? module.getLessonText() : null,
                         module.getGeneratedObjectives(),
                         module.getGeneratedKnowledge(),
                         module.getGeneratedExamples(),

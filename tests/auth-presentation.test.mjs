@@ -51,10 +51,10 @@ test('Login has visible labels, functional visibility, clear pending/error state
 test('Sign Up retains every labeled field, year options, hints and independent password toggles without decorative icons',async()=>{
  const view=await mount(Register);try{
   const {host}=view;assert.equal(host.querySelector('h1').textContent,'Create your account');assert.equal(host.querySelectorAll('img').length,0);
-  assert.equal(host.querySelectorAll('input,select').length,7);
+  assert.equal(host.querySelectorAll('input,select').length,8);
   for(const input of host.querySelectorAll('input,select')){assert.ok(input.labels?.length);assert.ok(document.getElementById(input.getAttribute('aria-describedby')));}
   assert.deepEqual([...host.querySelectorAll('option')].map(o=>o.value),['','FIRST_YEAR','SECOND_YEAR']);
-  assert.equal(host.querySelector('#register-studentId').placeholder,'e.g. 29AHRT-0168');
+  assert.equal(host.querySelector('#register-studentId').placeholder,'e.g. 23AHRT-0168');
   for(const field of ['password','confirmPassword']){const toggle=host.querySelector(`[aria-controls="register-${field}"]`);await act(async()=>toggle.click());assert.equal(host.querySelector('#register-'+field).type,'text');}
   assert.equal(host.querySelectorAll('svg').length,3);assert.equal(host.querySelector('[type=submit]').textContent,'Create Account');assert.ok(host.querySelector('a[href="/login"]'));
  }finally{await view.close();}

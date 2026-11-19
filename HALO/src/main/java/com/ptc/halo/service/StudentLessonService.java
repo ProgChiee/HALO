@@ -26,6 +26,7 @@ public class StudentLessonService {
                 new AiLearningModuleResponse();
 
         response.setId(module.getId());
+        response.setGenerationMode(LessonSourceScope.isExpansion(module.getSourceScope())?"OBTL_EXPANSION":"SOURCE_GROUNDED");
         response.setWeekId(module.getWeek().getId());
         response.setSubjectId(module.getWeek().getSubject().getId());
         response.setWeekNumber(module.getWeek().getWeekNumber());

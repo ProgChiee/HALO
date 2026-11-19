@@ -1,0 +1,12 @@
+.main { padding: var(--space-5); min-width: 0; color: var(--color-text-primary); }
+.card { margin-top: var(--space-5); padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.controls { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); margin: var(--space-3) 0; }
+.controls label { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.controls input, .controls select { max-width: 100%; box-sizing: border-box; padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-primary); }
+.controls :focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.scroll { overflow: auto; max-height: 480px; }
+.scroll table { border-collapse: collapse; width: 100%; text-align: left; }
+.scroll th, .scroll td { padding: var(--space-3); border-bottom: 1px solid var(--color-border); overflow-wrap: anywhere; min-width: 100px; vertical-align: top; }
+@media(max-width:600px) { .main,.card { padding: var(--space-3); } .controls label { width: 100%; } }
+
+.dialog { composes: dialogSurface from "../../../components/shared/UIPrimitives.module.css"; width: min(480px, 100%); padding: var(--space-5); box-sizing: border-box; }

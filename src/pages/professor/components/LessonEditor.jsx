@@ -1,5 +1,6 @@
 import Topbar from '../../../components/shared/Topbar';
 import LessonRevision from './LessonRevision';
+import LessonSourceSelection from './LessonSourceSelection';
 import QuizRevision from './QuizRevision';
 import RevisionHistory from './RevisionHistory';
 import LessonWorkspaceTabs from './LessonWorkspaceTabs';
@@ -51,6 +52,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [sourceRefresh, setSourceRefresh] = useState(0);
   const [pendingAction, setPendingAction] = useState(null);
   const actionLock = useRef(false);
   const lifecycle = useRef(null);
@@ -170,7 +172,10 @@ function RouteLessonEditor({ subjectId, weekId }) {
       const updated = await request(isCurrent);
       if (!isCurrent()) return;
       setModule(updated);
-      if (action === 'generate' && updated.aiGenerationStatus !== 'COMPLETED') {
+      setSourceRefresh(value => value + 1);
+      if (action === 'generate' && updated.outlineDraft) {
+        showToast('Source-Grounded outline saved as a Professor-only draft. Add instructional sources or explicitly choose OBTL-Guided AI Lesson Expansion.', 'success');
+      } else if (action === 'generate' && updated.aiGenerationStatus !== 'COMPLETED') {
         showToast('The lesson could not be generated from these materials.', 'error');
       } else {
         showToast(successMessage, 'success');
@@ -446,12 +451,13 @@ function RouteLessonEditor({ subjectId, weekId }) {
         </div>}
 
         {/* --- Step 2: Generate + review --- */}
+        {module && savedFiles.length > 0 && !isPublished && !workflow.preview && <LessonSourceSelection key={`sources-${module.id}-${reloadKey}-${sourceRefresh}`} moduleId={module.id} disabled={isBusy || hasUnsavedChanges} onChanged={() => { setLoading(true); setReloadKey(key => key + 1); }} />}
         {module && (
           <div className={styles.panelCard}>
             <div className={styles.panelHeader}>
               <span className={styles.panelIcon}><Sparkles size={16} /></span>
               <div>
-                <h2 className={styles.panelTitle}>AI-Generated Lesson</h2>
+                <h2 className={styles.panelTitle}>{module?.outlineDraft ? 'Professor-only Outline Draft' : 'AI-Generated Lesson'}</h2>
                 <p className={styles.panelSubtitle}>{isPublished ? 'Published content available to eligible Students. Expand a section to read it.' : 'Review before approving — this is what students will see.'}</p>
               </div>
             </div>
@@ -464,6 +470,11 @@ function RouteLessonEditor({ subjectId, weekId }) {
                 </Button>
               </div>
             )}
+
+            {module?.outlineDraft && !isPublished && <section aria-label="Outline draft">
+              <p>This Source-Grounded outline is not publishable. Add and confirm instructional references, or select OBTL-Guided AI Lesson Expansion above, confirm that mode and generate again. Supplementary PDFs are optional for expansion; academic review and approval remain required.</p>
+              <GeneratedLessonSections lesson={module} />
+            </section>}
 
             {hasGeneratedContent && (
               <div>

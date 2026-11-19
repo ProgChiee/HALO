@@ -22,6 +22,7 @@ import static org.mockito.Mockito.*;
 @Import({LoginTokenIssuer.class, JwtService.class, AuthService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class StudentLoginGreetingTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
     @Autowired UserRepository users;
     @Autowired LoginTokenIssuer issuer;
     @Autowired AuthService auth;

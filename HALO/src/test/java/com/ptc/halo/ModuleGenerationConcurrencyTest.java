@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 @Import({AiGenerationService.class,ModuleGenerationState.class,ModuleGenerationConcurrencyTest.Config.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class ModuleGenerationConcurrencyTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.LessonSourceScope sourceScopes;
  static final ChatClient CLIENT=mock(ChatClient.class,RETURNS_DEEP_STUBS);
  @TestConfiguration static class Config {
   @Bean ChatClient.Builder builder(){var builder=mock(ChatClient.Builder.class);when(builder.build()).thenReturn(CLIENT);return builder;}

@@ -24,6 +24,7 @@ import static org.mockito.Mockito.*;
 @DataJpaTest(properties = {"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect", "spring.jpa.open-in-view=false"}, showSql=false)
 @Import({AiLearningModuleController.class, com.ptc.halo.service.ProfessorModuleService.class})
 class ProfessorModuleOwnershipTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.LessonSourceScope sourceScopes;
  @Autowired AiLearningModuleController controller;
  @Autowired AiLearningModuleRepository modules;
  @Autowired AiLearningFileRepository files;
@@ -83,6 +84,7 @@ class ProfessorModuleOwnershipTest {
   week.getSubject().setProfessor(null);subjects.saveAndFlush(week.getSubject());allDenied(owner);
  }
  @Test void ownerReadsUpdatesGeneratesDeclinesAndApproves() {
+  module.setSourceScope("confirmed-test-snapshot"); // Scope validation is mocked in this ownership fixture.
   assertEquals(module.getId(),controller.getModuleByWeek(week.getId(),owner).getBody().getId());
   assertEquals(module.getId(),controller.getModuleById(module.getId(),owner).getBody().getId());
   var edit=new AiLearningModuleUpdateRequest();edit.setLessonText("updated");controller.updateModule(module.getId(),edit,owner);
@@ -124,16 +126,22 @@ class ProfessorModuleOwnershipTest {
    document.save(original.toFile());
   }
   var index=new com.ptc.halo.component.ModuleMaterialIndex(mock(org.springframework.ai.chat.client.ChatClient.class),new com.fasterxml.jackson.databind.ObjectMapper(),new com.ptc.halo.service.LessonStoragePaths(directory.toString()));
+  var worker=mock(ObtlExtractionProcess.class);when(worker.extract(any())).thenAnswer(i->ObtlPdfText.extract(i.getArgument(0),""));
+  var scope=new LessonSourceScope(new com.fasterxml.jackson.databind.ObjectMapper(),new LessonStoragePaths(directory.toString()),worker);
+  module.setSourceScope(scope.extract(module));
+  String section=scope.read(module.getSourceScope()).documents().get(0).extraction().sections().get(0).id();
+  module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(file.getId(),List.of(section),true)),week.getSubject().getProfessor().getUser().getId()));
+  scope.markInstructionVerified(module);org.springframework.test.util.ReflectionTestUtils.setField(index,"sourceScopes",scope);
   when(materialIndex.getOrBuild(any())).thenAnswer(call->index.getOrBuild(call.getArgument(0)));
   assertEquals(LessonStatus.APPROVED,controller.approveLesson(module.getId(),owner).getBody().getStatus());
   assertFalse(index.getOrBuild(module).chunks().isEmpty());
   var order=inOrder(materialIndex,assessment,audit);order.verify(materialIndex).getOrBuild(any());order.verify(assessment).generateAssessment(module.getId());order.verify(audit).createLog(any(),any(),anyString());
  }
- @Test void unreadableOriginalFilePreventsPublicationAndAssessment() {
+ @Test void unconfirmedOriginalFilePreventsPublicationAndAssessment() {
   var index=new com.ptc.halo.component.ModuleMaterialIndex(mock(org.springframework.ai.chat.client.ChatClient.class),new com.fasterxml.jackson.databind.ObjectMapper(),new com.ptc.halo.service.LessonStoragePaths(directory.toString()));
   when(materialIndex.getOrBuild(any())).thenAnswer(call->index.getOrBuild(call.getArgument(0)));
   var error=assertThrows(ResponseStatusException.class,()->controller.approveLesson(module.getId(),owner));
-  assertEquals("MODULE_MATERIAL_UNREADABLE",error.getReason());assertEquals(409,controller.handleRequestError(error).getStatusCode().value());
+  assertEquals("SOURCE_CONFIRMATION_REQUIRED",error.getReason());assertEquals(422,controller.handleRequestError(error).getStatusCode().value());
   assertEquals(LessonStatus.PENDING,module.getStatus());verifyNoInteractions(assessment,audit);
  }
 }

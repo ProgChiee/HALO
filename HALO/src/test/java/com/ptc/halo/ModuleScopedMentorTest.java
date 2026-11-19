@@ -87,6 +87,53 @@ class ModuleScopedMentorTest {
                 .thenReturn(mapper.writeValueAsString(Map.of("inScope", allowed, "sourceIds", ids, "answer", answer)));
     }
     List<String> ids() { return index.getOrBuild(module).chunks().stream().map(ModuleMaterialIndex.Chunk::id).toList(); }
+    @Test void expansionMentorUsesOnlyReviewedLessonAndRejectsOldSourceIds()throws Exception{
+        files.add(pdf(1,"Chapter 1 Middle East outline",module));files.add(pdf(2,"Chapter 4 SECRET_ITALIAN",module));
+        var worker=mock(ObtlExtractionProcess.class);when(worker.extract(any())).thenAnswer(i->ObtlPdfText.extract(i.getArgument(0),"Middle East"));
+        var scope=new LessonSourceScope(mapper,new LessonStoragePaths(directory.toString()),worker);
+        var week=new WeekEntity();week.setTitle("Middle East");when(module.getWeek()).thenReturn(week);
+        doAnswer(i->{when(module.getSourceScope()).thenReturn(i.getArgument(0));return null;}).when(module).setSourceScope(anyString());
+        module.setSourceScope(scope.extract(module));String section=scope.read(module.getSourceScope()).documents().get(0).extraction().sections().get(0).id();
+        module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(1L,List.of(section),false)),5L,LessonSourceScope.Mode.OBTL_EXPANSION));
+        when(module.getGeneratedObjectives()).thenReturn("Learn Middle Eastern spices");when(module.getGeneratedKnowledge()).thenReturn("APPROVED_ELABORATION cumin has an earthy flavor");when(module.getGeneratedExamples()).thenReturn("Cumin in a hospitality menu");when(module.getGeneratedSummary()).thenReturn("Spices and hospitality");
+        scope.markInstructionVerified(module);org.springframework.test.util.ReflectionTestUtils.setField(index,"sourceScopes",scope);
+        assertThrows(ResponseStatusException.class,()->index.getOrBuild(module));scope.acknowledgeExpansion(module,5L);
+        var old=new MentorMessageEntity();old.setSender(MessageSender.HALO);old.setMessage("SECRET_ITALIAN prior revision");old.setSourceSelectionId(UUID.randomUUID().toString());when(messages.findTop10BySessionIdOrderByCreatedAtDesc(21L)).thenReturn(List.of(old));
+        var selected=ids();decision(true,selected,"Cumin adds earthy flavor.");
+        assertTrue(mentor.sendMessage(21L,student,"Explain cumin.").getHaloMessage().contains("Professor-approved AI-generated lesson"));
+        var input=ArgumentCaptor.forClass(String.class);verify(replySpec).user(input.capture());
+        assertTrue(input.getValue().contains("approvedLessonExcerpts"));assertTrue(input.getValue().contains("APPROVED_ELABORATION"));assertFalse(input.getValue().contains("SECRET_ITALIAN"));
+        decision(false,List.of(),"");assertEquals(MentorService.OUT_OF_SCOPE,mentor.sendMessage(21L,student,"Teach Italian cuisine.").getHaloMessage());
+        decision(true,List.of("other-selection:lesson:0"),"Foreign");assertThrows(ResponseStatusException.class,()->mentor.sendMessage(21L,student,"Explain another chapter."));
+    }
+    @Test void publishedSelectionIgnoresLegacyCacheAndExcludedConversationEvidence()throws Exception{
+        files.add(pdf(1,"Chapter 1 Management",module));files.add(pdf(2,"Chapter 2 SECRET_EXCLUDED",module));
+        var oldIds=ids();assertEquals(2,oldIds.size());
+        var worker=mock(ObtlExtractionProcess.class);when(worker.extract(any())).thenAnswer(i->ObtlPdfText.extract(i.getArgument(0),"Management"));
+        var scope=new LessonSourceScope(mapper,new LessonStoragePaths(directory.toString()),worker);
+        var week=new WeekEntity();week.setTitle("Management");when(module.getWeek()).thenReturn(week);
+        String extracted=scope.extract(module);when(module.getSourceScope()).thenReturn(extracted);
+        String section=scope.read(module.getSourceScope()).documents().get(0).extraction().sections().get(0).id();
+        String confirmed=scope.confirm(module,List.of(new LessonSourceScope.Choice(1L,List.of(section),true)),5L);
+        var s=scope.read(confirmed);
+        when(module.getSourceScope()).thenReturn(scope.write(new LessonSourceScope.Snapshot(s.format(),s.id(),s.moduleId(),s.documents(),s.choices(),s.confirmedBy(),s.confirmedAt(),true)));
+        org.springframework.test.util.ReflectionTestUtils.setField(index,"sourceScopes",scope);
+        var selected=ids();assertEquals(1,selected.size());assertFalse(oldIds.contains(selected.get(0)));
+        var old=new MentorMessageEntity();old.setSender(MessageSender.HALO);old.setMessage("SECRET_EXCLUDED old answer");
+        var current=new MentorMessageEntity();current.setSender(MessageSender.HALO);current.setMessage("CURRENT_SCOPE_CONTEXT");current.setSourceSelectionId(s.id());
+        when(messages.findTop10BySessionIdOrderByCreatedAtDesc(21L)).thenReturn(List.of(current,old));
+        decision(true,selected,"Management is our selected chapter.");mentor.sendMessage(21L,student,"Explain management.");
+        var input=ArgumentCaptor.forClass(String.class);verify(replySpec).user(input.capture());assertFalse(input.getValue().contains("SECRET_EXCLUDED"));
+        assertTrue(input.getValue().contains("CURRENT_SCOPE_CONTEXT"));
+        var saved=ArgumentCaptor.forClass(MentorMessageEntity.class);verify(messages,times(2)).save(saved.capture());
+        assertTrue(saved.getAllValues().stream().allMatch(m->s.id().equals(m.getSourceSelectionId())));
+        var gate=ArgumentCaptor.forClass(String.class);verify(gateSpec).user(gate.capture());assertFalse(gate.getValue().contains("SECRET_EXCLUDED"));
+        decision(true,List.of(oldIds.get(1)),"Forbidden");
+        assertThrows(ResponseStatusException.class,()->mentor.sendMessage(21L,student,"Explain the excluded topic."));
+        String key=UUID.randomUUID().toString();
+        when(messages.findBySessionIdAndRequestIdAndSender(21L,key,MessageSender.HALO)).thenReturn(Optional.of(old));
+        assertEquals("MENTOR_STATE_CHANGED",assertThrows(ResponseStatusException.class,()->mentor.getExchange(21L,student,key)).getReason());
+    }
     @Test void questionDirectlyFoundInPdfIsAnsweredWithOriginalEvidence() throws Exception {
         files.add(pdf(1, "Front office welcomes hotel guests and manages check-in.", module));
         decision(true, ids(), "The front office welcomes guests and handles check-in.");

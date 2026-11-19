@@ -166,6 +166,11 @@ async function getStudentProgressSummaries(page = 0, size = 20, config = {}) {
 }
 
   async function getProfilePhoto(config = {}) { return (await apiClient.get('/professor/profile/photo', { ...config, responseType: 'blob' })).data; }
+  const sourcePath = id => '/professor/ai-learning-modules/' + id + '/sources';
+  const getSources = async (id, revisionVersion, config = {}) => (await apiClient.get(sourcePath(id), { ...config, params: { revisionVersion } })).data;
+  const extractSources = async (id, version, revisionVersion) => apiClient.post(sourcePath(id) + '/extract', { version, revisionVersion }, { timeout: 360000 });
+  const confirmSources = async (id, version, revisionVersion, choices, mode = 'SOURCE_GROUNDED') => apiClient.post(sourcePath(id) + '/confirm', { version, revisionVersion, choices, mode });
+  const reviewExpansion = async (id, version, revisionVersion, lesson, acknowledged) => apiClient.post(sourcePath(id) + '/review', { version, revisionVersion, lesson, acknowledged }, { timeout: 180000 });
   const revisionPath = id => '/professor/ai-learning-modules/' + id + '/revision';
   const getRevision = async (id, config = {}) => (await apiClient.get(revisionPath(id), config)).data;
   const getRevisionHistory = async (id, page = 0, size = 10, config = {}) =>
@@ -185,7 +190,7 @@ async function getStudentProgressSummaries(page = 0, size = 20, config = {}) {
   const getQuizRevision = async (id, config = {}) => (await apiClient.get(quizPath(id), config)).data;
   const generateQuizRevision = async id => (await apiClient.post(quizPath(id) + '/generate', undefined, { timeout: 180000 })).data;
   const approveQuizRevision = async (id, draftId) => (await apiClient.post(quizPath(id) + '/approve', { draftId })).data;
-  return { saveSubjectCover,removeSubjectCover,getSubjectCover, getRevisionHistory, getRevisionHistoryVersion, getQuizRevision, generateQuizRevision, approveQuizRevision, getRevision, startRevision, saveRevision, reviewRevision, publishRevision, discardRevision, getProfilePhoto, createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement, getStudentAssessmentHistory };
+  return { getSources, extractSources, confirmSources, reviewExpansion, saveSubjectCover,removeSubjectCover,getSubjectCover, getRevisionHistory, getRevisionHistoryVersion, getQuizRevision, generateQuizRevision, approveQuizRevision, getRevision, startRevision, saveRevision, reviewRevision, publishRevision, discardRevision, getProfilePhoto, createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement, getStudentAssessmentHistory };
 }
 
 export const { createSubject, getSubjects, getSubjectById, updateSubject, deleteSubject, addWeek, getWeeks, getWeekById, updateWeek, deleteWeek, getLearningModuleByWeek, createLearningModule, generateLesson, approveLesson, declineLesson, updateLearningModule, uploadModuleFile, deleteModuleFile, getProfessorDashboardData, getStudents, getStudentProgress, getStudentSubjects, getProfessorProfile, getStudentProgressSummaries, getLearningEngagement, getModuleEngagement, getStudentAssessmentHistory } = createProfessorService();

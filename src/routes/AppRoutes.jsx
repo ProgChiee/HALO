@@ -20,6 +20,7 @@ const ProfessorMode = lazy(() => import('../pages/admin/acting/ProfessorMode'));
 const ProfessorModeSelector = lazy(() => import('../pages/admin/acting/ProfessorMode').then(module => ({ default: module.ProfessorModeSelector })));
 const AdminDashboard = lazy(() => import('../pages/admin/components/AdminDashboard'));
 const ProfessorManagement = lazy(() => import('../pages/admin/components/ProfessorManagement'));
+const StudentRegistry = lazy(() => import('../pages/admin/components/StudentRegistry'));
 const StudentManagement = lazy(() => import('../pages/admin/components/StudentManagement'));
 const AdminProfile = lazy(() => import('../pages/admin/components/AdminProfile'));
 const Monitoring = lazy(() => import('../pages/admin/components/Monitoring'));
@@ -207,6 +208,7 @@ export default function AppRoutes() {
         }
       />
 
+      <Route path="/admin/student-registry" element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]}><StudentRegistry /></ProtectedRoute>} />
       <Route
         path="/admin/students"
         element={

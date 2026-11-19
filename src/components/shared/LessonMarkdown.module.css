@@ -1,0 +1,26 @@
+.content {
+  color: inherit;
+  font-size: inherit;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
+}
+.content > :first-child { margin-top: 0; }
+.content > :last-child { margin-bottom: 0; }
+.content p, .content ul, .content ol, .content pre, .content blockquote { margin: .6em 0; }
+.content h1, .content h2, .content h3, .content h4, .content h5, .content h6 {
+  color: inherit;
+  font-size: 1.1em;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 1em 0 .4em;
+}
+.content ul { list-style: disc; padding-left: 1.5em; }
+.content ol { list-style: decimal; padding-left: 1.5em; }
+.content li + li { margin-top: .2em; }
+.content li > p { margin: .2em 0; }
+.content code, .content pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+.content a { color: var(--color-primary); text-decoration: underline; }
+.content a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }

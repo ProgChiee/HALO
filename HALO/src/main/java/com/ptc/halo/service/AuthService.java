@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
+    @org.springframework.beans.factory.annotation.Autowired private StudentRegistryService registry;
     private final AuthAuditService audit;
     @org.springframework.beans.factory.annotation.Autowired
     private LoginTokenIssuer tokenIssuer;
@@ -63,6 +64,7 @@ public class AuthService {
     public StudentResponse registerStudent(StudentRequest studentRequest){
 
         StudentRegistrationValidator.validate(studentRequest);
+        long registryId=registry.validateClaim(studentRequest);
         var conflicts=new java.util.LinkedHashMap<String,String>();
         if(userRepository.existsByEmail(studentRequest.getEmail())) conflicts.put("email","This email is already registered. Sign in or use password recovery.");
         if(studentProfileRepository.existsByStudentId(studentRequest.getStudentId())) conflicts.put("studentId","This Student ID is already registered. Contact an administrator if you need help.");
@@ -109,6 +111,8 @@ public class AuthService {
         response.setStudentId(savedStudent.getStudentId());
         response.setSection(savedStudent.getSection());
         response.setYearLevel(savedStudent.getYearLevel());
+        userRepository.flush();
+        registry.claim(registryId,savedUser.getId());
 
 
         return response;

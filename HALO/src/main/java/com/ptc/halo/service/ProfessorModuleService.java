@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 
 
 public class ProfessorModuleService {
+    @org.springframework.beans.factory.annotation.Autowired private LessonSourceScope sourceScopes;
 
     private final AiLearningModuleRepository aiLearningModuleRepository;
     private final WeekRepository weekRepository;
@@ -179,6 +180,7 @@ public class ProfessorModuleService {
         AiLearningModuleEntity module = findModule(id, professor);
 
         requireApprovalReady(module);
+        if(module.getSourceScope()!=null)sourceScopes.requirePublishedReady(module);
         // Same module-only readiness checks as Mentor, before approval or assessment writes.
         materialIndex.getOrBuild(module);
         module.setStatus(LessonStatus.APPROVED);
@@ -376,10 +378,13 @@ public class ProfessorModuleService {
         response.setLessonText(module.getLessonText());
         response.setGeneratedObjectives(module.getGeneratedObjectives());
         response.setGeneratedKnowledge(module.getGeneratedKnowledge());
+        response.setGenerationMode(LessonSourceScope.isExpansion(module.getSourceScope())?"OBTL_EXPANSION":"SOURCE_GROUNDED");
         response.setGeneratedExamples(module.getGeneratedExamples());
         response.setGeneratedSummary(module.getGeneratedSummary());
         response.setStatus(module.getStatus());
         response.setAiGenerationStatus(module.getAiGenerationStatus());
+        response.setOutlineDraft(module.getSourceScope()!=null && module.getAiGenerationStatus()==AiGenerationStatus.PENDING
+            && module.getGeneratedKnowledge()!=null && sourceScopes.outlineOnly(module));
 
         response.setFiles(
                 module.getFiles().stream()
@@ -416,6 +421,9 @@ public class ProfessorModuleService {
                     "MODULE_ALREADY_APPROVED"
             );
         }
+
+        if(module.getSourceScope()==null && module.getFiles()!=null && module.getFiles().stream().anyMatch(f->"application/pdf".equals(f.getFileType())))
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,"SOURCE_CONFIRMATION_REQUIRED");
 
         if (module.getAiGenerationStatus() != AiGenerationStatus.COMPLETED) {
             throw new ResponseStatusException(

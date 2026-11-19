@@ -20,6 +20,7 @@ import static org.mockito.Mockito.*;
 @Import({AuthService.class, com.ptc.halo.service.LoginTokenIssuer.class,AuthAuditService.class,ActivityLogService.class,PasswordResetService.class,PasswordResetProtection.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AuthenticationAuditTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
  @Autowired AuthService auth; @Autowired AuthAuditService audit; @Autowired PasswordResetService reset;
  @Autowired ActivityLogService activity; @Autowired ActivityLogRepository logs; @Autowired UserRepository users; @Autowired PasswordResetOtpRepository otps;
  @MockBean PasswordResetThrottle throttle;

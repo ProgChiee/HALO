@@ -77,6 +77,14 @@ test('delayed save cannot replace new module and unmounted generation has no UI 
 }));
 
 const ready = () => ({...moduleData(1,'Lesson'),aiGenerationStatus:'COMPLETED',generatedObjectives:'Objectives'});
+test('outline-only generation is a successful Professor draft with no publish action',async()=>fixture(async({host,toasts,resolve})=>{
+ await resolve(0,moduleData(1,'Lesson'));
+ await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent.includes('Generate Lesson with AI')).click());
+ await resolve(1,{...moduleData(1,'Lesson'),outlineDraft:true,generatedKnowledge:'Chapter 1 outline',generatedSummary:'Not publishable: outline only.'});
+ assert.match(host.textContent,/Professor-only Outline Draft/);assert.match(host.textContent,/Chapter 1 outline/);
+ assert.equal([...host.querySelectorAll('button')].some(b=>b.textContent.includes('Approve & Publish')),false);
+ assert.equal(toasts.at(-1)[1],'success');assert.match(toasts.at(-1)[0],/Professor-only draft/);
+}));
 const approveButton = host => [...host.querySelectorAll('button')].find(b=>b.textContent.includes('Approve & Publish'));
 test('approval uses bounded extended timeout and prevents duplicate submissions',async()=>fixture(async({host,pending,toasts,resolve})=>{
  await resolve(0,ready());

@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  properties="jwt.secret=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=")
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class,JwtService.class,CustomUserDetailsService.class,AuthService.class,JwtAccountIdentityHttpTest.IdentityController.class})
 class JwtAccountIdentityHttpTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
  @RestController static class IdentityController {
   @GetMapping({"/api/student/identity-test","/api/professor/identity-test","/api/admin/identity-test","/api/super-admin/identity-test"})
   public Map<String,Object> identity(Authentication auth) {

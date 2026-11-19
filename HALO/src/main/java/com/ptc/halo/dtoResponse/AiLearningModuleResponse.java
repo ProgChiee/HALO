@@ -8,6 +8,12 @@ import java.util.List;
 public class AiLearningModuleResponse {
 
     private Long id;
+    private String generationMode;
+    public String getGenerationMode(){return generationMode;}
+    public void setGenerationMode(String value){generationMode=value;}
+    private boolean outlineDraft;
+    public boolean isOutlineDraft() { return outlineDraft; }
+    public void setOutlineDraft(boolean value) { outlineDraft = value; }
 
     private Long weekId;
     private Long subjectId;

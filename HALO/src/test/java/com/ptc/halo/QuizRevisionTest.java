@@ -18,6 +18,7 @@ import static org.mockito.Mockito.*;
 @DataJpaTest(properties="spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",showSql=false)
 @Import({QuizRevisionService.class,AssessmentService.class,ProfessorModuleService.class,ActivityLogService.class})
 class QuizRevisionTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.LessonSourceScope sourceScopes;
  @Autowired QuizRevisionService service;@Autowired AssessmentService assessmentService;
  @Autowired UserRepository users;@Autowired ProfessorRepository professors;@Autowired SubjectRepository subjects;@Autowired WeekRepository weeks;@Autowired AiLearningModuleRepository modules;
  @Autowired AssessmentRepository quizzes;@Autowired AssessmentAttemptRepository attempts;@Autowired StudentAnswerRepository answers;@Autowired StudentModuleProgressRepository progress;@Autowired ActivityLogRepository logs;

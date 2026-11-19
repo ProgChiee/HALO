@@ -27,6 +27,7 @@ import static org.mockito.Mockito.*;
 @Import({com.ptc.halo.service.ProfessorModuleService.class,AiLearningModuleController.class,ModuleFileTransactionTest.Config.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class ModuleFileTransactionTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.LessonSourceScope sourceScopes;
  static Path directory;
  @TestConfiguration static class Config {
   @Bean FileUploadService storage() throws Exception {directory=Files.createTempDirectory("halo-file-tx-");return new FileUploadService(new LessonStoragePaths(directory.toString()));}

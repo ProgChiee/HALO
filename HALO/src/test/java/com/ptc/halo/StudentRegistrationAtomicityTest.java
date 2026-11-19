@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Import({AuthService.class, com.ptc.halo.service.LoginTokenIssuer.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class StudentRegistrationAtomicityTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
  @Autowired AuthService auth;
  @Autowired UserRepository users;
  @org.springframework.boot.test.mock.mockito.SpyBean StudentProfileRepository profiles;

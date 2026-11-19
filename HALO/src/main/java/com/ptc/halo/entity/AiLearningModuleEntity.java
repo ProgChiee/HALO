@@ -39,6 +39,12 @@ public class AiLearningModuleEntity {
     @Column(columnDefinition = "LONGTEXT")
     private String aiNotes;
 
+    // Null means legacy full-document scope. Draft revisions carry their own immutable snapshot.
+    @Column(columnDefinition = "LONGTEXT")
+    private String sourceScope;
+    public String getSourceScope() { return sourceScope; }
+    public void setSourceScope(String value) { sourceScope = value; }
+
     @OneToMany(
             mappedBy = "module",
             cascade = CascadeType.ALL,

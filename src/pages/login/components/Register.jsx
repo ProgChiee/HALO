@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
-import { register as registerService } from '../../../services/authService';
+import { sendRegistrationCode, register as registerService } from '../../../services/authService';
 import bgImage from '../../../assets/login/Background.png';
 import { validateRegistration, registrationHints, registrationFailure } from '../../../utils/registration';
 import styles from '../styles/Register.module.css';
@@ -24,6 +24,8 @@ export default function Register() {
   const [studentId, setStudentId] = useState('');
   const [section, setSection] = useState('');
   const [yearLevel, setYearLevel] = useState('');
+  const [verificationCode,setVerificationCode]=useState('');
+  const [codeNotice,setCodeNotice]=useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -38,6 +40,7 @@ export default function Register() {
     if (submitting.current) return;
     setError('');
     const result = validateRegistration({ name: fullName, email, password, confirmPassword, studentId, section, yearLevel });
+    if (!/^[0-9]{6}$/.test(verificationCode)) result.errors.verificationCode='Enter the six-digit code sent to your school email.';
     setErrors(result.errors);
     if (Object.keys(result.errors).length) {
       requestAnimationFrame(() => document.getElementById('register-' + Object.keys(result.errors)[0])?.focus());
@@ -47,7 +50,7 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      await registerService(result.value.name, result.value.email, password, result.value.studentId, result.value.section, yearLevel);
+      await registerService(result.value.name, result.value.email, password, result.value.studentId, result.value.section, yearLevel, verificationCode);
       showToast('Account created! Please sign in.', 'success');
       navigate('/login');
     } catch (failure) {
@@ -60,6 +63,13 @@ export default function Register() {
     }
   }
 
+  async function requestCode() {
+    if(submitting.current)return;
+    submitting.current=true;setIsLoading(true);setError('');setCodeNotice('');
+    try {const result=await sendRegistrationCode(studentId.trim(),email.trim());setCodeNotice(result.message);}
+    catch {setError('Could not request a code. Check your details or wait before retrying.');}
+    finally{submitting.current=false;setIsLoading(false);}
+  }
   return (
     <main className={styles.wrapper} style={{ '--bg-image': `url(${bgImage})` }}>
       <section className={styles.card} aria-labelledby="register-title">
@@ -119,7 +129,7 @@ export default function Register() {
                   id="register-studentId" aria-invalid={!!errors.studentId} aria-describedby="register-studentId-hint" disabled={isLoading}
                   value={studentId}
                   onChange={(e) => { setStudentId(e.target.value); clearField('studentId'); }}
-                  placeholder="e.g. 29AHRT-0168"
+                  placeholder="e.g. 23AHRT-0168"
                 />
               </div>
               <p id="register-studentId-hint" className={errors.studentId ? styles.fieldError : styles.hint}>{errors.studentId || registrationHints.studentId}</p>
@@ -185,6 +195,14 @@ export default function Register() {
             </fieldset>
             {error && <p role="alert" className={styles.error}>{error}</p>}
 
+            <div className={styles.field}>
+              <label htmlFor="register-verificationCode" className={styles.label}>Email verification code</label>
+              <input id="register-verificationCode" aria-invalid={!!errors.verificationCode} className={styles.input} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verificationCode} onChange={e=>setVerificationCode(e.target.value)} disabled={isLoading} aria-describedby="registration-code-help" />
+              <p id="registration-code-help" className={styles.hint}>Use the six-digit code sent to your official school email. Your official registry name will be used for the account.</p>
+              <Button type="button" disabled={isLoading||!studentId.trim()||!email.trim()} onClick={requestCode}>Send / resend verification code</Button>
+              {codeNotice&&<p role="status">{codeNotice}</p>}
+              {errors.verificationCode&&<p role="alert">{errors.verificationCode}</p>}
+            </div>
             <Button type="submit" disabled={isLoading} isLoading={isLoading}>Create Account</Button>
 
             <p className={styles.signinText}>

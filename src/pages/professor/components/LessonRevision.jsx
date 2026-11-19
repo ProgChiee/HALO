@@ -7,6 +7,7 @@ import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import styles from '../styles/LessonEditor.module.css';
 import { GeneratedLessonSections } from './LessonContent';
+import LessonSourceSelection from './LessonSourceSelection';
 
 export default function LessonRevision({ moduleId, onPublished }) {
  const { api, preview } = useProfessorWorkflow();
@@ -79,6 +80,8 @@ export default function LessonRevision({ moduleId, onPublished }) {
     <Button variant="secondary" disabled={disabled} onClick={() => setConfirm('discard')}>Discard Revision</Button>
    </div>
    {busy && <p role="status">Processing revision...</p>}
+   {revision.files.length > 0 && <LessonSourceSelection key={`sources-${revision.version}`} moduleId={moduleId} revisionVersion={revision.version} disabled={disabled || changed} onChanged={() => { setLoading(true); setReload(n => n + 1); }} />}
+   {revision.state === 'DRAFT' && revision.generatedKnowledge && <section aria-label="Outline draft"><h4>Professor-only outline plan</h4><GeneratedLessonSections lesson={revision} /></section>}
    {changed && <p className={styles.panelSubtitle}>Save Draft before reviewing or publishing. Your edits stay here when you switch tabs.</p>}
    <section className={styles.revisionReview} aria-label="Review and publish revision">
     <h3>Review Changes</h3>

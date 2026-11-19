@@ -45,12 +45,12 @@ test('all six Admin pages retain navigation during loading at desktop, tablet an
       const cleanup = await mount(Page);
       try {
         const toggle = document.querySelector('[aria-label="Open navigation"]');
-        if (width > 1024) { assert.equal(toggle, null); assert.equal(document.querySelectorAll('nav a').length, 8); }
+        if (width > 1024) { assert.equal(toggle, null); assert.equal(document.querySelectorAll('nav a').length, 9); }
         else {
           assert.doesNotMatch(document.body.textContent, /Superadmin|Super Admin/); assert.ok(toggle); assert.equal(document.querySelector('aside'), null);
           await click(toggle);
           assert.equal(toggle.getAttribute('aria-expanded'), 'true');
-          assert.equal(document.querySelectorAll('[role="dialog"] nav a').length, 8);
+          assert.equal(document.querySelectorAll('[role="dialog"] nav a').length, 9);
           await click(document.querySelector('[aria-label="Close navigation"]'));
           assert.equal(document.querySelector('[role="dialog"]'), null);
           assert.equal(document.activeElement, toggle);
@@ -67,7 +67,7 @@ test('compact navigation preserves links, active state, Escape, desktop transiti
     let toggle = document.querySelector('[aria-label="Open navigation"]');
     await click(toggle);
     assert.equal(document.querySelector('nav a[aria-current="page"]').getAttribute('href'), '/admin/professors');
-    assert.deepEqual([...document.querySelectorAll('nav a')].map(a => a.getAttribute('href')), ['/admin', '/admin/professors', '/admin/students', '/admin/monitoring', '/admin/professor-mode', '/admin/student-mode', '/admin/profile', '/admin/settings']);
+    assert.deepEqual([...document.querySelectorAll('nav a')].map(a => a.getAttribute('href')), ['/admin', '/admin/professors', '/admin/students', '/admin/student-registry', '/admin/monitoring', '/admin/professor-mode', '/admin/student-mode', '/admin/profile', '/admin/settings']);
     await act(async () => document.querySelector('[role="dialog"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     assert.equal(document.querySelector('[role="dialog"]'), null);
     assert.equal(document.activeElement, toggle);
@@ -148,7 +148,7 @@ test('branded Admin navigation keeps logo first and groups destinations in deskt
       assert.equal(sidebar.children[1].textContent.trim(), 'Admin');
       const nav = sidebar.querySelector('nav');
       assert.deepEqual([...nav.querySelectorAll('p')].map(p => p.textContent), ['Main', 'Modes', 'Account']);
-      assert.deepEqual([...nav.querySelectorAll('a')].map(a => a.textContent.trim()), ['Dashboard', 'Professor Management', 'Student Management', 'Monitoring', 'Professor Mode', 'Student Mode', 'Profile', 'Settings']);
+      assert.deepEqual([...nav.querySelectorAll('a')].map(a => a.textContent.trim()), ['Dashboard', 'Professor Management', 'Student Management', 'Student Registry', 'Monitoring', 'Professor Mode', 'Student Mode', 'Profile', 'Settings']);
       assert.equal(nav.querySelector('[aria-current="page"]').textContent.trim(), 'Dashboard');
       assert.ok(sidebar.querySelector('[aria-label="Log out"]'));
     } finally { await cleanup(); }

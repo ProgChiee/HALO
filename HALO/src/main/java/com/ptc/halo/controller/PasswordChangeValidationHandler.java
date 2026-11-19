@@ -6,6 +6,12 @@ import java.util.Map;
 // Safe authentication input and password errors; protected-route rules are unchanged.
 @RestControllerAdvice(assignableTypes = AuthController.class)
 public class PasswordChangeValidationHandler {
+    @ExceptionHandler(com.ptc.halo.service.RegistrationRateLimitException.class)
+    public ResponseEntity<?> registrationRateLimit(com.ptc.halo.service.RegistrationRateLimitException error) {
+        return ResponseEntity.status(429).header("Retry-After",Long.toString(error.getRetryAfterSeconds()))
+                .body(Map.of("status",429,"code","REGISTRATION_RATE_LIMITED","retryAfterSeconds",error.getRetryAfterSeconds(),
+                        "message","Too many registration attempts. Please wait before trying again."));
+    }
     @ExceptionHandler(com.ptc.halo.service.RegistrationValidationException.class)
     public ResponseEntity<?> registration(com.ptc.halo.service.RegistrationValidationException error) {
         return ResponseEntity.status(error.status).body(Map.of("status",error.status,"code","REGISTRATION_VALIDATION_FAILED","message","Please correct the indicated fields.","errors",error.errors));

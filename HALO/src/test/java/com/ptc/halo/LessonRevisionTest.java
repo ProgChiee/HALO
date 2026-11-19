@@ -19,6 +19,7 @@ import static org.mockito.Mockito.*;
 @DataJpaTest(properties="spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",showSql=false)
 @Import({LessonRevisionService.class,QuizRevisionService.class,ProfessorModuleService.class,ActivityLogService.class,ObjectMapper.class})
 class LessonRevisionTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.LessonSourceScope sourceScopes;
  @Autowired LessonRevisionService service;@Autowired UserRepository users;@Autowired ProfessorRepository professors;@Autowired SubjectRepository subjects;
  @Autowired WeekRepository weeks;@Autowired AiLearningModuleRepository modules;@Autowired LessonRevisionRepository revisions;@Autowired ActivityLogRepository logs;
  @Autowired StudentModuleProgressRepository progress;@Autowired jakarta.persistence.EntityManager em;
@@ -41,6 +42,98 @@ class LessonRevisionTest {
  UserEntity user(String name,Role role){var u=new UserEntity();u.setName(name);u.setEmail(name+"@test");u.setRole(role);u.setStatus(Status.ACTIVE);return users.saveAndFlush(u);}
  AiLearningModuleUpdateRequest values(){var v=new AiLearningModuleUpdateRequest();v.setLessonText("Revision text");v.setAiNotes("New notes");v.setYoutubeLink("https://youtu.be/dQw4w9WgXcQ");return v;}
  LessonRevisionService.View start(){return service.start(module.getId(),professor,null);}
+ @Test void expansionRevisionRequiresAcademicReviewAndPreservesImmutablePublishedBaseline()throws Exception{
+  var storage=mock(LessonMaterialStorage.class);var worker=mock(ObtlExtractionProcess.class);when(storage.read("original")).thenReturn("fixture".getBytes());
+  when(worker.extract(any())).thenReturn(new ObtlPdfText.Extracted("fixture",ObtlSections.detect(List.of(new ObtlSections.Page(1,"Chapter 1 Guest service\nTopics and outcomes\nChapter 2 EXCLUDED")),"Guest service")));
+  var scopes=new LessonSourceScope(new ObjectMapper(),storage,worker);org.springframework.test.util.ReflectionTestUtils.setField(service,"sources",scopes);
+  when(index.buildRevision(any())).thenAnswer(i->scopes.teachingIndex(i.getArgument(0),false));
+  try{
+   var r=start();var c=service.sourceCandidate(module.getId(),r.version(),professor);c.setSourceScope(scopes.extract(c));
+   String id=scopes.read(c.getSourceScope()).documents().get(0).extraction().sections().get(0).id();
+   c.setSourceScope(scopes.confirm(c,List.of(new LessonSourceScope.Choice(c.getFiles().get(0).getId(),List.of(id),false)),professor.getId(),LessonSourceScope.Mode.OBTL_EXPANSION));
+   service.saveSource(module.getId(),r.version(),c.getSourceScope(),professor,null);r=service.get(module.getId(),professor);
+   var prepared=service.prepare(module.getId(),r.version(),professor,false);c=prepared.candidate();new LessonSourceScope.Lesson("Objectives","Detailed instruction","Hospitality scenario","Summary").apply(c);scopes.markInstructionVerified(c);c.setAiGenerationStatus(AiGenerationStatus.COMPLETED);
+   r=service.reviewed(module.getId(),prepared,professor,null,index.buildRevision(c).fingerprint());
+   var unreviewed=service.prepare(module.getId(),r.version(),professor,true);assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.publish(module.getId(),unreviewed,index.buildRevision(unreviewed.candidate()).fingerprint(),professor,null));
+   assertEquals("Published knowledge",module.getGeneratedKnowledge());assertNull(module.getSourceScope());
+   long oldVersion=r.version();c=service.sourceCandidate(module.getId(),r.version(),professor);scopes.acknowledgeExpansion(c,professor.getId());service.saveExpansionReview(module.getId(),r.version(),c,professor,null);
+   final var reviewedCandidate=c;assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.saveExpansionReview(module.getId(),oldVersion,reviewedCandidate,professor,null));
+   r=service.get(module.getId(),professor);var publish=service.prepare(module.getId(),r.version(),professor,true);service.publish(module.getId(),publish,index.buildRevision(publish.candidate()).fingerprint(),professor,null);em.flush();
+   String historical=history.findByModuleIdAndRevisionNumber(module.getId(),1).orElseThrow().getPayload();assertTrue(historical.contains("OBTL_EXPANSION"));assertNotNull(scopes.read(module.getSourceScope()).review());
+   assertTrue(history.findByModuleIdAndRevisionNumber(module.getId(),0).orElseThrow().getPayload().contains("Published knowledge"));
+   var next=start();service.saveSource(module.getId(),next.version(),scopes.extract(service.sourceCandidate(module.getId(),next.version(),professor)),professor,null);
+   assertEquals(historical,history.findByModuleIdAndRevisionNumber(module.getId(),1).orElseThrow().getPayload());assertEquals("Detailed instruction",module.getGeneratedKnowledge());
+  }finally{org.springframework.test.util.ReflectionTestUtils.setField(service,"sources",sourceScopes);}
+ }
+ @Test void confirmedOutlineToInstructionalPublicationKeepsExactSourceIsolation()throws Exception{
+  var storage=mock(LessonMaterialStorage.class);var worker=mock(ObtlExtractionProcess.class);
+  when(storage.read("original")).thenReturn("synthetic outline identity".getBytes());
+  when(storage.read("instruction")).thenReturn("synthetic instructional identity".getBytes());
+  when(worker.extract(any())).thenAnswer(i->{
+   boolean outline=Arrays.equals(i.getArgument(0),"synthetic outline identity".getBytes());
+   String text=outline?"Chapter 1 Management\nWhat is management?\nChapter 2 Excluded\nEXCLUDED_CHAPTER_TWO":"Chapter 1 Management\nManagers plan work and coordinate staff.\nChapter 2 Excluded\nEXCLUDED_SUPPLEMENT";
+   return new ObtlPdfText.Extracted("worker-test",ObtlSections.detect(List.of(new ObtlSections.Page(1,text)),"Management"));
+  });
+  var f=new AiLearningFileEntity();f.setOriginalFileName("Instruction.pdf");f.setStoredFileName("instruction");f.setFilePath("instruction");f.setFileType("application/pdf");module.addFile(f);modules.saveAndFlush(module);
+  var realScope=new LessonSourceScope(new ObjectMapper(),storage,worker);
+  var chat=mock(org.springframework.ai.chat.client.ChatClient.class,RETURNS_DEEP_STUBS);
+  var builder=mock(org.springframework.ai.chat.client.ChatClient.Builder.class);when(builder.build()).thenReturn(chat);
+  var realGeneration=new AiGenerationService(builder,modules,new ObjectMapper(),index,mock(ModuleGenerationState.class),storage);
+  org.springframework.test.util.ReflectionTestUtils.setField(realGeneration,"sourceScopes",realScope);
+  org.springframework.test.util.ReflectionTestUtils.setField(service,"sources",realScope);
+  try{
+   var r=start();var candidate=service.sourceCandidate(module.getId(),r.version(),professor);
+   service.saveSource(module.getId(),r.version(),realScope.extract(candidate),professor,null);
+   r=service.get(module.getId(),professor);candidate=service.sourceCandidate(module.getId(),r.version(),professor);
+   var documents=realScope.read(candidate.getSourceScope()).documents();var outline=documents.get(0);var instruction=documents.get(1);
+   service.saveSource(module.getId(),r.version(),realScope.confirm(candidate,List.of(new LessonSourceScope.Choice(outline.fileId(),List.of(outline.extraction().sections().get(0).id()),false)),professor.getId()),professor,null);
+   r=service.get(module.getId(),professor);var prepared=service.prepare(module.getId(),r.version(),professor,false);
+   realGeneration.generateRevision(prepared.candidate());r=service.reviewed(module.getId(),prepared,professor,null,realScope.index(prepared.candidate(),true).fingerprint());
+   assertEquals("DRAFT",r.state());assertNull(module.getSourceScope());verifyNoInteractions(chat,assessments);
+   final long draftVersion=r.version();assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.prepare(module.getId(),draftVersion,professor,true));
+   candidate=service.sourceCandidate(module.getId(),r.version(),professor);
+   service.saveSource(module.getId(),r.version(),realScope.confirm(candidate,List.of(new LessonSourceScope.Choice(outline.fileId(),List.of(outline.extraction().sections().get(0).id()),false),new LessonSourceScope.Choice(instruction.fileId(),List.of(instruction.extraction().sections().get(0).id()),true)),professor.getId()),professor,null);
+   r=service.get(module.getId(),professor);prepared=service.prepare(module.getId(),r.version(),professor,false);
+   String sourceId=realScope.index(prepared.candidate(),true).chunks().get(0).id();
+   when(chat.prompt().system(startsWith("Evaluate only")).user(anyString()).call().content()).thenReturn("{\"relevant\":true,\"sufficient\":true}");
+   when(chat.prompt().system(startsWith("Generate a lesson ONLY")).user(anyString()).call().content()).thenReturn(new ObjectMapper().writeValueAsString(Map.of("valid",true,"objectives","Learn management","knowledge","Managers plan work and coordinate staff.","examples","Coordinating staff","summary","Plan and coordinate","sourceIds",List.of(sourceId))));
+   realGeneration.generateRevision(prepared.candidate());String fingerprint=realScope.index(prepared.candidate(),true).fingerprint();
+   r=service.reviewed(module.getId(),prepared,professor,null,fingerprint);assertEquals("REVIEWED",r.state());assertNull(module.getSourceScope());
+   var publication=service.prepare(module.getId(),r.version(),professor,true);service.publish(module.getId(),publication,realScope.index(publication.candidate(),true).fingerprint(),professor,null);em.flush();
+   realScope.requirePublishedReady(module);var published=realScope.index(module,true);
+   assertEquals(1,published.chunks().size());assertFalse(published.chunks().get(0).text().contains("EXCLUDED"));
+   assertTrue(published.chunks().get(0).text().contains("coordinate staff"));
+   assertTrue(history.findByModuleIdAndRevisionNumber(module.getId(),1).orElseThrow().getPayload().contains(sourceId.substring(0,36)));
+   assertTrue(history.findByModuleIdAndRevisionNumber(module.getId(),0).orElseThrow().getPayload().contains("Published text"));
+  }finally{org.springframework.test.util.ReflectionTestUtils.setField(service,"sources",sourceScopes);}
+ }
+ @Test void sourceSelectionChangesOnlyDraftAndRejectsStaleEdits()throws Exception{
+  var r=start();String baseline=history.findByModuleIdAndRevisionNumber(module.getId(),0).orElseThrow().getPayload();
+  service.saveSource(module.getId(),r.version(),"synthetic-snapshot",professor,null);
+  em.flush();em.clear();
+  assertNull(modules.findById(module.getId()).orElseThrow().getSourceScope());
+  var next=service.get(module.getId(),professor);assertEquals("DRAFT",next.state());
+  assertEquals("synthetic-snapshot",service.sourceCandidate(module.getId(),next.version(),professor).getSourceScope());
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.saveSource(module.getId(),r.version(),"stale",professor,null));
+  assertEquals(baseline,history.findByModuleIdAndRevisionNumber(module.getId(),0).orElseThrow().getPayload());
+ }
+ @Test void outlineRevisionStaysDraftAndCannotPublishOrGenerateAssessment(){
+  var r=start();service.saveSource(module.getId(),r.version(),"outline-snapshot",professor,null);
+  r=service.get(module.getId(),professor);
+  doAnswer(i->{AiLearningModuleEntity c=i.getArgument(0);c.setAiGenerationStatus(AiGenerationStatus.PENDING);c.setGeneratedKnowledge("Outline plan");return c;}).when(generation).generateRevision(any());
+  var reviewed=review(r);assertEquals("DRAFT",reviewed.state());assertEquals("Outline plan",reviewed.generatedKnowledge());
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.prepare(module.getId(),reviewed.version(),professor,true));
+  assertNull(module.getSourceScope());assertEquals("Published text",module.getLessonText());verifyNoInteractions(assessments);
+ }
+ @Test void publishedSourceSnapshotIsRetainedInImmutableHistory(){
+  var r=start();service.saveSource(module.getId(),r.version(),"confirmed-instructional-snapshot",professor,null);
+  r=review(service.get(module.getId(),professor));publish(r);em.flush();
+  String snapshot=history.findByModuleIdAndRevisionNumber(module.getId(),1).orElseThrow().getPayload();
+  assertTrue(snapshot.contains("confirmed-instructional-snapshot"));assertEquals("confirmed-instructional-snapshot",module.getSourceScope());
+  var next=start();service.saveSource(module.getId(),next.version(),"changed-draft",professor,null);
+  assertEquals(snapshot,history.findByModuleIdAndRevisionNumber(module.getId(),1).orElseThrow().getPayload());
+  assertEquals("confirmed-instructional-snapshot",module.getSourceScope());verify(sourceScopes).requirePublishedReady(any());
+ }
  LessonRevisionService.View save(LessonRevisionService.View r)throws Exception{return service.save(module.getId(),r.version(),values(),r.files().stream().map(LessonRevisionService.FileView::key).toList(),List.of(),professor,null);}
  AssessmentEntity quizDraft(){
   var quiz=new AssessmentEntity();quiz.setModule(module);quiz.setTitle("Replacement quiz");quiz.setQuizVersion(2);quiz.setPassingScore(75);quiz.setStatus(AssessmentStatus.DRAFT);quiz.setCreatedAt(java.time.LocalDateTime.now());quiz.setSourceModuleVersion(module.getVersion());em.persist(quiz);em.flush();return quiz;

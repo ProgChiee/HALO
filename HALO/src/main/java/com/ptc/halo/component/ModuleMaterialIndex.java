@@ -21,6 +21,7 @@ import java.util.*;
 /** File-derived index only: no global corpus and no generated lesson as scope. */
 @Component
 public class ModuleMaterialIndex {
+    @org.springframework.beans.factory.annotation.Autowired private com.ptc.halo.service.LessonSourceScope sourceScopes;
     public record Chunk(String id, Long fileId, String source, int page, String text, String topics) {}
     public record Index(Long moduleId, String fingerprint, List<Chunk> chunks) {}
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ModuleMaterialIndex.class);
@@ -45,9 +46,15 @@ public class ModuleMaterialIndex {
         Arrays.setAll(locks, i -> new Object());
     }
 
-    public Index getOrBuild(AiLearningModuleEntity module) { return build(module, true); }
+    public Index getOrBuild(AiLearningModuleEntity module) {
+        if(module.getSourceScope()!=null){
+            if(module.getStatus()==com.ptc.halo.enums.LessonStatus.APPROVED)sourceScopes.requirePublishedReadable(module);
+            return sourceScopes.teachingIndex(module,true);
+        }
+        return build(module, true);
+    }
     // Draft validation never reads or replaces the live module cache.
-    public Index buildRevision(AiLearningModuleEntity module) { return build(module, false); }
+    public Index buildRevision(AiLearningModuleEntity module) { return module.getSourceScope()==null?build(module,false):sourceScopes.teachingIndex(module,false); }
     public void invalidate(Long moduleId) {
         synchronized (locks[Math.floorMod(moduleId.hashCode(), locks.length)]) {
             try { Files.deleteIfExists(cachePaths.resolve(".module-index/" + moduleId + ".json")); }

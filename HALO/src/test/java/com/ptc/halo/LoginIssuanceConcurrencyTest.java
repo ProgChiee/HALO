@@ -31,6 +31,7 @@ import static org.mockito.Mockito.*;
 @Import({AuthService.class, com.ptc.halo.service.LoginTokenIssuer.class,JwtService.class,LoginIssuanceConcurrencyTest.Config.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class LoginIssuanceConcurrencyTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
  @TestConfiguration static class Config { @Bean PasswordEncoder encoder(){return new BCryptPasswordEncoder(4);} }
  @Autowired AuthService auth; @Autowired UserRepository users; @Autowired PasswordEncoder encoder;
  @Autowired PlatformTransactionManager manager; @SpyBean JwtService jwt;

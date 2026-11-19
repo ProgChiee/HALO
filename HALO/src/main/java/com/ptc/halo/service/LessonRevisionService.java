@@ -26,6 +26,7 @@ public class LessonRevisionService {
  private final AiGenerationService generation;
  private final ModuleMaterialIndex index;
  private final ActivityLogService audit;
+ @org.springframework.beans.factory.annotation.Autowired private LessonSourceScope sources;
  private final ObjectMapper json;
  private final AssessmentRepository quizzes;private final AssessmentContentChange changes;
  public LessonRevisionService(LessonRevisionRepository revisions,AiLearningModuleRepository modules,ProfessorModuleService professorModules,
@@ -34,10 +35,24 @@ public class LessonRevisionService {
   this.history=history;
  }
  public record Attachment(String key,Long fileId,String originalFileName,String storedFileName,String filePath,String fileType,boolean publishedSource) {}
- public record Payload(String lessonText,String youtubeLink,String aiNotes,List<Attachment> files,String objectives,String knowledge,String examples,String summary,String fingerprint) {}
+ public record Payload(String lessonText,String youtubeLink,String aiNotes,List<Attachment> files,String objectives,String knowledge,String examples,String summary,String fingerprint,String sourceScope) { public Payload(String l,String y,String a,List<Attachment> f,String o,String k,String e,String s,String p){this(l,y,a,f,o,k,e,s,p,null);} }
  public record FileView(String key,String originalFileName) {}
+ public AiLearningModuleEntity sourceCandidate(Long id,Long version,UserEntity p){
+  var m=live(id,p,false);return candidate(m,payload(draft(m,version)));
+ }
+ public void saveSource(Long id,Long version,String scope,UserEntity p,AdminActingSessionEntity a){
+  var m=live(id,p,true);var r=draft(m,version);var old=payload(r);
+  payload(r,new Payload(old.lessonText(),old.youtubeLink(),old.aiNotes(),old.files(),null,null,null,null,null,scope));
+  r.state="DRAFT";r.revisedBy=actor(p,a);r.revisedAt=LocalDateTime.now();revisions.saveAndFlush(r);
+  log(p,a,"Changed draft source selection",m);
+ }
  public record View(Long version,int revisionNumber,String state,Long baseVersion,Long revisedBy,LocalDateTime revisedAt,LocalDateTime publishedAt,
-  String lessonText,String youtubeLink,String aiNotes,List<FileView> files,String generatedObjectives,String generatedKnowledge,String generatedExamples,String generatedSummary) {}
+  String lessonText,String youtubeLink,String aiNotes,List<FileView> files,String generatedObjectives,String generatedKnowledge,String generatedExamples,String generatedSummary,String generationMode) {}
+ public void saveExpansionReview(Long id,Long version,AiLearningModuleEntity c,UserEntity p,AdminActingSessionEntity a){
+  var m=live(id,p,true);var r=draft(m,version);var old=payload(r);sources.requirePublishedReady(c);
+  payload(r,new Payload(old.lessonText(),old.youtubeLink(),old.aiNotes(),old.files(),c.getGeneratedObjectives(),c.getGeneratedKnowledge(),c.getGeneratedExamples(),c.getGeneratedSummary(),index.buildRevision(c).fingerprint(),c.getSourceScope()));
+  r.state="REVIEWED";r.revisedBy=actor(p,a);r.revisedAt=LocalDateTime.now();revisions.saveAndFlush(r);log(p,a,"Acknowledged AI expansion accuracy",m);
+ }
  public record Prepared(Long revisionVersion,Long moduleVersion,AiLearningModuleEntity candidate,String previousContent,boolean filesChanged) {
   public Prepared(Long revisionVersion,Long moduleVersion,AiLearningModuleEntity candidate){this(revisionVersion,moduleVersion,candidate,"",true);}
  }
@@ -54,7 +69,7 @@ public class LessonRevisionService {
  private Payload payload(LessonRevisionEntity r){try{return json.readValue(r.payload,Payload.class);}catch(Exception e){throw new IllegalStateException("Revision unavailable",e);}}
  private void payload(LessonRevisionEntity r,Payload p){try{r.payload=json.writeValueAsString(p);}catch(Exception e){throw new IllegalStateException("Revision unavailable",e);}}
  private Payload publishedPayload(AiLearningModuleEntity m){
-  return new Payload(m.getLessonText(),m.getYoutubeLink(),m.getAiNotes(),m.getFiles().stream().map(f->new Attachment(UUID.randomUUID().toString(),f.getId(),f.getOriginalFileName(),f.getStoredFileName(),f.getFilePath(),f.getFileType(),true)).toList(),m.getGeneratedObjectives(),m.getGeneratedKnowledge(),m.getGeneratedExamples(),m.getGeneratedSummary(),null);
+  return new Payload(m.getLessonText(),m.getYoutubeLink(),m.getAiNotes(),m.getFiles().stream().map(f->new Attachment(UUID.randomUUID().toString(),f.getId(),f.getOriginalFileName(),f.getStoredFileName(),f.getFilePath(),f.getFileType(),true)).toList(),m.getGeneratedObjectives(),m.getGeneratedKnowledge(),m.getGeneratedExamples(),m.getGeneratedSummary(),null,m.getSourceScope());
  }
  private void archivePublished(LessonRevisionEntity r,Long publishedModuleVersion){
   if(!"PUBLISHED".equals(r.state)||history.existsByModuleIdAndRevisionNumber(r.moduleId,r.revisionNumber))return;
@@ -82,7 +97,7 @@ public class LessonRevisionService {
   try{var content=json.readValue(h.getPayload(),Payload.class);return new HistoryContent(historySummary(h),content.lessonText(),content.youtubeLink(),content.aiNotes(),content.files().stream().map(f->new FileView(f.key(),f.originalFileName())).toList(),content.objectives(),content.knowledge(),content.examples(),content.summary());}
   catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException("Revision unavailable",e);}
  }
- private View view(LessonRevisionEntity r){var p=payload(r);return new View(r.version,r.revisionNumber,r.state,r.baseVersion,r.revisedBy,r.revisedAt,r.publishedAt,p.lessonText(),p.youtubeLink(),p.aiNotes(),p.files().stream().map(f->new FileView(f.key(),f.originalFileName())).toList(),p.objectives(),p.knowledge(),p.examples(),p.summary());}
+ private View view(LessonRevisionEntity r){var p=payload(r);var source=new AiLearningModuleEntity();source.setSourceScope(p.sourceScope());return new View(r.version,r.revisionNumber,r.state,r.baseVersion,r.revisedBy,r.revisedAt,r.publishedAt,p.lessonText(),p.youtubeLink(),p.aiNotes(),p.files().stream().map(f->new FileView(f.key(),f.originalFileName())).toList(),p.objectives(),p.knowledge(),p.examples(),p.summary(),sources.expansion(source)?"OBTL_EXPANSION":"SOURCE_GROUNDED");}
  private LessonRevisionEntity draft(AiLearningModuleEntity m,Long version) {
   var r=editableDraft(m,version);
   if(!Objects.equals(r.baseVersion,m.getVersion()))throw conflict("STALE_MODULE_OPERATION");
@@ -120,7 +135,7 @@ public class LessonRevisionService {
   if(selected.isEmpty())throw conflict("MODULE_MATERIALS_REQUIRED");
   for(var f:previous.files())if(!keep.contains(f.key())&&!f.publishedSource())uploads.deleteFile(f.filePath());
   boolean sameSources=selected.equals(previous.files())&&AssessmentContentChange.normalize(values.getLessonText()).equals(AssessmentContentChange.normalize(previous.lessonText()))&&Objects.equals(values.getAiNotes(),previous.aiNotes());
-  payload(r,new Payload(values.getLessonText(),youtube,values.getAiNotes(),selected,sameSources?previous.objectives():null,sameSources?previous.knowledge():null,sameSources?previous.examples():null,sameSources?previous.summary():null,null));
+  payload(r,new Payload(values.getLessonText(),youtube,values.getAiNotes(),selected,sameSources?previous.objectives():null,sameSources?previous.knowledge():null,sameSources?previous.examples():null,sameSources?previous.summary():null,null,previous.sourceScope()));
   r.state="DRAFT";r.revisedBy=actor(p,a);r.revisedAt=LocalDateTime.now();revisions.saveAndFlush(r);log(p,a,"Saved lesson revision",m);return view(r);
  }
  public void discard(Long id,Long version,UserEntity p,AdminActingSessionEntity a) throws Exception {
@@ -132,7 +147,7 @@ public class LessonRevisionService {
  }
  private AiLearningModuleEntity candidate(AiLearningModuleEntity m,Payload p){
   var c=new AiLearningModuleEntity();c.setId(m.getId());c.setWeek(m.getWeek());c.setStatus(LessonStatus.PENDING);
-  c.setLessonText(p.lessonText());c.setYoutubeLink(p.youtubeLink());c.setAiNotes(p.aiNotes());
+  c.setSourceScope(p.sourceScope());c.setLessonText(p.lessonText());c.setYoutubeLink(p.youtubeLink());c.setAiNotes(p.aiNotes());
   c.setGeneratedObjectives(p.objectives());c.setGeneratedKnowledge(p.knowledge());c.setGeneratedExamples(p.examples());c.setGeneratedSummary(p.summary());
   for(var f:p.files()){var file=new AiLearningFileEntity();file.setId(f.fileId());file.setOriginalFileName(f.originalFileName());file.setStoredFileName(f.storedFileName());file.setFilePath(f.filePath());file.setFileType(f.fileType());c.addFile(file);}return c;
  }
@@ -145,25 +160,26 @@ public class LessonRevisionService {
  // No database transaction or acting-session lock is held during extraction/provider calls.
  public Prepared generate(Prepared prepared){
   // A supporting URL/formatting-only edit keeps the already approved generated content.
-  if(!prepared.filesChanged()&&AssessmentContentChange.normalize(prepared.previousContent()).equals(AssessmentContentChange.normalize(assessed(prepared.candidate()))))return prepared;
+  if(prepared.candidate().getSourceScope()==null&&!prepared.filesChanged()&&AssessmentContentChange.normalize(prepared.previousContent()).equals(AssessmentContentChange.normalize(assessed(prepared.candidate()))))return prepared;
   var c=generation.generateRevision(prepared.candidate());
-  if(c.getAiGenerationStatus()!=AiGenerationStatus.COMPLETED)throw generation.generationFailed();
+  if(c.getAiGenerationStatus()!=AiGenerationStatus.COMPLETED && c.getSourceScope()==null)throw generation.generationFailed();
   return new Prepared(prepared.revisionVersion(),prepared.moduleVersion(),c,prepared.previousContent(),prepared.filesChanged());
  }
  public View reviewed(Long id,Prepared prepared,UserEntity p,AdminActingSessionEntity a,String fingerprint){
   var m=live(id,p,true);var r=draft(m,prepared.revisionVersion());var old=payload(r);var c=prepared.candidate();
-  payload(r,new Payload(old.lessonText(),old.youtubeLink(),old.aiNotes(),old.files(),c.getGeneratedObjectives(),c.getGeneratedKnowledge(),c.getGeneratedExamples(),c.getGeneratedSummary(),fingerprint));
-  r.state="REVIEWED";r.revisedBy=actor(p,a);r.revisedAt=LocalDateTime.now();revisions.saveAndFlush(r);log(p,a,"Reviewed lesson revision",m);return view(r);
+  payload(r,new Payload(old.lessonText(),old.youtubeLink(),old.aiNotes(),old.files(),c.getGeneratedObjectives(),c.getGeneratedKnowledge(),c.getGeneratedExamples(),c.getGeneratedSummary(),fingerprint,c.getSourceScope()));
+  r.state=c.getSourceScope()==null||c.getAiGenerationStatus()==AiGenerationStatus.COMPLETED?"REVIEWED":"DRAFT";r.revisedBy=actor(p,a);r.revisedAt=LocalDateTime.now();revisions.saveAndFlush(r);log(p,a,"Reviewed lesson revision",m);return view(r);
  }
  public String fingerprint(Prepared prepared){return index.buildRevision(prepared.candidate()).fingerprint();}
  public void publish(Long id,Prepared prepared,String fingerprint,UserEntity p,AdminActingSessionEntity a){publish(id,prepared,fingerprint,p,a,true);}
  public void publish(Long id,Prepared prepared,String fingerprint,UserEntity p,AdminActingSessionEntity a,boolean assessmentChanged){
   var m=live(id,p,true);var r=draft(m,prepared.revisionVersion());var content=payload(r);
   if(!r.state.equals("REVIEWED")||!Objects.equals(content.fingerprint(),fingerprint))throw conflict("REVISION_REVIEW_REQUIRED");
+  if(content.sourceScope()!=null)sources.requirePublishedReady(prepared.candidate());
   // Preserve still-live legacy content before activation without inventing lost revision metadata.
   archiveBaseline(m,"LEGACY_LIVE_BASELINE");
   if(assessmentChanged&&quizzes.findByModuleId(id).isPresent())m.setAssessmentNeedsReview(true);
-  m.setLessonText(content.lessonText());m.setYoutubeLink(content.youtubeLink());m.setAiNotes(content.aiNotes());
+  m.setSourceScope(content.sourceScope());m.setLessonText(content.lessonText());m.setYoutubeLink(content.youtubeLink());m.setAiNotes(content.aiNotes());
   m.setGeneratedObjectives(content.objectives());m.setGeneratedKnowledge(content.knowledge());m.setGeneratedExamples(content.examples());m.setGeneratedSummary(content.summary());
   m.setAiGenerationStatus(AiGenerationStatus.COMPLETED);m.setGenerationToken(UUID.randomUUID().toString());
   // Preserve unchanged file IDs; only remove associations absent from the approved revision.
@@ -176,7 +192,8 @@ public class LessonRevisionService {
   log(p,a,"Published revised lesson",m);
   // Snapshot initialized data before the transaction closes. Fingerprints also prevent stale reuse on races.
   var snapshot=new Payload(m.getLessonText(),m.getYoutubeLink(),m.getAiNotes(),m.getFiles().stream().map(f->new Attachment("",f.getId(),f.getOriginalFileName(),f.getStoredFileName(),f.getFilePath(),f.getFileType(),true)).toList(),null,null,null,null,null);
-  var published=candidate(m,snapshot);
+  var published=candidate(m,snapshot);published.setSourceScope(m.getSourceScope());
+  published.setGeneratedObjectives(m.getGeneratedObjectives());published.setGeneratedKnowledge(m.getGeneratedKnowledge());published.setGeneratedExamples(m.getGeneratedExamples());published.setGeneratedSummary(m.getGeneratedSummary());
   TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){@Override public void afterCommit(){
    try{index.invalidate(id);index.getOrBuild(published);}catch(Exception error){org.slf4j.LoggerFactory.getLogger(LessonRevisionService.class).error("revision_index_rebuild_failed moduleId={} exceptionType={}",id,error.getClass().getSimpleName());}
   }});

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+    @org.springframework.beans.factory.annotation.Autowired private com.ptc.halo.service.StudentRegistryService registry;
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
     private final UserRepository userRepository;
@@ -37,8 +38,16 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    public record RegistrationCodeRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=32) String studentId,
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max=254) String email) {}
+    @PostMapping("/register/student/code")
+    public ResponseEntity<?> registrationCode(@jakarta.validation.Valid @RequestBody RegistrationCodeRequest request,jakarta.servlet.http.HttpServletRequest http){
+        registry.requestCode(request.studentId(),request.email(),http.getRemoteAddr());
+        return ResponseEntity.ok(java.util.Map.of("message","If your details match an eligible registry record, a verification code will be emailed. Contact your school Admin if it does not arrive."));
+    }
     @PostMapping("/register/student")
-    public ResponseEntity<StudentResponse> registerStudent(@RequestBody StudentRequest studentRequest){
+    public ResponseEntity<StudentResponse> registerStudent(@RequestBody StudentRequest studentRequest, jakarta.servlet.http.HttpServletRequest http){
+    registry.admit(studentRequest.getEmail(),http.getRemoteAddr(),true);
     StudentResponse response;
     try { response = authService.registerStudent(studentRequest); }
     catch (org.springframework.dao.DataIntegrityViolationException conflict) {

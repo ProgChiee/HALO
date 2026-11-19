@@ -93,6 +93,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/login",
                                 "/api/auth/register/student",
+                                "/api/auth/register/student/code",
                                 "/api/auth/forgot-password",
                                 "/api/auth/forgot-password/resend",
                                 "/api/auth/verify-reset-code",

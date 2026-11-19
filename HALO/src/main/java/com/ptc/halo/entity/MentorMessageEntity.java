@@ -16,6 +16,10 @@ public class MentorMessageEntity {
     private String requestId;
     public String getRequestId() { return requestId; }
     public void setRequestId(String requestId) { this.requestId = requestId; }
+    @Column(name = "source_selection_id", length = 36)
+    private String sourceSelectionId;
+    public String getSourceSelectionId() { return sourceSelectionId; }
+    public void setSourceSelectionId(String value) { sourceSelectionId = value; }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", nullable = false)

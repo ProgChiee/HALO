@@ -17,7 +17,7 @@ export async function login(email, password) {
 // (POST /auth/register/student). Admins and Professors are created by an
 // Admin/SuperAdmin instead (see adminService.createProfessor /
 // superadminService.addAdmin) — there is no general /auth/register.
-export async function register(fullName, email, password, studentId, section, yearLevel) {
+export async function register(fullName, email, password, studentId, section, yearLevel, verificationCode) {
   const res = await apiClient.post('/auth/register/student', {
     name: fullName, // backend field is "name", not "fullName"
     email,
@@ -25,6 +25,7 @@ export async function register(fullName, email, password, studentId, section, ye
     studentId,
     section,
     yearLevel,
+    verificationCode,
   }, { skipAuth: true });
   return res.data;
 }
@@ -55,3 +56,4 @@ export async function changePassword(currentPassword, newPassword) {
   const res = await apiClient.post('/auth/change-password', { currentPassword, newPassword });
   return res.data;
 }
+export async function sendRegistrationCode(studentId,email) { return (await apiClient.post('/auth/register/student/code',{studentId,email},{skipAuth:true})).data; }

@@ -39,6 +39,7 @@ public class ModuleGenerationState {
         // Copy generated fields only. Never merge detached materials, files, or publication state.
         if (result.getAiGenerationStatus() == AiGenerationStatus.COMPLETED) current.setStatus(LessonStatus.PENDING);
         current.setGeneratedObjectives(result.getGeneratedObjectives());
+        current.setSourceScope(result.getSourceScope());
         current.setGeneratedKnowledge(result.getGeneratedKnowledge());
         current.setGeneratedExamples(result.getGeneratedExamples());
         current.setGeneratedSummary(result.getGeneratedSummary());

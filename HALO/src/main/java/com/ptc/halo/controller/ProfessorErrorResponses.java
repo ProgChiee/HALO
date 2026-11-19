@@ -7,6 +7,20 @@ import org.springframework.web.server.ResponseStatusException;
 
 public class ProfessorErrorResponses {
     private static final Map<String, String> MESSAGES = Map.ofEntries(
+        Map.entry("EXPANSION_GENERATION_REQUIRED", "Confirm the curriculum sources and generate the OBTL-guided lesson before academic review and publication. Supplementary PDFs are optional in this mode."),
+        Map.entry("EXPANSION_REVIEW_REQUIRED", "Review the AI elaborations, correct them if needed, and acknowledge responsibility for academic accuracy before approval."),
+        Map.entry("EXPANSION_SCOPE_INVALID", "The proposed lesson is incomplete or outside the confirmed curriculum scope. Correct it or regenerate before review."),
+        Map.entry("INVALID_EXPANSION_CONTENT", "Provide objectives, explanations, examples and summary, each within 30,000 characters."),
+        Map.entry("SOURCE_BOUNDARY_REVIEW_REQUIRED", "Table boundaries could not be isolated safely. Review the original PDF and provide a clearly bounded chapter-specific reference, then extract again."),
+        Map.entry("INSTRUCTIONAL_SOURCES_REQUIRED", "Source-Grounded mode requires instructional references. Add and confirm them, or explicitly confirm OBTL-Guided AI Lesson Expansion and regenerate before review and publication."),
+        Map.entry("INVALID_SOURCE_SELECTION", "The selected source sections are invalid. Reload and review them."),
+        Map.entry("SCOPED_SOURCE_PDF_REQUIRED", "Chapter-scoped selection requires readable PDF files. Replace image sources with instructional PDFs."),
+        Map.entry("SOURCE_CONFIRMATION_REQUIRED", "Extract and confirm the chapter-specific PDF sources before generation or approval."),
+        Map.entry("SOURCE_EXTRACTION_FAILED", "Source extraction failed. Use a readable, unprotected PDF and try again."),
+        Map.entry("SOURCE_REEXTRACTION_REQUIRED", "Materials changed. Extract and confirm the sources again."),
+        Map.entry("SOURCE_SCOPE_UNAVAILABLE", "The saved source selection is unavailable. Re-extract and review the sources."),
+        Map.entry("SOURCE_SELECTION_REQUIRED", "Select at least one chapter-specific source section."),
+        Map.entry("SOURCE_TEXT_LIMIT", "Selected text exceeds the safe processing limit. Use smaller chapter-specific references."),
         Map.entry("AUTHENTICATION_REQUIRED", "Please sign in to continue."),
         Map.entry("ACCESS_DENIED", "You do not have permission to access this resource."),
         Map.entry("RESOURCE_NOT_FOUND", "The requested resource is unavailable."),

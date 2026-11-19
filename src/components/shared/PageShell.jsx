@@ -57,7 +57,7 @@ export default function PageShell({ navItems, progress, sectionLabel, roleBadge,
   const mode=useAdminWorkflow();
   const {pathname}=useLocation();
   if(mode.acting){
-    navItems=ADMIN_NAV_ITEMS.filter(item=>item.section!=='Modes').map(item=>({...item,path:item.path.replace('/admin',mode.basePath)}));
+    navItems=ADMIN_NAV_ITEMS.filter(item=>item.section!=='Modes' && item.path!=='/admin/student-registry').map(item=>({...item,path:item.path.replace('/admin',mode.basePath)}));
     roleBadge='Admin';sectionLabel='Admin';navigationLabel='HALO - Admin Mode';
     children=<><section className={modeStyles.banner} aria-label="Admin acting mode"><strong>Admin Mode - Acting as {mode.target.name}</strong><span>Changes are audited under your Super Admin identity.</span><button disabled={mode.leaving} onClick={mode.leave}>Return to Super Admin</button>{mode.exitError&&<p role="alert">{mode.exitError}</p>}</section>{children}</>;
   }

@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 @Import({AuthService.class, com.ptc.halo.service.LoginTokenIssuer.class,JwtService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class LogoutRevocationTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
  @Autowired AuthService auth; @Autowired JwtService jwt; @Autowired UserRepository users;
  @MockBean AuthenticationManager manager; @MockBean PasswordEncoder encoder; @MockBean AuthAuditService audit;
  @ParameterizedTest @EnumSource(Role.class)

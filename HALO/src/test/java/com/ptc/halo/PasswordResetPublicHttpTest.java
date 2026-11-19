@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class})
 class PasswordResetPublicHttpTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
  @Autowired MockMvc mvc;
  @MockBean AuthService auth; @MockBean PasswordResetService resets; @MockBean UserRepository users;
  @MockBean CustomUserDetailsService details; @MockBean JwtService jwt;
@@ -51,6 +52,7 @@ class PasswordResetPublicHttpTest {
    mvc.perform(post("/api/auth"+path).contentType("application/json").content("{\"email\":\"test@example.test\",\"otp\":\"123456\",\"newPassword\":\"Replacement-123\"}"))
     .andExpect(status().isTooManyRequests()).andExpect(header().string("Retry-After","60"))
     .andExpect(jsonPath("$.code").value("PASSWORD_RESET_RATE_LIMITED")).andExpect(jsonPath("$.retryAfterSeconds").value(60))
+    .andExpect(jsonPath("$.message").value("Too many recovery attempts. Please wait before trying again."))
     .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Replacement-123"))));
  }
  @Test void malformedInputsDoNotReachService()throws Exception{

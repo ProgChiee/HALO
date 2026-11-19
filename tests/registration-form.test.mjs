@@ -23,12 +23,23 @@ test('registration shows field errors, retains values and blocks duplicate submi
   await act(async()=>root.render(React.createElement(Router.MemoryRouter,null,React.createElement(ToastContext.Provider,{value:{showToast:()=>{}}},React.createElement(Register)))));
   const submit=()=>host.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
   await act(async()=>{submit();await new Promise(r=>setTimeout(r,1));});
-  assert.equal(calls,0);assert.equal(host.querySelectorAll('[aria-invalid="true"]').length,7);
-  for(const [key,value] of Object.entries({name:'Talidong, Archie V.',email:'archie@paterostechnologicalcollege.edu.ph',studentId:'29AHRT-0168',section:'AHRT 1A',yearLevel:'FIRST_YEAR',password:'password-123',confirmPassword:'password-123'})){
+  assert.equal(calls,0);assert.equal(host.querySelectorAll('[aria-invalid="true"]').length,8);
+  for(const [key,value] of Object.entries({name:'Talidong, Archie V.',email:'archie@paterostechnologicalcollege.edu.ph',studentId:'29AHRT-0168',section:'AHRT 1A',yearLevel:'FIRST_YEAR',password:'password-123',confirmPassword:'password-123',verificationCode:'123456'})){
    await act(async()=>{const input=host.querySelector('#register-'+key);Object.getOwnPropertyDescriptor(key==='yearLevel'?window.HTMLSelectElement.prototype:window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event(key==='yearLevel'?'change':'input',{bubbles:true}));});
   }
   await act(async()=>{submit();submit();});assert.equal(calls,1);assert.equal(host.querySelector('[type="submit"]').disabled,true);
   await act(async()=>reject({response:{status:409,data:{code:'REGISTRATION_VALIDATION_FAILED',errors:{studentId:'This Student ID is already registered.'}}}}));
   assert.equal(host.querySelector('#register-studentId').value,'29AHRT-0168');assert.equal(host.querySelector('#register-studentId').getAttribute('aria-invalid'),'true');assert.match(host.textContent,/already registered/);assert.equal(host.querySelector('[type="submit"]').disabled,false);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+test('registration code request is separate from account creation and returns generic guidance',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const calls=[];
+ api.defaults.adapter=async config=>{calls.push(config);return {status:200,headers:{},config,data:{message:'If eligible, a verification code will be emailed.'}};};
+ try{
+  await act(async()=>root.render(React.createElement(Router.MemoryRouter,null,React.createElement(ToastContext.Provider,{value:{showToast:()=>{}}},React.createElement(Register)))));
+  for(const [key,value] of Object.entries({studentId:'23AHRT-0168',email:'synthetic@paterostechnologicalcollege.edu.ph'}))await act(async()=>{const input=host.querySelector('#register-'+key);Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await act(async()=>[...host.querySelectorAll('button')].find(b=>b.textContent.includes('Send / resend')).click());
+  assert.equal(calls.length,1);assert.equal(calls[0].url,'/auth/register/student/code');assert.deepEqual(Object.keys(JSON.parse(calls[0].data)).sort(),['email','studentId']);assert.match(host.textContent,/If eligible/);assert.ok(host.querySelector('#register-verificationCode'));
  }finally{await act(async()=>root.unmount());host.remove();}
 });

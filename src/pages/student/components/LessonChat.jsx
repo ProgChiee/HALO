@@ -283,6 +283,7 @@ function ModuleLessonChat({ topicId, weekId }) {
           {lesson && (
             <section className={styles.bubble} aria-label="Published lesson">
               <h2>Published Lesson</h2>
+              {lesson.generationMode === 'OBTL_EXPANSION' && <p>Professor-approved AI-generated lesson. The OBTL defines its curriculum scope; explanations are AI-assisted elaborations.</p>}
               {[
                 ['Objectives', lesson.generatedObjectives],
                 ['Knowledge', lesson.generatedKnowledge],
@@ -291,7 +292,7 @@ function ModuleLessonChat({ topicId, weekId }) {
               ].map(([title, content]) => (
                 <section key={title}>
                   <h3>{title}</h3>
-                  <p style={{ whiteSpace: 'pre-wrap' }}>{content}</p>
+                  <LessonMarkdown>{content}</LessonMarkdown>
                 </section>
               ))}
               <LessonAttachments files={lesson.files || []} load={workflow.api.getLessonAttachment} />
@@ -374,3 +375,4 @@ function ModuleLessonChat({ topicId, weekId }) {
     </StudentPageShell>
   );
 }
+import LessonMarkdown from '../../../components/shared/LessonMarkdown';

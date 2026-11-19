@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class,JwtAuthenticationFilter.class})
 class AuthLogoutHttpTest {
+ @org.springframework.boot.test.mock.mockito.MockBean com.ptc.halo.service.StudentRegistryService registry;
  @Autowired MockMvc mvc;
  @MockBean AuthService auth; @MockBean PasswordResetService reset; @MockBean UserRepository users; @MockBean JwtService jwt; @MockBean CustomUserDetailsService details;
  @Test void logoutRequiresAuthentication() throws Exception {mvc.perform(post("/api/auth/logout")).andExpect(status().isUnauthorized());verifyNoInteractions(auth);}

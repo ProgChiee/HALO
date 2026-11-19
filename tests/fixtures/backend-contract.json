@@ -776,6 +776,18 @@
       "method": "GET",
       "path": "/api/admin/preview/professor/ai-learning-modules/files/{id}/content",
       "controller": "LessonAttachmentController.java"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/register/student/code"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/super-admin/admin/{id}/name"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/super-admin/admin/{id}/profile"
     }
   ],
   "dtos": {
