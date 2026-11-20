@@ -8,8 +8,9 @@ import { useProfessorWorkflow } from '../../../context/professor/useProfessorWor
 import styles from '../styles/LessonEditor.module.css';
 import { GeneratedLessonSections } from './LessonContent';
 import LessonSourceSelection from './LessonSourceSelection';
+import { Upload } from 'lucide-react';
 
-export default function LessonRevision({ moduleId, onPublished }) {
+export default function LessonRevision({ moduleId, onPublished, onContextChange }) {
  const { api, preview } = useProfessorWorkflow();
  const [revision, setRevision] = useState(null), [draft, setDraft] = useState(null), [files, setFiles] = useState([]);
  const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(''), [confirm, setConfirm] = useState(null), [reload, setReload] = useState(0);
@@ -27,8 +28,10 @@ export default function LessonRevision({ moduleId, onPublished }) {
    if (!workspace.current?.closest('[hidden]')) workspace.current?.focus();
   }
  }, [busy, confirm]);
- if (preview) return null;
  const changed = revision && draft && (draft.lessonText !== (revision.lessonText || '') || draft.youtubeLink !== (revision.youtubeLink || '') || draft.aiNotes !== (revision.aiNotes || '') || draft.keepFiles.length !== revision.files.length || files.length > 0);
+ const label = revision ? (revision.state === 'REVIEWED' && !changed ? 'Review Revision' : 'Revise Lesson') : 'View Lesson';
+ useEffect(() => { onContextChange?.({label, dirty: Boolean(changed)}); }, [label, changed, onContextChange]);
+ if (preview) return null;
  async function run(action) {
   if (lock.current) return;
   lock.current = true; setBusy(true); setError('');
@@ -46,11 +49,12 @@ export default function LessonRevision({ moduleId, onPublished }) {
   } catch (e) { if (alive.current) setError(professorErrorMessage(e)); }
   finally { lock.current = false; if (alive.current) setBusy(false); }
  }
- function pick(event) {
-  const incoming = Array.from(event.target.files || []);
-  if (incoming.some(f => !['application/pdf', 'image/png', 'image/jpeg'].includes(f.type) || !f.size || f.size > 3 * 1024 * 1024)) { setError('Choose readable PDF, PNG or JPG/JPEG files up to 3 MB each.'); event.target.value = ''; return; }
-  if (draft.keepFiles.length + incoming.length > 10) { setError('A revision can contain at most 10 files.'); event.target.value = ''; return; }
-  setFiles(incoming); setError('');
+ function pick(fileList) {
+  if (busy || loading || !fileList?.length) return;
+  const incoming = Array.from(fileList);
+  if (incoming.some(f => !['application/pdf', 'image/png', 'image/jpeg'].includes(f.type) || !f.size || f.size > 3 * 1024 * 1024)) { setError('Choose readable PDF, PNG or JPG/JPEG files up to 3 MB each.'); return; }
+  if (draft.keepFiles.length + files.length + incoming.length > 10) { setError('A revision can contain at most 10 files.'); return; }
+  setFiles([...files, ...incoming]); setError('');
  }
  const disabled = busy || loading;
  return <section ref={workspace} tabIndex={-1} className={styles.panelCard} aria-label="Published lesson revision">
@@ -74,7 +78,15 @@ export default function LessonRevision({ moduleId, onPublished }) {
    <div className={styles.field}><label className={styles.label} htmlFor="revision-youtube">Revision YouTube link</label><input id="revision-youtube" className={styles.input} maxLength={255} value={draft.youtubeLink} disabled={disabled} onChange={e => setDraft({ ...draft, youtubeLink: e.target.value })} /><VideoPreview url={draft.youtubeLink} /></div>
    <div className={styles.field}><label className={styles.label} htmlFor="revision-notes">Revision notes for the AI Mentor</label><textarea id="revision-notes" className={styles.textarea} rows={3} maxLength={10000} value={draft.aiNotes} disabled={disabled} onChange={e => setDraft({ ...draft, aiNotes: e.target.value })} /></div>
    <ul>{revision.files.filter(f => draft.keepFiles.includes(f.key)).map(f => <li key={f.key} className={styles.revisionFile}><span>{f.originalFileName}</span><Button variant="secondary" disabled={disabled} onClick={() => setDraft({ ...draft, keepFiles: draft.keepFiles.filter(key => key !== f.key) })}>Remove from revision</Button></li>)}</ul>
-   <div className={styles.field}><label className={styles.label} htmlFor="revision-files">Add revision files (PDF, PNG, JPG/JPEG; 3 MB each)</label><input id="revision-files" ref={upload} type="file" multiple accept=".pdf,.png,.jpg,.jpeg" disabled={disabled} onChange={pick} /></div>
+   <div className={styles.field}>
+    <h4>Add revision files</h4>
+    <div className={styles.dropZone} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); pick(e.dataTransfer.files); }}>
+     <Upload size={22} aria-hidden="true"/><span>Drop files here or <label htmlFor="revision-files">Browse Files</label></span>
+     <small id="revision-file-help">PDF, PNG or JPG/JPEG · 3 MB per file. Uploads when you save the draft.</small>
+     <input id="revision-files" ref={upload} type="file" multiple accept=".pdf,.png,.jpg,.jpeg" aria-describedby="revision-file-help" disabled={disabled} onChange={e => { pick(e.target.files); e.target.value = ''; }} />
+    </div>
+    {!!files.length && <ul className={styles.pendingFiles}>{files.map((file,i) => <li key={i}><small>{file.type.split('/')[1].toUpperCase()}</small><span>{file.name} <small>({Math.ceil(file.size / 1024)} KB)</small></span><button type="button" disabled={disabled} aria-label={'Remove ' + file.name} onClick={() => setFiles(files.filter((_,j) => j !== i))}>Remove</button></li>)}</ul>}
+   </div>
    <div className={styles.revisionActions}>
     <Button disabled={disabled || !changed} onClick={() => run('save')}>Save Draft</Button>
     <Button variant="secondary" disabled={disabled} onClick={() => setConfirm('discard')}>Discard Revision</Button>

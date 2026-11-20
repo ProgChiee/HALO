@@ -7,6 +7,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 public class ProfessorErrorResponses {
     private static final Map<String, String> MESSAGES = Map.ofEntries(
+        Map.entry("OBTL_RECOGNITION_UNVERIFIED", "The suggested boundaries could not be verified. Review the PDF using the existing source controls."),
+        Map.entry("OBTL_RECOGNITION_BUDGET", "This extraction exceeds the recognition budget. Use manual source review."),
+        Map.entry("OBTL_RECOGNITION_UNAVAILABLE", "Structure recognition is busy or unavailable. Manual source review is available."),
+        Map.entry("SOURCE_REGION_REVIEW_REQUIRED", "Review one original row and provide a valid section label."),
+        Map.entry("SOURCE_REGION_MISMATCH", "The selected regions do not match the verified section boundaries."),
         Map.entry("EXPANSION_GENERATION_REQUIRED", "Confirm the curriculum sources and generate the OBTL-guided lesson before academic review and publication. Supplementary PDFs are optional in this mode."),
         Map.entry("EXPANSION_REVIEW_REQUIRED", "Review the AI elaborations, correct them if needed, and acknowledge responsibility for academic accuracy before approval."),
         Map.entry("EXPANSION_SCOPE_INVALID", "The proposed lesson is incomplete or outside the confirmed curriculum scope. Correct it or regenerate before review."),

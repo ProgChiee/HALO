@@ -133,6 +133,14 @@ The existing snapshot policy also applies to v5: published v3/v4 lessons retain 
 
 Verification: 106 focused backend tests discovered, 105 passed, one existing optional upload-fixture test skipped, zero failures/errors. This includes the original four PDFs, source confirmation, both generation modes, immutable revisions and scoped Mentor tests. Backend packaging passed. The packaged Windows worker returned v5, seven pages and 18 sections for PATHFIT with matching checksum, exit code 0 and empty stderr. No frontend code changed in this follow-up; the prior 482-test frontend run was not repeated. Render/Linux and live browser confirmation remain unverified.
 
+## Manual recovery of unresolved curriculum tables
+
+Extraction v6 can offer individual rows from an unresolved table. On a draft, use **Extract / Refresh Sources**, select a recovery candidate alone for that PDF, and inspect the outline on the original page. Select each proposed region, enter a display label, check the assembled excerpt, and confirm. The label is Professor metadata. Generation and Mentor indexing use the verified PDF text and its original heading.
+
+The worker requires enclosing table rules and a source chapter/topic anchor or a schedule column aligned with the preceding curriculum table. A week reference inside assessment text cannot establish ownership. A continuation requires an explicit continued topic on an adjacent page with matching ownership and geometry. Pages without sufficient evidence remain blocked. For multi-page review, select every required region in the PDF page selector.
+
+Region confirmations use snapshot format 3 in the existing JSON column. They reference extracted row evidence by section ID, PDF checksum, extraction version and exact page offsets. Formats 1 and 2 remain readable. Existing published snapshots are retained. Refresh and reconfirm an older **draft** before generating or publishing with v6. Coordinate frontend and backend releases before accepting format 3 confirmations; earlier readers that support only formats 1 and 2 cannot open them.
+
 ## Implementation file inventory
 
 Backend additions: `LessonSourceController`, `LessonSourceScope`, `ObtlSections`, `ObtlPdfText`, `ObtlExtractionProcess`, `ObtlWorker`, and the review-only SQL migration.

@@ -1,5 +1,6 @@
 import SubjectCover from '../../../components/shared/SubjectCover';
 import SubjectCoverDialog from './SubjectCoverDialog';
+import Breadcrumb from '../../../components/shared/Breadcrumb';
 import Topbar from '../../../components/shared/Topbar';
 import Dialog from '../../../components/shared/Dialog';
 import { professorErrorMessage } from '../../../utils/professorErrors';
@@ -257,16 +258,13 @@ export default function SubjectManagement() {
   }
 
   function goToLessonEditor(subject, week) {
-    navigate(`${workflow.basePath}/subjects/${subject.id}/week/${week.id}`);
+    navigate(`${workflow.basePath}/subjects/${subject.id}/week/${week.id}`, { state: { lessonTitle: week.title } });
   }
 
   return (
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
       <Topbar>
-        <div className={styles.breadcrumb}>
-          <BookOpen size={16} />
-          Subjects
-        </div>
+        <Breadcrumb items={[{ label: 'Dashboard', to: workflow.basePath }, { label: 'Subjects' }]} />
         <Button onClick={openCreateSubject} disabled={isSubmitting || workflow.preview}>
           <Plus size={16} style={{ marginRight: 6 }} />
           Create Subject

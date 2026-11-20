@@ -5,13 +5,14 @@ import styles from '../styles/LessonEditor.module.css';
 const tabs = [['lesson', 'Lesson', BookOpen], ['assessment', 'Assessment', ClipboardCheck], ['history', 'Revision History', History]];
 
 // Retain editable panels. Reopen read-only history fresh after revision actions.
-export default function LessonWorkspaceTabs({ children, assessment, history }) {
+export default function LessonWorkspaceTabs({ children, assessment, history, onSelect }) {
   const id = useId();
   const buttons = useRef([]);
   const [active, setActive] = useState('lesson');
   const [visited, setVisited] = useState(['lesson']);
   function select(key) {
     setActive(key);
+    onSelect?.(key);
     setVisited(previous => previous.includes(key) ? previous : [...previous, key]);
   }
   function navigate(event, index) {

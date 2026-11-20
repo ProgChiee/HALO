@@ -544,3 +544,11 @@
   .confirmDialog .revisionActions { flex-direction: column; align-items: stretch; }
   .saveRow > button, .generateRow > button { width: 100%; }
 }
+.dropZone { position: relative; display: grid; justify-items: center; gap: .5rem; padding: 1.1rem; text-align: center; border: 1px dashed var(--color-border-panel, #64748b); border-radius: .75rem; background: var(--color-bg-card); }
+.dropZone label { cursor: pointer; color: var(--color-accent-primary, #2f7d5b); font-weight: 700; text-decoration: underline; }
+.dropZone:focus-within, .dropZone:hover { outline: 2px solid #2f7d5b; outline-offset: 2px; }
+.dropZone input { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+.pendingFiles { list-style: none; padding: 0; }
+.pendingFiles li { display: flex; align-items: center; gap: .65rem; padding: .55rem 0; border-bottom: 1px solid var(--color-border-panel); }
+.pendingFiles span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pendingFiles button { color: inherit; background: transparent; border: 0; cursor: pointer; text-decoration: underline; }

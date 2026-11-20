@@ -41,7 +41,22 @@ public final class ObtlPdfText {
             String checksum;
             try {checksum=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}
             catch (java.security.NoSuchAlgorithmException impossible) {throw new IllegalStateException(impossible);}
-            return new Extracted(checksum,ObtlSections.detect(pages,moduleTitle));
+            var detection=ObtlSections.detect(pages,moduleTitle);
+            if(detection.sections().isEmpty() && pages.stream().anyMatch(p->!p.rows().isEmpty())){
+                // A ruled curriculum with orphaned rows cannot safely use the
+                // whole-document fallback intended for single-topic supplements.
+                var reviewed=new ArrayList<>(pages);
+                int available=ObtlSections.MAX_CHARS;
+                for(int i=0;i<pages.size();i++){
+                    var original=pages.get(i);
+                    if(!original.rows().isEmpty())reviewed.set(i,ObtlTableLayout.read(document.getPage(i),
+                        i+1,original.text(),available,i==0?null:pages.get(i-1),true));
+                    available-=reviewed.get(i).text().length();
+                    if(available<0)throw new IOException("SOURCE_TEXT_LIMIT");
+                }
+                detection=ObtlSections.detect(reviewed,moduleTitle);
+            }
+            return new Extracted(checksum,detection);
         }
     }
     private static void inspect(COSBase root) throws IOException {

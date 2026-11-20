@@ -13,7 +13,50 @@ import org.springframework.web.server.ResponseStatusException;
 public class LessonSourceScope {
     private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(LessonSourceScope.class);
     public record Document(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,String name,String checksum,ObtlSections.Detection extraction) {}
-    public record Choice(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,List<String> sectionIds,boolean instructional) {}
+    public record Correction(String checksum,String extractionVersion,List<ObtlSections.Span> fragments,String displayLabel) {
+        public Correction(String checksum,String extractionVersion,List<ObtlSections.Span> fragments){this(checksum,extractionVersion,fragments,null);}
+    }
+    public record Choice(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,List<String> sectionIds,boolean instructional,Correction correction) {
+        public Choice(Long fileId,List<String> sectionIds,boolean instructional){this(fileId,sectionIds,instructional,null);}
+    }
+    private static List<ObtlSections.Span> permitted(Document doc,Choice choice,ObtlSections.Section section){
+        var correction=choice.correction();
+        if (section.warnings().contains(ObtlSections.MANUAL_REGION)) {
+            if(correction==null || choice.sectionIds().size()!=1 || correction.displayLabel()==null
+                    || !correction.displayLabel().matches("[\\p{L}\\p{N}][\\p{L}\\p{M}\\p{N} .,&():/–—-]{0,99}"))
+                throw failure("SOURCE_REGION_REVIEW_REQUIRED");
+            if(!doc.checksum().equals(correction.checksum()) || !doc.extraction().version().equals(correction.extractionVersion()))
+                throw failure("SOURCE_REEXTRACTION_REQUIRED");
+            if(!section.spans().equals(correction.fragments()))throw failure("SOURCE_REGION_MISMATCH");
+            for(var span:section.spans()){
+                var page=doc.extraction().pages().get(span.page()-1);
+                if(page.rows().stream().filter(r->r.gridKey().startsWith("recovery:") && r.start()==span.start()
+                        && r.end()==span.end() && r.left()>=0 && r.top()>=0 && r.right()>r.left() && r.bottom()>r.top()).count()!=1)
+                    throw failure("SOURCE_REGION_MISMATCH");
+            }
+            return section.spans();
+        }
+        if(correction==null)return section.spans();
+        var fragments=correction.fragments();
+        if(!doc.checksum().equals(correction.checksum()) || !doc.extraction().version().equals(correction.extractionVersion())
+                || choice.sectionIds().size()!=1 || fragments==null || fragments.isEmpty() || fragments.size()>256
+                || section.id().equals("whole") || section.id().startsWith("ambiguous-") || section.id().startsWith("unruled-"))
+            throw failure("INVALID_SOURCE_SELECTION");
+        int lastPage=0,lastEnd=0;
+        for(var fragment:fragments){
+            if(fragment==null || fragment.start()<0 || fragment.end()<=fragment.start()
+                    || fragment.page()<lastPage || fragment.page()==lastPage && fragment.start()<lastEnd
+                    || section.spans().stream().noneMatch(owner->owner.page()==fragment.page()
+                        && owner.start()<=fragment.start() && fragment.end()<=owner.end()))
+                throw failure("INVALID_SOURCE_SELECTION");
+            String page=doc.extraction().pages().get(fragment.page()-1).text();
+            if(page.substring(fragment.start(),fragment.end()).isBlank()
+                || Character.isLowSurrogate(page.charAt(fragment.start()))
+                || Character.isHighSurrogate(page.charAt(fragment.end()-1)))throw failure("INVALID_SOURCE_SELECTION");
+            lastPage=fragment.page();lastEnd=fragment.end();
+        }
+        return fragments;
+    }
     public enum Mode { SOURCE_GROUNDED, OBTL_EXPANSION }
     public record Review(Long actor,String at,String contentHash) {}
     public record Snapshot(int format,String id,Long moduleId,List<Document> documents,List<Choice> choices,
@@ -34,7 +77,7 @@ public class LessonSourceScope {
     private final ObjectMapper json; private final LessonMaterialStorage storage;private final ObtlExtractionProcess extractor;
     public LessonSourceScope(ObjectMapper json,LessonMaterialStorage storage,ObtlExtractionProcess extractor){this.json=json;this.storage=storage;this.extractor=extractor;}
     public Snapshot read(String value){
-        try{var result=json.readValue(value,Snapshot.class);if(result.format()!=1)throw new IllegalArgumentException();return result;}
+        try{var result=json.readValue(value,Snapshot.class);if(result.format()<1 || result.format()>3)throw new IllegalArgumentException();return result;}
         catch(Exception e){throw failure("SOURCE_SCOPE_UNAVAILABLE");}
     }
     public String write(Snapshot value){try{return json.writeValueAsString(value);}catch(Exception e){throw failure("SOURCE_SCOPE_UNAVAILABLE");}}
@@ -93,8 +136,11 @@ public class LessonSourceScope {
             if(!ObtlSections.VERSION.equals(document.extraction().version()))throw failure("SOURCE_REEXTRACTION_REQUIRED");
             if(!document.extraction().sections().stream().map(ObtlSections.Section::id).toList().containsAll(choice.sectionIds()))throw failure("INVALID_SOURCE_SELECTION");
             if(document.extraction().sections().stream().filter(s->choice.sectionIds().contains(s.id())).anyMatch(s->s.spans().isEmpty()||s.warnings().contains("AMBIGUOUS_TABLE_BOUNDARY")||s.warnings().contains("TABLE_CONTINUATION_UNCONFIRMED")))throw failure("SOURCE_BOUNDARY_REVIEW_REQUIRED");
+            document.extraction().sections().stream().filter(s->choice.sectionIds().contains(s.id())).forEach(s->permitted(document,choice,s));
         }
-        return write(new Snapshot(1,UUID.randomUUID().toString(),module.getId(),snapshot.documents(),List.copyOf(choices),actor,java.time.Instant.now().toString(),false,mode,null,null));
+        int format=choices.stream().anyMatch(c->c.sectionIds().stream().anyMatch(id->id.startsWith("region-p")))?3:
+                choices.stream().anyMatch(choice->choice.correction()!=null)?2:1;
+        return write(new Snapshot(format,UUID.randomUUID().toString(),module.getId(),snapshot.documents(),List.copyOf(choices),actor,java.time.Instant.now().toString(),false,mode,null,null));
     }
     public boolean expansion(AiLearningModuleEntity module){return module.getSourceScope()!=null&&read(module.getSourceScope()).mode()==Mode.OBTL_EXPANSION;}
     public static boolean isExpansion(String snapshot){
@@ -151,7 +197,7 @@ public class LessonSourceScope {
             if(instructionalOnly&&!choice.instructional())continue;
             var doc=s.documents().stream().filter(d->Objects.equals(d.fileId(),choice.fileId())).findFirst().orElseThrow();
             for(var section:doc.extraction().sections())if(choice.sectionIds().contains(section.id())){
-                for(var span:section.spans()){
+                for(var span:permitted(doc,choice,section)){
                     String page=doc.extraction().pages().get(span.page()-1).text();
                     for(int start=span.start();start<span.end();start+=2200){
                         String text=page.substring(start,Math.min(start+2200,span.end()));
@@ -163,6 +209,17 @@ public class LessonSourceScope {
             }
         }
         return new ModuleMaterialIndex.Index(module.getId(),s.id()+":"+hash(module.getSourceScope().getBytes(java.nio.charset.StandardCharsets.UTF_8)),List.copyOf(chunks));
+    }
+    public byte[] originalForReview(AiLearningModuleEntity module,Long fileId){
+        var snapshot=read(module.getSourceScope());
+        if(!Objects.equals(snapshot.moduleId(),module.getId()))throw failure("MODULE_MATERIAL_MISMATCH");
+        var doc=snapshot.documents().stream().filter(d->Objects.equals(d.fileId(),fileId)).findFirst().orElseThrow(()->failure("INVALID_SOURCE_SELECTION"));
+        var file=module.getFiles().stream().filter(f->Objects.equals(f.getId(),fileId)).findFirst().orElseThrow(()->failure("SOURCE_REEXTRACTION_REQUIRED"));
+        try{
+            byte[] bytes=storage.read(file.getFilePath());
+            if(!hash(bytes).equals(doc.checksum()))throw failure("SOURCE_REEXTRACTION_REQUIRED");
+            return bytes;
+        }catch(java.io.IOException e){throw failure("SOURCE_SCOPE_UNAVAILABLE");}
     }
     public void validateDocuments(AiLearningModuleEntity module,Snapshot snapshot){
         if(!Objects.equals(module.getId(),snapshot.moduleId()))throw failure("MODULE_MATERIAL_MISMATCH");

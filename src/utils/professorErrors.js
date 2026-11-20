@@ -1,5 +1,10 @@
 // Fixed messages only: never display arbitrary server messages or payloads.
 const MESSAGES = {
+  OBTL_RECOGNITION_UNVERIFIED: "The suggested boundaries could not be verified. Review the PDF using the existing source controls.",
+  OBTL_RECOGNITION_BUDGET: "This extraction exceeds the recognition budget. Use manual source review.",
+  OBTL_RECOGNITION_UNAVAILABLE: "Structure recognition is busy or unavailable. Manual source review is available.",
+  SOURCE_REGION_REVIEW_REQUIRED: "Review one original row and enter a section label (up to 100 letters, numbers or standard punctuation).",
+  SOURCE_REGION_MISMATCH: "Select every highlighted region of the same section in page order, then confirm again.",
   INSTRUCTIONAL_SOURCES_REQUIRED: "Source-Grounded mode requires instructional references. Add and confirm them, or explicitly confirm OBTL-Guided AI Lesson Expansion and regenerate before review and publication.",
   EXPANSION_GENERATION_REQUIRED: "Confirm the curriculum sources and generate the OBTL-guided lesson before academic review and publication. Supplementary PDFs are optional in this mode.",
   INVALID_SOURCE_SELECTION: "The selected source sections are invalid. Reload and review them.",

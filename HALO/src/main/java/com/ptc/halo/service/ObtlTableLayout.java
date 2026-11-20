@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 /** Conservative ruled-table reader. Coordinates are PDF crop-box-relative, top down. */
 final class ObtlTableLayout extends PDFGraphicsStreamEngine {
     private static final Pattern CHAPTER=Pattern.compile("(?i)^(?:chapter|unit|module|lesson|weeks?)\\s+(?:\\d+|[ivxlcdm]+|one|two|three|four|five)(?:\\s*(?:&|and|[-–—])\\s*\\d+)*\\b.*");
-    private record Line(double x1,double y1,double x2,double y2) {}
+    record Line(double x1,double y1,double x2,double y2) {}
     private final List<Line> lines=new ArrayList<>(),path=new ArrayList<>();
     private Point2D current,origin;private int operations;
     ObtlTableLayout(PDPage page){super(page);}
@@ -63,6 +63,9 @@ final class ObtlTableLayout extends PDFGraphicsStreamEngine {
     @Override public void shadingFill(org.apache.pdfbox.cos.COSName name){}
 
     static ObtlSections.Page read(PDPage page,int number,String plain,int budget,ObtlSections.Page previous)throws IOException{
+        return read(page,number,plain,budget,previous,false);
+    }
+    static ObtlSections.Page read(PDPage page,int number,String plain,int budget,ObtlSections.Page previous,boolean orphanTable)throws IOException{
         var grid=new ObtlTableLayout(page);grid.processPage(page);
         var crop=page.getCropBox();double height=crop.getHeight(),width=crop.getWidth();
         List<Line> horizontal=new ArrayList<>(),vertical=new ArrayList<>();
@@ -72,6 +75,22 @@ final class ObtlTableLayout extends PDFGraphicsStreamEngine {
             if(y2-y1<1.2&&x2-x1>8)horizontal.add(new Line(x1,(y1+y2)/2,x2,(y1+y2)/2));
             if(x2-x1<1.2&&y2-y1>8)vertical.add(new Line((x1+x2)/2,y1,(x1+x2)/2,y2));
         }
+        var automatic = automatic(page,number,plain,budget,previous,width,horizontal,vertical);
+        if(page.getRotation()!=0)return automatic;
+        if(automatic.ambiguousTable()||orphanTable){
+            var unresolved=new ObtlSections.Page(number,plain,List.of(),true);
+            var recovered=recoverRows(unresolved,page,width,height,budget,horizontal,vertical,previous);
+            if(orphanTable||!recovered.rows().isEmpty())return recovered;
+        }
+        if(Pattern.compile("(?i)\\bchapter\\b").matcher(plain).find()){
+            var merged=MergedChapterLayout.read(page,automatic,previous,vertical,budget);
+            if(merged!=null)return merged;
+        }
+        return automatic;
+    }
+
+    private static ObtlSections.Page automatic(PDPage page,int number,String plain,int budget,ObtlSections.Page previous,
+            double width,List<Line> horizontal,List<Line> vertical)throws IOException {
         boolean chapterText=Pattern.compile("(?i)\\b(?:chapter|unit|weeks?)\\s+\\d").matcher(plain).find();
         String flat=plain.replaceAll("\\s+"," ").toLowerCase(Locale.ROOT);
         boolean curriculumHeader=flat.contains("content standards")||flat.contains("essential content")||flat.contains("essential learning")&&Pattern.compile("\\bweeks?\\b").matcher(flat).find();
@@ -195,6 +214,95 @@ final class ObtlTableLayout extends PDFGraphicsStreamEngine {
         return new ObtlSections.Page(number,text.toString(),rows,false);
     }
     private static boolean covers(List<Line> lines,double y,double x){return lines.stream().anyMatch(l->Math.abs(l.y1-y)<1.5&&l.x1<=x&&l.x2>=x);}
+
+    // A recovery candidate must be independently enclosed. Merged or partial rules
+    // inside the box are evidence of another cell/row and invalidate the candidate.
+    private record Band(double top,double bottom,List<Double> edges) {}
+    private static final Pattern OWNER = Pattern.compile("(?i)^(chapter|unit|lesson|module)\\s+\\d+(?:\\s*(?:&|and|[-–—])\\s*\\d+)*\\b");
+    // Split meetings can have superscript ordinal suffixes. Match the entire schedule
+    // cell, including PDFBox's whitespace around raised glyphs, before accepting it.
+    private static final Pattern SCHEDULE = Pattern.compile("(?i)(?:weeks?\\s+)?\\d{1,2}(?:\\s*[-–—&]\\s*\\d{1,2}"
+            + "|\\s*\\(\\s*(?:1\\s*st|2\\s*nd|3\\s*rd|[4-9]\\s*th)\\s*\\))?");
+    private static final Pattern CONTINUED = Pattern.compile("(?i)\\s*\\(continued\\)\\s*$");
+    private static boolean closedRule(List<Line> horizontal,double y,double left,double right) {
+        double end=left;
+        for (var line:horizontal.stream().filter(l->Math.abs(l.y1-y)<1.5 && l.x2>=left && l.x1<=right)
+                .sorted(Comparator.comparingDouble(Line::x1)).toList()) {
+            if (line.x1>end+1.5) return false;
+            end=Math.max(end,line.x2);
+        }
+        return end>=right-1.5;
+    }
+    private static ObtlSections.Page recoverRows(ObtlSections.Page original,PDPage page,double width,double height,
+            int budget,List<Line> horizontal,List<Line> vertical,ObtlSections.Page previous)throws IOException {
+        var ys=cluster(horizontal.stream().map(Line::y1).toList());
+        if(ys.size()>300)return original;
+        List<Band> bands=new ArrayList<>();
+        var stripper=new PDFTextStripperByArea(); stripper.setSortByPosition(true);
+        int regions=0;
+        for(int i=1;i<ys.size();i++){
+            double top=ys.get(i-1),bottom=ys.get(i);
+            if(top<0||bottom>height||bottom-top<8)continue;
+            var edges=cluster(vertical.stream().filter(l->l.y1<=top+1.5&&l.y2>=bottom-1.5).map(Line::x1).toList());
+            if(edges.size()<3||edges.size()>20)continue;
+            double left=edges.get(0),right=edges.get(edges.size()-1);
+            if(left<0||right>width||right-left<width*.5||!closedRule(horizontal,top,left,right)||!closedRule(horizontal,bottom,left,right))continue;
+            if(vertical.stream().anyMatch(l->l.x1>left+1.5&&l.x1<right-1.5&&l.y2>top+1.5&&l.y1<bottom-1.5
+                    &&edges.stream().noneMatch(x->Math.abs(x-l.x1)<1.5)))continue;
+            regions+=edges.size()-1;
+            if(regions>1000)return original;
+            for(int c=1;c<edges.size();c++)stripper.addRegion(bands.size()+"/"+c,
+                new Rectangle2D.Double(edges.get(c-1),top,edges.get(c)-edges.get(c-1),bottom-top));
+            bands.add(new Band(top,bottom,edges));
+        }
+        if(bands.isEmpty())return original;
+        stripper.extractRegions(page);
+        // Only an aligned schedule cell from the adjacent curriculum page can
+        // establish that a bare number denotes a teaching week.
+        var scheduleEdges=previousSchedule(previous);
+        StringBuilder evidence=new StringBuilder(); List<ObtlSections.Row> rows=new ArrayList<>();
+        for(int i=0;i<bands.size();i++){
+            Band band=bands.get(i); var edges=band.edges();
+            List<String> cells=new ArrayList<>();
+            for(int c=1;c<edges.size();c++)cells.add(stripper.getTextForRegion(i+"/"+c).strip());
+            String first=cells.get(0).replaceAll("\\s+"," ").strip();
+            int topicColumn=SCHEDULE.matcher(first).matches()||first.isEmpty()?1:0;
+            String topic=cells.get(topicColumn).replaceAll("\\s+"," ").strip();
+            boolean scheduled=scheduleEdges!=null && Math.abs(edges.get(0)-scheduleEdges[0])<2 &&
+                    Math.abs(edges.get(1)-scheduleEdges[1])<2 && SCHEDULE.matcher(first).matches() && !topic.isBlank();
+            if(!scheduled && (!OWNER.matcher(topic).find() || topic.length()>240))continue;
+            // A second numbered owner anywhere in the band is contradictory evidence.
+            var owners=Pattern.compile("(?i)\\b(?:chapter|unit|lesson|module)\\s+\\d+\\b").matcher(String.join("\n",cells));
+            long ownerCount=owners.results().limit(2).count();
+            if(ownerCount>1 || ownerCount==1 && !OWNER.matcher(topic).find())continue;
+            boolean continued=CONTINUED.matcher(topic).find();
+            if(continued && band.top()!=ys.get(0))continue;
+            String originalTopic=CONTINUED.matcher(topic).replaceFirst("").toLowerCase(Locale.ROOT);
+            String heading=scheduled ? (first.matches("(?i)weeks?.*")?first:"Week "+first) : CONTINUED.matcher(topic).replaceFirst("");
+            if (scheduled && topic.matches("(?i)(?:[\\p{L}-]+\\s+){0,3}exam(?:ination)?")) heading+=" — "+topic;
+            int start=evidence.length();
+            for(String cell:cells)if(!cell.isEmpty())evidence.append(cell).append('\n');
+            if(evidence.length()>budget)throw new IOException("SOURCE_TEXT_LIMIT");
+            rows.add(new ObtlSections.Row(start,evidence.length(),heading,continued,edges.get(0),band.top(),
+                edges.get(edges.size()-1),band.bottom(),"recovery:"+(scheduled?"week":"topic")+"|"+edges.get(0)+"|"+edges.get(1)+"|"+edges+"|"+
+                        ObtlSections.digest(originalTopic)));
+        }
+        if(!rows.isEmpty() && rows.get(rows.size()-1).bottom()!=ys.get(ys.size()-1))
+            rows.add(new ObtlSections.Row(evidence.length(),evidence.length(),"",false,0,0,0,0,"END"));
+        return rows.isEmpty()?original:new ObtlSections.Page(original.number(),evidence.toString(),rows,true);
+    }
+    private static double[] previousSchedule(ObtlSections.Page previous) {
+        if(previous==null||previous.rows().isEmpty())return null;
+        String key=previous.rows().get(previous.rows().size()-1).gridKey();
+        if(key.startsWith("recovery:week|")){
+            String[] parts=key.split("\\|",4);
+            return new double[]{Double.parseDouble(parts[1]),Double.parseDouble(parts[2])};
+        }
+        String[] parts=key.split(":",3);
+        if(parts.length!=3||!parts[1].equals("0"))return null;
+        String[] edges=parts[2].split(",");
+        return new double[]{Double.parseDouble(edges[0]),Double.parseDouble(edges[1])};
+    }
     private static boolean verticalAt(List<Line> lines,double x,double y){return lines.stream().anyMatch(l->Math.abs(l.x1-x)<1.5&&l.y1<=y&&l.y2>=y);}
     private static List<Double> cluster(List<Double> values){var sorted=values.stream().sorted().toList();List<Double> result=new ArrayList<>();for(double value:sorted)if(result.isEmpty()||value-result.get(result.size()-1)>1.5)result.add(value);return result;}
 }

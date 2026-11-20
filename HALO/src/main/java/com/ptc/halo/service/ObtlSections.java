@@ -5,7 +5,8 @@ import java.util.regex.Pattern;
 
 /** Deterministic proposals only. Neither matching nor confirmation proves instructional sufficiency. */
 public final class ObtlSections {
-    public static final String VERSION = "obtl-table-spans-v5";
+    public static final String VERSION = "obtl-table-spans-v9";
+    public static final String MANUAL_REGION = "MANUAL_ROW_REVIEW_REQUIRED";
     public static final int MAX_CHARS = 600_000;
     private static final Pattern HEADING = Pattern.compile(
         "(?im)^[\\t ]*(?:\\d{1,2}[\\t ]+)?((?:chapter|unit|module|lesson|weeks?)\\s+"
@@ -13,7 +14,9 @@ public final class ObtlSections {
         + "(?:[\\t ]*[-–—][\\t ]*\\d{1,3})?)(?=[\\s:.-]|$)[^\\r\\n]*");
     public record Row(int start, int end, String heading, boolean continuation,
                       double left, double top, double right, double bottom, String gridKey) {}
-    public record Page(int number, String text, List<Row> rows, boolean ambiguousTable) {
+    public record Schedule(String range,List<Long> columns) {}
+    public record Page(int number, String text, List<Row> rows, boolean ambiguousTable,Schedule schedule) {
+        public Page(int number,String text,List<Row> rows,boolean ambiguousTable){this(number,text,rows,ambiguousTable,null);}
         public Page(int number, String text) { this(number,text,List.of(),false); }
         public Page { rows=rows==null?List.of():List.copyOf(rows); }
     }
@@ -87,6 +90,38 @@ public final class ObtlSections {
                 if(heading!=null)warnings.add("AMBIGUOUS_TABLE_BOUNDARY");
                 sections.add(new Section("ambiguous-p"+page.number(),"Ambiguous table — review PDF page "+page.number(),
                     List.of(),List.of("AMBIGUOUS_TABLE_BOUNDARY","PROFESSOR_BOUNDARY_REVIEW_REQUIRED"),0));
+                for (Row row : page.rows()) {
+                    if (!row.gridKey().startsWith("recovery:")) continue;
+                    var span = new Span(page.number(), row.start(), row.end());
+                    // Join only an explicitly repeated owner on the immediately following page.
+                    if (row.continuation()) {
+                        if (page.rows().get(0) != row || page.number() == 1) continue;
+                        var previous = pages.get(page.number()-2).rows();
+                        if (previous.isEmpty()) continue;
+                        var last = previous.get(previous.size()-1);
+                        if (!last.gridKey().equals(row.gridKey()) || !last.heading().equalsIgnoreCase(row.heading())) continue;
+                        for (int i=sections.size()-1;i>=0;i--) {
+                            var candidate=sections.get(i);
+                            if (!candidate.warnings().contains(MANUAL_REGION)) continue;
+                            var tail=candidate.spans().get(candidate.spans().size()-1);
+                            if (tail.equals(new Span(page.number()-1,last.start(),last.end()))) {
+                                var joined=new ArrayList<>(candidate.spans()); joined.add(span);
+                                var flags=new ArrayList<>(candidate.warnings());
+                                String label=candidate.heading();
+                                if(row.gridKey().startsWith("recovery:merged|")){
+                                    flags.remove("TABLE_CONTINUATION_UNCONFIRMED");
+                                    label=label.replace(" (opening excerpt)","");
+                                }
+                                sections.set(i,tableSection(candidate.id(),label,joined,flags,pages,title));
+                                break;
+                            }
+                        }
+                    } else {
+                        boolean partial=row.gridKey().startsWith("recovery:merged|") && row.heading().endsWith(" (opening excerpt)");
+                        sections.add(tableSection(regionId(page,row),row.heading(),List.of(span),
+                            partial?List.of(MANUAL_REGION,"TABLE_CONTINUATION_UNCONFIRMED"):List.of(MANUAL_REGION),pages,title));
+                    }
+                }
                 continue;
             }
             if(page.rows().isEmpty()) {
@@ -116,10 +151,22 @@ public final class ObtlSections {
         if(sections.size()>256)throw new IllegalArgumentException("SOURCE_SECTION_LIMIT");
         return new Detection(VERSION,pages,List.copyOf(sections),List.of("TABLE_ROW_BOUNDARIES","NUMBERS_DO_NOT_ESTABLISH_WEEK_CHAPTER_EQUIVALENCE"));
     }
+    private static String regionId(Page page,Row row) {
+        String evidence=VERSION+"|"+page.number()+"|"+row.left()+"|"+row.top()+"|"+row.right()+"|"+
+                row.bottom()+"|"+row.gridKey()+"|"+page.text().substring(row.start(),row.end());
+        return "region-p"+page.number()+"-"+digest(evidence);
+    }
+    static String digest(String evidence) {
+        try {
+            byte[] digest=java.security.MessageDigest.getInstance("SHA-256").digest(evidence.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+    }
     private static Section tableSection(String id,String heading,List<Span> spans,List<String> warnings,List<Page> pages,String title){
         Set<String> flags=new LinkedHashSet<>(warnings);flags.add("PROFESSOR_BOUNDARY_REVIEW_REQUIRED");flags.add("INSTRUCTIONAL_SUFFICIENCY_NOT_VERIFIED");
         String lower=heading.toLowerCase(Locale.ROOT);
-        if(lower.matches(".*\\b(?:midterm|final)\\s+exam(?:ination)?\\b.*"))flags.add("EXAMINATION_SECTION");
+        if(lower.matches(".*\\b(?:midterm|final)\\s+exam(?:ination)?\\b.*") ||
+                flags.contains(MANUAL_REGION) && lower.matches(".* — (?:[\\p{L}-]+\\s+){0,3}exam(?:ination)?"))flags.add("EXAMINATION_SECTION");
         else if(lower.contains("orientation"))flags.add("ORIENTATION_SECTION");
         else if(lower.contains("integrative")||lower.contains("comparative study"))flags.add("CURRICULUM_ACTIVITY_SECTION");
         flags.add("VERIFY_COLUMN_ASSOCIATIONS_AGAINST_ORIGINAL");

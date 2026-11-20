@@ -84,6 +84,29 @@ class ObtlTableBoundaryTest {
         var d=ObtlPdfText.extract(fixture(false,true,false),"Cuisine").detection();
         assertTrue(d.pages().get(0).ambiguousTable());assertTrue(d.sections().stream().allMatch(s->s.spans().isEmpty()));
     }
+    @Test void oneConflictingBandDoesNotDiscardAnIndependentlyEnclosedRow()throws Exception{
+        try(var doc=new PDDocument();var out=new ByteArrayOutputStream()){
+            var page=new PDPage();doc.addPage(page);
+            try(var c=new PDPageContentStream(doc,page)){
+                for(int x:new int[]{30,100,290,580}){c.moveTo(x,400);c.lineTo(x,730);}
+                for(int y:new int[]{400,530,700,730}){c.moveTo(30,y);c.lineTo(580,y);}c.stroke();
+                label(c,35,715,"Week");label(c,108,715,"Content Standards");
+                label(c,35,630,"3");label(c,108,640,"Chapter 2");label(c,108,590,"Chapter 3");
+                label(c,300,620,"Repeated assessment");label(c,300,590,"Excluded evidence");
+                label(c,35,480,"4");label(c,108,465,"Chapter 4");label(c,300,510,"Recovered evidence");
+                label(c,300,430,"Repeated assessment");
+            }
+            doc.save(out);
+            var d=ObtlPdfText.extract(out.toByteArray(),"").detection();
+            var recovered=d.sections().stream().filter(s->s.warnings().contains(ObtlSections.MANUAL_REGION)).toList();
+            assertEquals(1,recovered.size());assertEquals("Chapter 4",recovered.get(0).heading());
+            String exact=ObtlSections.text(d,recovered.get(0));
+            assertTrue(exact.contains("Repeated assessment"));assertTrue(exact.contains("Recovered evidence"));
+            assertFalse(exact.contains("Excluded evidence"));
+            var row=d.pages().get(0).rows().get(0);
+            assertEquals(262,row.top(),0.01);assertEquals(392,row.bottom(),0.01);
+        }
+    }
     @Test void borderlessCurriculumTableRequiresReview()throws Exception{
         var d=ObtlPdfText.extract(fixture(false,false,true),"Cuisine").detection();
         assertTrue(d.pages().get(0).ambiguousTable());assertTrue(d.sections().stream().allMatch(s->s.spans().isEmpty()));

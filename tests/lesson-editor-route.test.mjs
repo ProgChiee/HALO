@@ -137,3 +137,34 @@ test('publication material errors show actionable messages without retrying appr
   assert.ok(!host.textContent.includes('Published: this lesson'));
  });
 });
+
+test('create breadcrumb links to real parents and canceling navigation retains unsaved text',async()=>fixture(async({host,pending,resolve})=>{
+ await resolve(0,null);
+ const trail=host.querySelector('nav[aria-label="Breadcrumb"]');
+ assert.equal(trail.querySelector('[aria-current="page"]').textContent,'Create Lesson');
+ assert.deepEqual([...trail.querySelectorAll('a')].map(a=>a.pathname),['/professor','/professor/subjects']);
+ const textarea=host.querySelector('textarea');
+ await act(async()=>{
+  Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set.call(textarea,'Unsaved lesson');
+  textarea.dispatchEvent(new Event('input',{bubbles:true}));
+ });
+ const original=window.confirm;
+ try {
+  window.confirm=()=>false;
+  await act(async()=>trail.querySelector('a').click());
+  assert.equal(host.querySelector('textarea').value,'Unsaved lesson');
+  window.confirm=()=>true;
+  await act(async()=>trail.querySelector('a').click());
+  assert.equal(host.querySelector('textarea'),null);
+  assert.equal(pending.length,1);
+ } finally {window.confirm=original;}
+}));
+test('published lesson breadcrumb follows the existing revision state',async()=>fixture(async({host,pending,resolve})=>{
+ await resolve(0,{...moduleData(1,'Published'),status:'APPROVED'});
+ const current=()=>host.querySelector('nav[aria-label="Breadcrumb"] [aria-current]').textContent;
+ assert.equal(current(),'View Lesson');
+ const index=pending.findIndex(p=>p.config.url.endsWith('/revision'));
+ assert.ok(index>0);
+ await resolve(index,{version:1,revisionNumber:2,state:'REVIEWED',files:[]});
+ assert.equal(current(),'Review Revision');
+}));

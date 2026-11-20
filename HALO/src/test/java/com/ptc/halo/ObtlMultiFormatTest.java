@@ -20,6 +20,72 @@ class ObtlMultiFormatTest {
     static byte[] art()throws Exception{return fixture("ART APPRECIATION OBTL 2026-2027.docx - She-Ann Teves.pdf","bf81d666c77fae10206feaea938843f98a8497cfd879b6a718c2e8f93de97580");}
     static byte[] pathfit()throws Exception{return fixture("ASSOCIATES OBTL PATHFIT 1 - SONEE JAMES C. LAMORENA.pdf","0ee4f11412c3cd7a2e8dadb9484ba16f1297fa5c811551c52ba22e54c636d4bd");}
     static ObtlSections.Section week(ObtlSections.Detection d,int n){return ObtlTableBoundaryTest.section(d,"Week "+n+" —");}
+    @Test void recoverClosedCateringRowsWithoutUsingExamCoverageAsSchedule() throws Exception {
+        var bytes=fixture("AHRT-CATERING SERVICE MANAGEMENT_OBTL.pdf","3b07c819d174012bfe8375c3d13966f2404b25554c75d12528c857cac1311e5d");
+        var d=ObtlPdfText.extract(bytes,"").detection();
+        var rows=d.sections().stream().filter(s->s.warnings().contains(ObtlSections.MANUAL_REGION)).toList();
+        assertEquals(List.of("Week 2","Week 3","Week 4","Week 5 & 6","Week 7 & 8","Week 9","Week 10 & 11","Week 12 & 13",
+                "Week 14 & 15","Week 16","Week 17","Week 18"),rows.stream().map(s->s.heading().split(" — ")[0]).toList());
+        assertEquals(2,rows.stream().filter(s->s.warnings().contains("EXAMINATION_SECTION")).count());
+        for(int i=0;i<rows.size();i++){
+            var span=rows.get(i).spans().get(0);
+            assertEquals(3+i/4,span.page());
+            var region=d.pages().get(span.page()-1).rows().get(i%4);
+            assertEquals(region.start(),span.start());assertEquals(region.end(),span.end());
+            if(i%4!=0){
+                var previous=d.pages().get(span.page()-1).rows().get(i%4-1);
+                assertTrue(previous.bottom()<=region.top());assertTrue(previous.end()<=span.start());
+            }
+        }
+    }
+    @Test void orphanedBreadTableDoesNotFallBackToFullDocument() throws Exception {
+        var bytes=fixture("AHRT-BREAD & PASTRY PRODUCTION_OBTL.pdf","e254236f93f49b65cefb5f021b0cb1f7354f01742e683425563fe4ddc1190bb3");
+        var d=ObtlPdfText.extract(bytes,"").detection();
+        var safe=d.sections().stream().filter(s->!s.spans().isEmpty()).toList();
+        var exam=safe.stream().filter(s->s.heading().startsWith("Week 9")).findFirst().orElseThrow();
+        assertEquals(11,exam.spans().get(0).page());
+        assertTrue(exam.warnings().contains("EXAMINATION_SECTION"));
+        var first=ObtlTableBoundaryTest.section(d,"Week 2(1st)");
+        var second=ObtlTableBoundaryTest.section(d,"Week 2(2nd)");
+        assertTrue(first.warnings().contains(ObtlSections.MANUAL_REGION));
+        assertEquals(4,first.spans().get(0).page());
+        assertEquals(first.spans().get(0).end(),second.spans().get(0).start());
+        String excerpt=ObtlSections.text(d,first).replaceAll("\\s+"," ");
+        assertTrue(excerpt.contains("Proper care, use, storage"));
+        assertFalse(excerpt.contains("Characteristics and functions of dry"));
+        assertTrue(ObtlSections.text(d,second).replaceAll("\\s+"," ").contains("Characteristics and functions of dry"));
+    }
+    @Test void abttMergedScheduleHasIndependentChapterAndExaminationEvidence() throws Exception {
+        var bytes=fixture("ABTT OBTL _Bulusan - Edna Bulusan.pdf","62028ae465a26712ef4b310f7138a631900b52ec8c87ed9f11e73a5d11a01195");
+        var d=ObtlPdfText.extract(bytes,"").detection();
+        var chapter=ObtlTableBoundaryTest.section(d,"Chapter 2");
+        assertTrue(chapter.warnings().contains(ObtlSections.MANUAL_REGION));
+        assertEquals(List.of(3),chapter.spans().stream().map(ObtlSections.Span::page).toList());
+        var text=ObtlSections.text(d,chapter).replaceAll("\\s+"," ").toLowerCase(Locale.ROOT);
+        for(String expected:List.of("tourism and its sectors","describe the characteristics","classify the different types"))
+            assertTrue(text.contains(expected),expected);
+        for(String other:List.of("what do managers","chapter 3","business tools","chapter test/quiz"))
+            assertFalse(text.contains(other),other);
+        assertEquals("recovery:merged|2-8",d.pages().get(2).rows().get(0).gridKey());
+        assertTrue(d.pages().get(4).rows().stream().anyMatch(r->r.gridKey().equals("recovery:merged|10-17")&&r.heading().startsWith("Chapter 6")));
+        assertTrue(ObtlTableBoundaryTest.section(d,"Chapter 6").warnings().contains("TABLE_CONTINUATION_UNCONFIRMED"));
+        var eight=ObtlTableBoundaryTest.section(d,"Chapter 8");
+        assertEquals(List.of(6),eight.spans().stream().map(ObtlSections.Span::page).toList());
+        assertTrue(eight.warnings().contains(ObtlSections.MANUAL_REGION));
+        assertFalse(eight.warnings().contains("TABLE_CONTINUATION_UNCONFIRMED"));
+        String guest=ObtlSections.text(d,eight).replaceAll("\\s+"," ").toLowerCase(Locale.ROOT);
+        assertTrue(guest.contains("customer and guest service activities"));
+        assertFalse(guest.contains("procurement"));assertFalse(guest.contains("chapter 9"));
+        assertEquals("recovery:merged|",d.pages().get(5).rows().get(0).gridKey());
+        assertEquals(List.of(7),ObtlTableBoundaryTest.section(d,"Chapter 10").spans().stream().map(ObtlSections.Span::page).toList());
+        for(String label:List.of("Week 9","Week 18"))
+            assertTrue(ObtlTableBoundaryTest.section(d,label).warnings().contains("EXAMINATION_SECTION"));
+    }
+    @Test void unresolvedBarPagesStayBlocked() throws Exception {
+        var d=ObtlPdfText.extract(fixture("AHRT-BAR & BEVERAGE MANAGEMENT_OBTL.pdf","4dc03b632cd555962eb3128b2880b6831179f1d0e7056eea857753ca731930a4"),"").detection();
+        assertTrue(d.sections().stream().anyMatch(s->s.spans().isEmpty()));
+        assertTrue(d.sections().stream().noneMatch(s->s.warnings().contains(ObtlSections.MANUAL_REGION)));
+    }
     static void isolated(ObtlSections.Detection d,int count){
         assertEquals(count,d.sections().size());Set<String> offsets=new HashSet<>();
         for(var s:d.sections()){

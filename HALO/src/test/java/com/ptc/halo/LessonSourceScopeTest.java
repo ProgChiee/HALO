@@ -42,6 +42,53 @@ class LessonSourceScopeTest {
         var section=scope.read(module.getSourceScope()).documents().get(0).extraction().sections().get(0);
         module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(3L,List.of(section.id()),instructional)),5L));
     }
+    @Test void manualRegionRequiresReviewAndIndexesOnlyItsOriginalEvidence()throws Exception {
+        var old=scope.read(module.getSourceScope());
+        var doc=old.documents().get(0);
+        String evidence="Shared wording\n", grid="recovery:topic|10|20|[10,20,300]";
+        var page1=new ObtlSections.Page(1,evidence.repeat(2),List.of(
+                new ObtlSections.Row(0,evidence.length(),"Chapter 1",false,10,10,300,20,grid),
+                new ObtlSections.Row(evidence.length(),2*evidence.length(),"Chapter 2",false,10,20,300,30,grid)),true);
+        var page2=new ObtlSections.Page(2,"Continued work",List.of(
+                new ObtlSections.Row(0,14,"Chapter 2",true,10,10,300,20,grid)),true);
+        var detection=ObtlSections.detect(List.of(page1,page2),"");
+        var target=detection.sections().stream().filter(s->s.heading().equals("Chapter 2")).findFirst().orElseThrow();
+        assertEquals(2,target.spans().size());
+        var document=new LessonSourceScope.Document(doc.fileId(),doc.name(),doc.checksum(),detection);
+        module.setSourceScope(scope.write(new LessonSourceScope.Snapshot(1,"draft",module.getId(),List.of(document),List.of(),null,null,false)));
+        var ids=List.of(target.id());
+        assertEquals("SOURCE_REGION_REVIEW_REQUIRED",assertThrows(ResponseStatusException.class,
+            ()->scope.confirm(module,List.of(new LessonSourceScope.Choice(doc.fileId(),ids,false)),5L)).getReason());
+        for(var spans:List.of(List.of(target.spans().get(0)),List.of(target.spans().get(0),target.spans().get(0)),
+                List.of(new ObtlSections.Span(1,0,evidence.length()),target.spans().get(1)))){
+            var forged=new LessonSourceScope.Correction(doc.checksum(),detection.version(),spans,"Week 3");
+            assertEquals("SOURCE_REGION_MISMATCH",assertThrows(ResponseStatusException.class,()->scope.confirm(module,
+                List.of(new LessonSourceScope.Choice(doc.fileId(),ids,false,forged)),5L)).getReason());
+        }
+        var review=new LessonSourceScope.Correction(doc.checksum(),detection.version(),target.spans(),"Week 3");
+        module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(doc.fileId(),ids,false,review)),5L,LessonSourceScope.Mode.OBTL_EXPANSION));
+        assertEquals(3,scope.read(module.getSourceScope()).format());
+        assertEquals(List.of(evidence,"Continued work"),scope.index(module,false).chunks().stream().map(ModuleMaterialIndex.Chunk::text).toList());
+        assertTrue(scope.index(module,true).chunks().isEmpty());
+    }
+    @Test void correctedEvidenceIsValidatedAndIsTheOnlyTextIndexed()throws Exception{
+        var d=scope.read(module.getSourceScope()).documents().get(0);
+        var section=d.extraction().sections().get(0);
+        int start=d.extraction().pages().get(0).text().indexOf("Evidence-1");
+        var fragment=new ObtlSections.Span(1,start,start+10);
+        var correction=new LessonSourceScope.Correction(d.checksum(),d.extraction().version(),List.of(fragment));
+        var choice=new LessonSourceScope.Choice(d.fileId(),List.of(section.id()),false,correction);
+        module.setSourceScope(scope.confirm(module,List.of(choice),5L,LessonSourceScope.Mode.OBTL_EXPANSION));
+        assertEquals("Evidence-1",scope.index(module,false).chunks().get(0).text());
+        assertEquals(correction,scope.read(module.getSourceScope()).choices().get(0).correction());
+        assertEquals(2,scope.read(module.getSourceScope()).format());
+        for(var invalid:List.of(new LessonSourceScope.Correction("stale",d.extraction().version(),List.of(fragment)),
+                new LessonSourceScope.Correction(d.checksum(),d.extraction().version(),List.of(fragment,fragment)),
+                new LessonSourceScope.Correction(d.checksum(),d.extraction().version(),d.extraction().sections().get(1).spans()))){
+            var bad=new LessonSourceScope.Choice(d.fileId(),List.of(section.id()),true,invalid);
+            assertThrows(ResponseStatusException.class,()->scope.confirm(module,List.of(bad),5L));
+        }
+    }
     @Test void ungeneratedExpansionDoesNotRequestSupplementaryInstruction() {
         expansion();
         assertEquals("EXPANSION_GENERATION_REQUIRED", assertThrows(ResponseStatusException.class,
@@ -50,6 +97,24 @@ class LessonSourceScopeTest {
         confirm(false);
         assertEquals("INSTRUCTIONAL_SOURCES_REQUIRED", assertThrows(ResponseStatusException.class,
             () -> scope.requirePublishedReady(module)).getReason());
+    }
+    @Test void cateringWeekCanBeConfirmedAndReloadedAsAnOutlineWithoutOtherRows() throws Exception {
+        byte[] pdf=ObtlMultiFormatTest.fixture("AHRT-CATERING SERVICE MANAGEMENT_OBTL.pdf",
+                "3b07c819d174012bfe8375c3d13966f2404b25554c75d12528c857cac1311e5d");
+        when(storage.read("original")).thenReturn(pdf);
+        when(worker.extract(pdf)).thenReturn(ObtlPdfText.extract(pdf,""));
+        module.setSourceScope(scope.extract(module));
+        var doc=scope.read(module.getSourceScope()).documents().get(0);
+        var row=ObtlTableBoundaryTest.section(doc.extraction(),"Week 5 & 6");
+        var review=new LessonSourceScope.Correction(doc.checksum(),doc.extraction().version(),row.spans(),"Weeks 5–6");
+        module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(doc.fileId(),List.of(row.id()),false,review)),
+                5L,LessonSourceScope.Mode.OBTL_EXPANSION));
+        String allowed=ObtlSections.text(doc.extraction(),row);
+        assertEquals(allowed,scope.index(module,false).chunks().stream().map(ModuleMaterialIndex.Chunk::text).collect(java.util.stream.Collectors.joining()));
+        assertTrue(scope.outlineOnly(module));
+        assertThrows(ResponseStatusException.class,()->scope.requirePublishedReady(module));
+        when(storage.read("original")).thenReturn(new byte[]{1,2,3});
+        assertEquals("SOURCE_REEXTRACTION_REQUIRED",assertThrows(ResponseStatusException.class,()->scope.index(module,false)).getReason());
     }
     @Test void legacyOutlineRequiresExplicitModeChangeThenInitialGenerationAcceptsOutline() throws Exception {
         confirm(false);

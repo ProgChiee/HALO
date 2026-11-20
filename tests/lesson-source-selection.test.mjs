@@ -4,6 +4,16 @@ import { JSDOM } from 'jsdom';
 import { createServer } from 'vite';
 import React, { act } from 'react';
 import { professorErrorMessage } from '../src/utils/professorErrors.js';
+import { locateFragment } from '../src/utils/locateSourceFragment.js';
+
+test('PDF highlights require a unique exact match within the selected page and section', () => {
+  const text = 'Intro Alpha Exam Alpha';
+  const owners = [{ page: 2, start: 0, end: 11 }];
+  assert.deepEqual(locateFragment(text, 'Intro', 2, owners), { page: 2, start: 0, end: 5 });
+  for (const value of ['Alpha', 'Exam', 'Alpha Exam', 'intro', ' '])
+    assert.equal(locateFragment(text, value, 2, owners), null);
+  assert.equal(locateFragment(text, 'Intro', 1, owners), null);
+});
 test('generation warnings distinguish expansion from legacy Source-Grounded drafts', () => {
   const message = code => professorErrorMessage({ response: { status: 422, data: { code } } });
   assert.match(message('EXPANSION_GENERATION_REQUIRED'), /Supplementary PDFs are optional/);
@@ -17,7 +27,9 @@ before(async () => {
   for (const key of ['window', 'document', 'HTMLElement', 'Event', 'localStorage', 'sessionStorage']) globalThis[key] = dom.window[key];
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   ({ createRoot } = await import('react-dom/client'));
-  server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
+  server = await createServer({ server: { middlewareMode: true, hmr:false }, appType: 'custom', ssr:{noExternal:['pdfjs-dist']},
+    plugins:[{name:'isolated-pdf-canvas',enforce:'pre',resolveId(id){if(id==='pdfjs-dist')return '\0fixture-pdf';},
+      load(id){if(id==='\0fixture-pdf')return 'export const GlobalWorkerOptions={}; export const getDocument=(...args)=>globalThis.fixturePdf(...args);';}}] });
   Component = (await server.ssrLoadModule('/src/pages/professor/components/LessonSourceSelection.jsx')).default;
   ({ ProfessorWorkflowContext: Context } = await server.ssrLoadModule('/src/context/professor/useProfessorWorkflow.js'));
 });
@@ -32,6 +44,64 @@ async function mount(api, props = {}, preview = false) {
   return { host, changed: () => changed, close: async () => { await act(async () => root.unmount()); host.remove(); } };
 }
 const button = (ui, text) => [...ui.host.querySelectorAll('button')].find(b => b.textContent === text);
+test('structure recognition is opt-in and a review pointer cannot confirm or select sources', async () => {
+  const fixture={...source,id:'saved-snapshot'};
+  let enabled=false;
+  const calls=[];
+  const api={getSources:async()=>({version:4,source:fixture,recognitionEnabled:enabled}),
+    recognizeSources:async(...args)=>{calls.push(args);return [{sectionId:null,pages:[4],heading:'Week 2'}];}};
+  const off=await mount(api);
+  try {assert.equal(button(off,'Suggest structure with Gemini'),undefined);} finally {await off.close();}
+  enabled=true;
+  const ui=await mount(api);
+  try {
+    assert.equal(calls.length,0);
+    await act(async()=>button(ui,'Suggest structure with Gemini').click());
+    assert.deepEqual(calls,[[7,3,'saved-snapshot',undefined]]);
+    assert.match(ui.host.textContent,/Week 2 · PDF page 4 · Boundary unresolved/);
+    assert.equal(button(ui,'Suggest structure with Gemini').disabled,true);
+    assert.equal(button(ui,'Confirm Selected Sources').disabled,true);
+  } finally {await ui.close();}
+});
+test('building a manual section requires reviewing the verified PDF region', async () => {
+  const fixture = structuredClone(source);
+  fixture.documents[0].extraction.sections[0].warnings.push('MANUAL_ROW_REVIEW_REQUIRED');
+  const ui = await mount({ getSources: async () => ({version:4, source:fixture}) });
+  try {
+    await act(async () => ui.host.querySelector('input[type=checkbox]').click());
+    assert.match(ui.host.textContent,/Section display label/);
+    assert.equal(button(ui,'Confirm Selected Sources').disabled,true);
+    assert.equal(ui.host.querySelector('canvas').getAttribute('aria-label'),'Original PDF page 1');
+  } finally { await ui.close(); }
+});
+test('reviewed geometry submits its exact row and keeps the Professor label separate', async () => {
+  const fixture=structuredClone(source), doc=fixture.documents[0], section=doc.extraction.sections[0];
+  const bytes=new Uint8Array([1,2,3]).buffer;
+  doc.checksum=Buffer.from(await crypto.subtle.digest('SHA-256',bytes)).toString('hex');
+  doc.extraction.version='fixture-v6';
+  section.warnings.push('MANUAL_ROW_REVIEW_REQUIRED');
+  doc.extraction.pages[0].rows=[{start:0,end:18,left:10,top:20,right:110,bottom:60,gridKey:'recovery:fixture'}];
+  const canvas=dom.window.HTMLCanvasElement.prototype;
+  const original=canvas.getContext;
+  canvas.getContext=()=>({});
+  globalThis.fixturePdf=()=>({destroy(){},promise:Promise.resolve({getPage:async()=>({
+    userUnit:1,rotate:0,getViewport:({scale})=>({width:200*scale,height:100*scale}),
+    render:()=>({promise:Promise.resolve(),cancel(){}})})})});
+  const calls=[];
+  const ui=await mount({getSources:async()=>({version:4,source:fixture}),getSourceOriginal:async()=>bytes,
+    confirmSources:async(...args)=>calls.push(args)});
+  try {
+    await act(async()=>ui.host.querySelector('input[type=checkbox]').click());
+    for(let i=0;i<30 && !ui.host.querySelector('button[aria-pressed]');i++)
+      await act(async()=>{await new Promise(resolve=>setTimeout(resolve,15));});
+    const region=ui.host.querySelector('button[aria-pressed]');
+    assert.ok(region);assert.equal(region.style.left,'5%');assert.equal(region.style.height,'40%');
+    await act(async()=>region.click());
+    assert.equal(ui.host.querySelector('section[aria-label="Manual PDF boundary correction"] pre').textContent,'Chapter 1\nOutline\n');
+    await act(async()=>button(ui,'Confirm Selected Sources').click());
+    assert.deepEqual(calls[0][3][0].correction,{checksum:doc.checksum,extractionVersion:'fixture-v6',fragments:section.spans,displayLabel:'Chapter 1'});
+  } finally { await ui.close();canvas.getContext=original;delete globalThis.fixturePdf; }
+});
 test('exams are labeled and unresolved boundaries cannot be selected alongside safe outline sections', async () => {
   const fixture = structuredClone(source);
   fixture.documents[0].extraction.sections[1].warnings = ['EXAMINATION_SECTION'];
@@ -69,6 +139,16 @@ test('exact previews require explicit selection and confirmation; outline is the
     assert.equal(button(ui, 'Confirm Selected Sources').disabled, true); assert.equal(calls.length, 0);
     assert.match(ui.host.textContent, /Outline-only plans|outline-only/);
     assert.equal(ui.host.querySelector('pre').textContent, 'Chapter 1\nOutline\n');
+    const preview = ui.host.querySelector('pre').closest('details');
+    const presentation = preview.querySelector('select');
+    assert.equal(presentation.value, 'readable');
+    await act(async () => {
+      presentation.value = 'exact';
+      presentation.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    assert.equal(preview.querySelector('pre').textContent, 'Chapter 1\nOutline\n');
+    assert.equal(preview.querySelector('strong').textContent, 'Page 1, characters 0–18');
+    assert.equal(button(ui, 'Confirm Selected Sources').disabled, true);
     await act(async () => ui.host.querySelector('input[type=checkbox]').click());
     await act(async () => button(ui, 'Confirm Selected Sources').click());
     assert.deepEqual(calls, [[7, 2, undefined, [{ fileId: 3, sectionIds: ['one'], instructional: false }], 'SOURCE_GROUNDED']]); assert.equal(ui.changed(), 1);
@@ -149,5 +229,21 @@ test('outline expansion is explicit and academic acknowledgment is required befo
     await act(async () => button(ui, 'Save Academic Review').click());
     assert.deepEqual(calls, [[7, 4, undefined, lesson, true]]);
     assert.equal(ui.changed(), 1);
+  } finally { await ui.close(); }
+});
+
+test('filtering a selected chapter out of view preserves the confirmation payload', async () => {
+  const calls = [];
+  const ui = await mount({getSources: async () => ({version:4,source}), confirmSources: async (...args) => calls.push(args)});
+  try {
+    await act(async () => ui.host.querySelector('input[type=checkbox]').click());
+    await act(async () => {
+      const filter = ui.host.querySelectorAll('select')[1];
+      filter.value = 'Examinations';
+      filter.dispatchEvent(new Event('change', {bubbles:true}));
+    });
+    assert.match(ui.host.textContent, /No matching sections/);
+    await act(async () => button(ui,'Confirm Selected Sources').click());
+    assert.deepEqual(calls[0][3], [{fileId:3, sectionIds:['one'], instructional:false}]);
   } finally { await ui.close(); }
 });

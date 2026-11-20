@@ -34,3 +34,18 @@ test('preview has no revision writes and failed review leaves draft editable',as
   await click('Discard Revision');await act(async()=>[...document.querySelectorAll('[role="dialog"] button')].find(b=>b.textContent==='Discard Revision').click());assert.equal(called,1);assert.ok(button('Revise Lesson'));
  }finally{await ui.close();}
 });
+
+test('dropping files stages them for explicit save and supports individual removal', async () => {
+ const saves=[];
+ const ui=await mount({getRevision:async()=>initial,getSources:async()=>({}),saveRevision:async(id,data,files)=>{saves.push(files);return initial;}});
+ try {
+  const files=['first.pdf','second.pdf'].map(name=>new window.File(['pdf'],name,{type:'application/pdf'}));
+  const event=new Event('drop',{bubbles:true,cancelable:true});
+  Object.defineProperty(event,'dataTransfer',{value:{files}});
+  await act(async()=>ui.host.querySelector('#revision-files').parentElement.dispatchEvent(event));
+  await act(async()=>ui.host.querySelector('[aria-label="Remove first.pdf"]').click());
+  assert.equal(saves.length,0);
+  await click('Save Draft');
+  assert.deepEqual(saves[0].map(file=>file.name),['second.pdf']);
+ } finally {await ui.close();}
+});

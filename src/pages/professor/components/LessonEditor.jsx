@@ -1,3 +1,4 @@
+import Breadcrumb from '../../../components/shared/Breadcrumb';
 import Topbar from '../../../components/shared/Topbar';
 import LessonRevision from './LessonRevision';
 import LessonSourceSelection from './LessonSourceSelection';
@@ -9,8 +10,8 @@ import { youtubeVideoId } from '../../../utils/youtubeVideo';
 import { VideoPreview } from '../../../components/shared/VideoLearning';
 import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileText, Upload, Link2, Sparkles, Check, X, RefreshCw, Image as ImageIcon } from 'lucide-react';
+import { useParams, useLocation } from 'react-router-dom';
+import { FileText, Upload, Link2, Sparkles, Check, X, RefreshCw, Image as ImageIcon } from 'lucide-react';
 import PageShell from './ProfessorPageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
@@ -37,7 +38,9 @@ function RouteLessonEditor({ subjectId, weekId }) {
   generateLesson,
   approveLesson,
   declineLesson, } = workflow.api;
-  const navigate = useNavigate();
+  const { state } = useLocation();
+  const [revisionContext, setRevisionContext] = useState(null);
+  const [activeTab, setActiveTab] = useState('lesson');
   const { showToast } = useToast();
   const materialsInputRef = useRef(null);
 
@@ -306,15 +309,26 @@ function RouteLessonEditor({ subjectId, weekId }) {
   const lessonStatus = module?.status; // 'PENDING' | 'APPROVED' | 'DECLINED'
   const hasGeneratedContent = aiStatus === 'COMPLETED';
 
+  const currentPage = loading || loadError ? 'Lesson Management'
+    : activeTab === 'history' ? 'Revision History' : activeTab === 'assessment' ? 'Assessment'
+    : isPublished ? revisionContext?.label || 'View Lesson'
+    : workflow.preview ? 'View Lesson' : module ? 'Edit Draft' : 'Create Lesson';
+  function guardNavigation(event) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const unsaved = hasUnsavedChanges || revisionContext?.dirty || (!module && (lessonText || youtubeLink || aiNotes));
+    if (unsaved && !window.confirm('Leave this lesson and discard unsaved edits?')) event.preventDefault();
+  }
+
   return (
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
       <Topbar>
         <div className={styles.topHeaderLeft}>
-          <button className={styles.backBtn} onClick={() => navigate(workflow.basePath + '/subjects')}>
-            <ArrowLeft size={16} />
-            Back
-          </button>
-          <div>
+          <div style={{ minWidth: 0, maxWidth: '100%' }}>
+            <Breadcrumb onNavigate={guardNavigation} items={[
+              { label: 'Dashboard', to: workflow.basePath },
+              { label: 'Subjects', to: workflow.basePath + '/subjects' },
+              { label: currentPage, title: typeof state?.lessonTitle === 'string' ? state.lessonTitle : '' }
+            ]} />
             <p className={styles.eyebrow}>Subject #{module?.subjectId ?? subjectId} · {module?.weekNumber != null ? `Week ${module.weekNumber}` : `Week record #${weekId}`}</p>
             <h1 className={styles.title}>Lesson Management</h1>
           </div>
@@ -337,10 +351,10 @@ function RouteLessonEditor({ subjectId, weekId }) {
             : 'Draft: Save Materials, Generate Lesson with AI, Review, then Approve & Publish.'}
           {hasUnsavedChanges && module ? ' Save your changes before generating or publishing.' : ''}
         </p>
-        <LessonWorkspaceTabs
+        <LessonWorkspaceTabs onSelect={setActiveTab}
           assessment={isPublished && !workflow.preview ? <QuizRevision key={'quiz-' + module.id + '-' + reloadKey} moduleId={module.id} /> : <section className={styles.panelCard}><h2 className={styles.panelTitle}>Assessment</h2><p className={styles.panelSubtitle}>{workflow.preview ? 'Assessment management is not available in read-only Professor Preview.' : 'Publish the lesson before managing its assessment.'}</p></section>}
           history={module && !workflow.preview ? <section className={styles.panelCard}><RevisionHistory key={module.id + '-' + reloadKey} moduleId={module.id} embedded /></section> : <section className={styles.panelCard}><h2 className={styles.panelTitle}>Revision History</h2><p className={styles.panelSubtitle}>{workflow.preview ? 'Revision history is not available in read-only Professor Preview.' : 'Published revision snapshots will appear here when available.'}</p></section>}>
-        {isPublished && !workflow.preview && <LessonRevision key={module.id} moduleId={module.id} onPublished={() => { setLoading(true); setReloadKey(key => key + 1); }} />}
+        {isPublished && !workflow.preview && <LessonRevision onContextChange={setRevisionContext} key={module.id} moduleId={module.id} onPublished={() => { setLoading(true); setReloadKey(key => key + 1); }} />}
         {/* --- Step 1: Raw materials --- */}
         {isPublished ? <PublishedMaterials module={module} /> : <div className={styles.panelCard}>
           <div className={styles.panelHeader}>
