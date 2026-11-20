@@ -101,7 +101,39 @@ Before any deployment:
 5. Test packaged parsing on the target Linux/container runtime and measure process memory under bounded concurrent traffic. Review existing diagnostic logging settings for production.
 6. Obtain separate migration/deployment approval. Preserve module, revision/history, Mentor messages and original files together in backups. Do not drop provenance columns or run old full-PDF code against scoped publications as a routine rollback: that would lose source isolation. Stop scoped operations and restore a compatible application/data snapshot under an approved recovery procedure.
 
-## Files in this feature
+## Multi-format table extraction (version v4)
+
+`obtl-table-spans-v4` separates filled shading from actual rules, recognizes numeric Week cells through the curriculum header, and carries column semantics across pages only when the physical borders match. Aligned vertical endpoints recover open top rows. Horizontal merged cells retain complete text. A transition to a different table ends curriculum ownership before references or policies. Topic rows, examinations, orientation and integrative/comparative activities are exposed rather than discarded. Original wording is retained, including inconsistent knowledge/outcome cells; Professors must check column associations against the PDF. No AI or OCR participates in extraction.
+
+Original local fixtures, kept outside Git and verified by checksums in `ObtlMultiFormatTest`, reproduce these results:
+
+| Document | Previous detection | v4 detection |
+| --- | --- | --- |
+| International Cuisine | 6 chapter proposals plus 1 ambiguous page | 18 sections: 13 chapter groups, orientation, 2 examinations, comparative study and integrative practical activity |
+| Kitchen Essentials | 2 unisolated-page warnings, no isolated weeks | 18 sections: Weeks 1–10 and 12–19; Week 11 is absent in the original |
+| Art Appreciation | No detected sections; whole-document proposal | 7 sections: two distinct rows in Weeks 1–4, Weeks 5–8, Week 9 examination, Weeks 10–13, Weeks 14–17 and Week 18 examination |
+
+International Cuisine's integrative activity spans pages 4–5; Kitchen Week 15 spans pages 5–6; Art's instructional ranges span pages 2–6. Continuations retain review warnings. Unsupported borderless curriculum tables and incompatible grids remain blocked; this is not a general PDF table/OCR solution. Shared merged cells may repeat their original text in the preview. Detection is not academic sufficiency or correctness verification.
+
+Existing published v3 snapshots remain readable and are not rewritten. New generation, reconfirmation or publication of old drafts requires explicit **Extract / Refresh Sources**, selection review and reconfirmation. Refresh does not update published revisions. No schema migration is needed. OBTL Expansion can confirm an outline with `instructional: false`; Source-Grounded sufficiency, academic review and publication checks remain unchanged.
+
+For browser acceptance, use a disposable draft, refresh each original PDF, inspect the exact previews and page continuations, choose the mode and select only the intended section. Confirm and reload; verify the mode/choices persist. Do not check the substantive-instruction box for a curriculum outline. Verify generation/review/publication separately under the existing provider approval policy. If production confirmation still fails, capture only its HTTP status, fixed error code, selected mode and extraction version—never tokens or the complete private source payload. Local tests do not establish Render success.
+
+Local verification on November 20, 2026: the focused backend run discovered 104 tests: 103 passed, zero failures/errors, one existing optional `halo.test.uploads` test skipped. All three original PDF fixtures executed. The broader `MentorExternalTransactionTest` separately has 11 initialization errors from a missing `LessonSourceScope` test bean; these were reproduced with the unchanged committed extractor and left outside this extraction fix. The complete frontend suite passed 482 tests with sequential execution (the concurrent run stalled with Vite port conflicts). Frontend lint/build passed. Backend packaging passed in a configuration-free disposable copy. The executable-JAR worker processed all three originals within the unchanged 30-second/96-MiB limits: section counts 18/18/7, matching original checksums, exit code 0 and empty stderr. No database-backed application startup, live Gemini, Linux/Render execution or production confirmation success is claimed.
+
+## PATHFIT examination-coverage regression (version v5)
+
+The original `ASSOCIATES OBTL PATHFIT 1 - SONEE JAMES C. LAMORENA.pdf` reproduced one incorrect section, `Weeks 1–8 – Demonstrate learned Midterm Written`, spanning pages 4–7. Its curriculum table uses a merged **Essential Learning** header instead of Content Standards. Without recognizing that header the table reader returned no rows, and the prose-heading fallback interpreted Week 9's examination coverage as a heading extending through the rest of the document.
+
+`obtl-table-spans-v5` recognizes this header only immediately after an explicitly identified Week column, with the existing ruled geometry checks. A `Week(s)` reference alone in another cell cannot establish a topic column. Unsupported ruled coverage regions fail closed rather than producing that prose fallback. The original coverage remains in Week 9's permitted text.
+
+After extraction, the file contains 18 independently identified sections: Weeks 1–18, including orientation at Week 1, Midterm Examination at Week 9, and Final Examination at Week 18. Week 3 continues from page 2 to page 3. Instruction is on pages 2–5; references, policies and administrative pages are excluded. Week 17's Final Performance Preparation remains an instructional topic, not an examination. No grouped instructional range is present in this particular PDF; legitimate grouped ranges in the Art/Cuisine fixtures remain covered by regression tests.
+
+The existing snapshot policy also applies to v5: published v3/v4 lessons retain their saved scope; old drafts must be explicitly refreshed and reconfirmed for new generation/publication. No migration or stored-record rewrite is required. The real-file test verifies the PDF checksum and asserts that exam content cannot contaminate other weeks, and a synthetic fixture checks that coverage cannot replace topic labels even when its cell begins with `Weeks 1–8`.
+
+Verification: 106 focused backend tests discovered, 105 passed, one existing optional upload-fixture test skipped, zero failures/errors. This includes the original four PDFs, source confirmation, both generation modes, immutable revisions and scoped Mentor tests. Backend packaging passed. The packaged Windows worker returned v5, seven pages and 18 sections for PATHFIT with matching checksum, exit code 0 and empty stderr. No frontend code changed in this follow-up; the prior 482-test frontend run was not repeated. Render/Linux and live browser confirmation remain unverified.
+
+## Implementation file inventory
 
 Backend additions: `LessonSourceController`, `LessonSourceScope`, `ObtlSections`, `ObtlPdfText`, `ObtlExtractionProcess`, `ObtlWorker`, and the review-only SQL migration.
 

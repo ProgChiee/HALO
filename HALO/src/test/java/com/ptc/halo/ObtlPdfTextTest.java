@@ -57,4 +57,14 @@ class ObtlPdfTextTest {
         assertThrows(IOException.class,()->ObtlPdfText.extract("%PDF-invalid".getBytes(),""));
         assertThrows(IOException.class,()->ObtlPdfText.extract(new byte[3*1024*1024+1],""));
     }
+    @Test void imageOnlyPdfRequiresReadableReplacement()throws Exception{
+        try(var doc=new PDDocument();var out=new ByteArrayOutputStream()){
+            var page=new PDPage();doc.addPage(page);
+            try(var c=new PDPageContentStream(doc,page)){
+                var image=new java.awt.image.BufferedImage(20,20,java.awt.image.BufferedImage.TYPE_INT_RGB);
+                c.drawImage(org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory.createFromImage(doc,image),40,40,100,100);
+            }
+            doc.save(out);assertEquals("SOURCE_TEXT_REQUIRED_NO_OCR",assertThrows(IOException.class,()->ObtlPdfText.extract(out.toByteArray(),"")).getMessage());
+        }
+    }
 }

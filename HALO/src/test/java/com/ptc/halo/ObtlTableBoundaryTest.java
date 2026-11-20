@@ -102,4 +102,61 @@ class ObtlTableBoundaryTest {
         assertTrue(d.sections().get(0).warnings().contains("AMBIGUOUS_TABLE_BOUNDARY"));
         assertFalse(text(d,"Chapter 1").contains("uncertain"));
     }
+    @Test void shadedNumericWeeksOpenPageEdgeAndMissingWeekArePreserved()throws Exception{
+        try(var doc=new PDDocument();var out=new ByteArrayOutputStream()){
+            for(int p=0;p<2;p++){
+                var page=new PDPage();doc.addPage(page);try(var c=new PDPageContentStream(doc,page)){
+                    // Many shaded rectangles must not become extra table columns.
+                    c.setNonStrokingColor(java.awt.Color.LIGHT_GRAY);
+                    for(int i=0;i<25;i++){c.addRect(30+i*2,550,10,150);c.fill();}
+                    c.setNonStrokingColor(java.awt.Color.BLACK);
+                    for(int x:new int[]{30,100,290,580}){c.moveTo(x,400);c.lineTo(x,730);}
+                    for(int y:new int[]{550,400}){c.moveTo(30,y);c.lineTo(580,y);}
+                    if(p==0){for(int y:new int[]{730,700}){c.moveTo(30,y);c.lineTo(580,y);}}
+                    c.stroke();
+                    if(p==0){label(c,35,715,"Week");label(c,105,715,"Content Standards");label(c,295,715,"Outcomes");}
+                    label(c,35,600,p==0?"9":"12");label(c,105,600,p==0?"MIDTERM EXAMINATION":"Starch Cookery");label(c,295,680,p==0?"Exam-only task":"Starch-only task");
+                    label(c,35,450,p==0?"10":"13");label(c,105,450,p==0?"Salads":"Meat Cookery");label(c,295,530,p==0?"Salad-only task":"Meat-only task");
+                }
+            }
+            doc.save(out);var d=ObtlPdfText.extract(out.toByteArray(),"").detection();
+            assertEquals(List.of("9","10","12","13"),d.sections().stream().map(s->s.heading().split(" ")[1]).toList());
+            assertTrue(d.sections().get(0).warnings().contains("EXAMINATION_SECTION"));
+            assertTrue(text(d,"Week 12").contains("starch-only task"));assertFalse(text(d,"Week 12").contains("meat-only task"));
+        }
+    }
+    @Test void topicRowsNeedVerifiedGeometryEvenWithoutChapterOrWeekLabels()throws Exception{
+        for(boolean ruled:List.of(true,false))try(var doc=new PDDocument();var out=new ByteArrayOutputStream()){
+            var page=new PDPage();doc.addPage(page);try(var c=new PDPageContentStream(doc,page)){
+                if(ruled){
+                    for(int x:new int[]{30,250,580}){c.moveTo(x,400);c.lineTo(x,730);}
+                    for(int y:new int[]{730,700,550,400}){c.moveTo(30,y);c.lineTo(580,y);}c.stroke();
+                }
+                label(c,35,715,"Content Standards");label(c,255,715,"Learning Outcomes");
+                label(c,35,600,"Kitchen Safety");label(c,255,680,"Safety-only outcomes");
+                label(c,35,450,"Food Presentation");label(c,255,530,"Presentation-only outcomes");
+            }
+            doc.save(out);var d=ObtlPdfText.extract(out.toByteArray(),"").detection();
+            if(ruled){assertEquals(2,d.sections().size());assertTrue(text(d,"Kitchen Safety").contains("safety-only"));assertFalse(text(d,"Kitchen Safety").contains("presentation"));}
+            else{assertTrue(d.pages().get(0).ambiguousTable());assertTrue(d.sections().stream().allMatch(s->s.spans().isEmpty()));}
+        }
+    }
+    @Test void examCoverageCannotDetermineTopicColumnEvenWhenItStartsWithWeeks()throws Exception{
+        for(boolean knownHeader:List.of(true,false))try(var doc=new PDDocument();var out=new ByteArrayOutputStream()){
+            var p=new PDPage();doc.addPage(p);try(var c=new PDPageContentStream(doc,p)){
+                for(int x:new int[]{30,90,580}){c.moveTo(x,400);c.lineTo(x,730);}
+                c.moveTo(280,400);c.lineTo(280,700);
+                for(int y:new int[]{730,700,550,400}){c.moveTo(30,y);c.lineTo(580,y);}c.stroke();
+                label(c,35,715,knownHeader?"Week":"Schedule");label(c,100,715,knownHeader?"Essential Learning":"Learning");
+                label(c,35,620,"9");label(c,100,620,"MIDTERM EXAMINATION");label(c,285,680,"Weeks 1-8 - coverage only");
+                label(c,35,470,"10");label(c,100,470,"Nutrition and Recovery");label(c,285,530,"Nutrition-only outcomes");
+            }
+            doc.save(out);var d=ObtlPdfText.extract(out.toByteArray(),"").detection();
+            if(knownHeader){
+                assertEquals(2,d.sections().size());assertEquals("Week 9 — MIDTERM EXAMINATION",d.sections().get(0).heading());
+                assertTrue(text(d,"Week 9").contains("weeks 1-8"));assertFalse(text(d,"Week 9").contains("nutrition"));
+                assertFalse(text(d,"Week 10").contains("coverage only"));assertTrue(d.sections().get(0).warnings().contains("EXAMINATION_SECTION"));
+            }else{assertTrue(d.pages().get(0).ambiguousTable());assertTrue(d.sections().stream().allMatch(s->s.spans().isEmpty()));}
+        }
+    }
 }

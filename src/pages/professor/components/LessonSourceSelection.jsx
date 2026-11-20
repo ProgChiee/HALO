@@ -5,6 +5,9 @@ import { professorErrorMessage } from '../../../utils/professorErrors';
 import { useProfessorWorkflow } from '../../../context/professor/useProfessorWorkflow';
 import styles from '../styles/LessonSourceSelection.module.css';
 
+const boundaryBlocked = section => !section.spans.length || section.warnings.some(w => ['AMBIGUOUS_TABLE_BOUNDARY', 'TABLE_CONTINUATION_UNCONFIRMED'].includes(w));
+const sectionKind = section => section.warnings.includes('EXAMINATION_SECTION') ? 'Examination' : section.warnings.includes('ORIENTATION_SECTION') ? 'Orientation' : section.warnings.includes('CURRICULUM_ACTIVITY_SECTION') ? 'Curriculum activity' : 'Curriculum section';
+
 export default function LessonSourceSelection({ moduleId, revisionVersion, disabled, onChanged }) {
   const { api, preview } = useProfessorWorkflow();
   const [view, setView] = useState(null), [choices, setChoices] = useState([]);
@@ -67,10 +70,12 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
           <p>Table reading order and repeated headings can be ambiguous. Open every selected preview and verify topics, outcomes and page boundaries. Unchecked sections are excluded.</p>
           <p>Ambiguous table boundaries cannot be confirmed. Review the original PDF and supply a clearly bounded chapter-specific reference if isolation fails. Refresh Sources to re-extract older drafts; published selections stay unchanged.</p>
           {doc.extraction.sections.map(section => <div key={section.id} className={styles.section}>
-            <label><input type="checkbox" checked={!!choice?.sectionIds.includes(section.id)} onChange={e => choose(doc.fileId, section.id, e.target.checked)} /> {section.heading}</label>
-            <small>Pages {section.spans.map(s => s.page).join(', ')} · Title term matches: {section.titleMatches} (suggestion only)</small>
+            <label><input type="checkbox" disabled={boundaryBlocked(section) && !choice?.sectionIds.includes(section.id)} checked={!!choice?.sectionIds.includes(section.id)} onChange={e => choose(doc.fileId, section.id, e.target.checked)} /> {section.heading}</label>
+            <small>{sectionKind(section)} · {section.spans.length ? `Pages ${[...new Set(section.spans.map(s => s.page))].join(', ')}` : 'Page boundaries unavailable'} · Title term matches: {section.titleMatches} (suggestion only)</small>
+            {boundaryBlocked(section) && <p>Cannot confirm this section: its source boundaries are unresolved. Refresh Sources or provide a clearly bounded reference. Other safely isolated sections remain selectable.</p>}
             <details><summary>Preview exact permitted text and boundary warnings</summary>
               <p>{section.warnings.map(w => w.replaceAll('_', ' ').toLowerCase()).join('; ')}</p>
+              {section.warnings.includes('VERIFY_COLUMN_ASSOCIATIONS_AGAINST_ORIGINAL') && <p>Original row wording is preserved. Check that topics, knowledge, outcomes and tasks agree; the extractor does not correct curriculum inconsistencies.</p>}
               {section.spans.map(span => <div key={`${span.page}:${span.start}`}><strong>Page {span.page}, characters {span.start}–{span.end}</strong><pre>{doc.extraction.pages[span.page - 1].text.slice(span.start, span.end)}</pre></div>)}
             </details>
           </div>)}

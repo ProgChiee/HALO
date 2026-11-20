@@ -142,8 +142,7 @@ class LessonSourceScopeTest {
         var input=org.mockito.ArgumentCaptor.forClass(String.class);verify(spec).user(input.capture());
         assertTrue(input.getValue().contains("Cumin"));assertFalse(input.getValue().contains("Italian culinary heritage"));assertFalse(input.getValue().contains("Classical French"));verify(spec,never()).user(any(java.util.function.Consumer.class));
         String saved=module.getSourceScope();
-        var ambiguous=outline.sections().stream().filter(s->s.warnings().contains("AMBIGUOUS_TABLE_BOUNDARY")).findFirst().orElseThrow();
-        assertEquals("SOURCE_BOUNDARY_REVIEW_REQUIRED",assertThrows(ResponseStatusException.class,()->scope.confirm(module,List.of(choices.get(1),new LessonSourceScope.Choice(3L,List.of(ambiguous.id()),true)),5L)).getReason());
+        assertEquals("INVALID_SOURCE_SELECTION",assertThrows(ResponseStatusException.class,()->scope.confirm(module,List.of(choices.get(1),new LessonSourceScope.Choice(3L,List.of("ambiguous-p4"),true)),5L)).getReason());
         assertEquals(saved,module.getSourceScope());
     }
     @Test void realCuisineSelectionIsConfirmedBeforeGenerationAndMentorIndexing()throws Exception{
@@ -165,10 +164,33 @@ class LessonSourceScopeTest {
         module.setSourceScope(null);module.setSourceScope(scope.extract(module));
         var choice=new LessonSourceScope.Choice(3L,List.of(detection.sections().get(0).id()),true);
         assertEquals("SOURCE_BOUNDARY_REVIEW_REQUIRED",assertThrows(ResponseStatusException.class,()->scope.confirm(module,List.of(choice),5L)).getReason());
+        assertEquals("SOURCE_BOUNDARY_REVIEW_REQUIRED",assertThrows(ResponseStatusException.class,()->scope.confirm(module,List.of(choice),5L,LessonSourceScope.Mode.OBTL_EXPANSION)).getReason());
         assertNull(scope.read(module.getSourceScope()).confirmedBy());verifyNoInteractions(chat);
     }
+    @Test void realChapterOneOutlineExpansionPersistsWithoutSupplementAndKeepsMentorScoped()throws Exception{
+        var detection=ObtlTableBoundaryTest.original();
+        when(worker.extract(any())).thenReturn(new ObtlPdfText.Extracted("unused",detection));
+        module.getWeek().setTitle("Cuisines of the Middle East");module.setSourceScope(null);module.setSourceScope(scope.extract(module));
+        var choice=new LessonSourceScope.Choice(3L,List.of(ObtlTableBoundaryTest.section(detection,"Chapter 1:").id()),false);
+        module.setSourceScope(scope.confirm(module,List.of(choice),5L,LessonSourceScope.Mode.OBTL_EXPANSION));
+        module.setSourceScope(scope.write(scope.read(module.getSourceScope())));
+        assertTrue(scope.expansion(module));assertTrue(scope.outlineOnly(module));assertFalse(scope.read(module.getSourceScope()).instructionVerified());
+        String curriculum=scope.index(module,false).chunks().stream().map(ModuleMaterialIndex.Chunk::text).collect(java.util.stream.Collectors.joining(" "));
+        assertTrue(curriculum.contains("Historical influences"));
+        for(String excluded:List.of("Greek Cuisine","Iberian Cuisine","North African Cuisine","FINAL EXAMINATION"))assertFalse(curriculum.contains(excluded));
+        expansionProvider(true);generation.generatePrepared(module.getId(),module);
+        assertEquals(AiGenerationStatus.COMPLETED,module.getAiGenerationStatus());
+        assertEquals("EXPANSION_REVIEW_REQUIRED",assertThrows(ResponseStatusException.class,()->scope.requirePublishedReady(module)).getReason());
+        scope.acknowledgeExpansion(module,5L);scope.requirePublishedReady(module);
+        assertFalse(scope.teachingIndex(module,true).chunks().stream().anyMatch(c->c.text().contains("North African Cuisine")));
+        String published=module.getSourceScope();
+        module.setSourceScope(scope.confirm(module,List.of(choice),5L,LessonSourceScope.Mode.SOURCE_GROUNDED));
+        assertEquals("INSTRUCTIONAL_SOURCES_REQUIRED",assertThrows(ResponseStatusException.class,()->scope.requirePublishedReady(module)).getReason());
+        assertNotNull(scope.read(published).review());
+    }
     @Test void explicitRefreshReextractsOldVersionWithoutMutatingSavedSnapshot()throws Exception{
-        confirm(true);String saved=module.getSourceScope().replace(ObtlSections.VERSION,"obtl-spans-v1");module.setSourceScope(saved);
+        confirm(true);scope.markInstructionVerified(module);String saved=module.getSourceScope().replace(ObtlSections.VERSION,"obtl-table-spans-v3");module.setSourceScope(saved);
+        scope.requirePublishedReadable(module);
         assertFalse(scope.index(module,true).chunks().isEmpty());
         assertEquals("SOURCE_REEXTRACTION_REQUIRED",assertThrows(ResponseStatusException.class,()->scope.requirePublishedReady(module)).getReason());
         assertEquals("SOURCE_REEXTRACTION_REQUIRED",assertThrows(ResponseStatusException.class,()->generation.generateRevision(module)).getReason());

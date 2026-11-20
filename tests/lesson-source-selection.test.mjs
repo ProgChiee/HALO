@@ -32,6 +32,26 @@ async function mount(api, props = {}, preview = false) {
   return { host, changed: () => changed, close: async () => { await act(async () => root.unmount()); host.remove(); } };
 }
 const button = (ui, text) => [...ui.host.querySelectorAll('button')].find(b => b.textContent === text);
+test('exams are labeled and unresolved boundaries cannot be selected alongside safe outline sections', async () => {
+  const fixture = structuredClone(source);
+  fixture.documents[0].extraction.sections[1].warnings = ['EXAMINATION_SECTION'];
+  fixture.documents[0].extraction.sections.push({ id: 'uncertain', heading: 'Unisolated row', spans: [], warnings: ['AMBIGUOUS_TABLE_BOUNDARY'], titleMatches: 0 });
+  const calls = [];
+  const ui = await mount({ getSources: async () => ({ version: 4, source: fixture }), confirmSources: async (...args) => calls.push(args) });
+  try {
+    const boxes = ui.host.querySelectorAll('input[type=checkbox]');
+    assert.equal(boxes[0].disabled, false); assert.equal(boxes[2].disabled, true);
+    assert.match(ui.host.textContent, /Examination/); assert.match(ui.host.textContent, /Other safely isolated sections remain selectable/);
+    await act(async () => { const select = ui.host.querySelector('select'); select.value = 'OBTL_EXPANSION'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    await act(async () => boxes[0].click());
+    await act(async () => button(ui, 'Confirm Selected Sources').click());
+    assert.deepEqual(calls, [[7, 4, undefined, [{ fileId: 3, sectionIds: ['one'], instructional: false }], 'OBTL_EXPANSION']]);
+  } finally { await ui.close(); }
+});
+test('old extraction feedback requests explicit refresh without changing published lessons', () => {
+  const message = professorErrorMessage({ response: { data: { code: 'SOURCE_REEXTRACTION_REQUIRED' } } });
+  assert.match(message, /extraction version changed/); assert.match(message, /Published lessons stay unchanged/);
+});
 test('ambiguous boundary rejection explains safe review without confirming', async () => {
   const ui = await mount({ getSources: async () => ({ version: 2, source }), confirmSources: async () => {
     throw { response: { status: 422, data: { code: 'SOURCE_BOUNDARY_REVIEW_REQUIRED' } } };

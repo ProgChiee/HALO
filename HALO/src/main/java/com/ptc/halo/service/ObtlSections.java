@@ -5,7 +5,7 @@ import java.util.regex.Pattern;
 
 /** Deterministic proposals only. Neither matching nor confirmation proves instructional sufficiency. */
 public final class ObtlSections {
-    public static final String VERSION = "obtl-table-spans-v3";
+    public static final String VERSION = "obtl-table-spans-v5";
     public static final int MAX_CHARS = 600_000;
     private static final Pattern HEADING = Pattern.compile(
         "(?im)^[\\t ]*(?:\\d{1,2}[\\t ]+)?((?:chapter|unit|module|lesson|weeks?)\\s+"
@@ -106,7 +106,7 @@ public final class ObtlSections {
                     heading=null;spans=new ArrayList<>();warnings=new ArrayList<>();continue;
                 }
                 if(heading!=null) {
-                    if(row.continuation()&&!Objects.equals(gridKey,row.gridKey())){warnings.add("AMBIGUOUS_TABLE_BOUNDARY");continue;}
+                    if(row.continuation()&&!sameGrid(gridKey,row.gridKey())){warnings.add("AMBIGUOUS_TABLE_BOUNDARY");continue;}
                     if(row.continuation())warnings.add("TABLE_CONTINUATION_REQUIRES_REVIEW");
                     spans.add(new Span(page.number(),row.start(),row.end()));
                 }
@@ -118,9 +118,20 @@ public final class ObtlSections {
     }
     private static Section tableSection(String id,String heading,List<Span> spans,List<String> warnings,List<Page> pages,String title){
         Set<String> flags=new LinkedHashSet<>(warnings);flags.add("PROFESSOR_BOUNDARY_REVIEW_REQUIRED");flags.add("INSTRUCTIONAL_SUFFICIENCY_NOT_VERIFIED");
+        String lower=heading.toLowerCase(Locale.ROOT);
+        if(lower.matches(".*\\b(?:midterm|final)\\s+exam(?:ination)?\\b.*"))flags.add("EXAMINATION_SECTION");
+        else if(lower.contains("orientation"))flags.add("ORIENTATION_SECTION");
+        else if(lower.contains("integrative")||lower.contains("comparative study"))flags.add("CURRICULUM_ACTIVITY_SECTION");
+        flags.add("VERIFY_COLUMN_ASSOCIATIONS_AGAINST_ORIGINAL");
         StringBuilder text=new StringBuilder();for(Span s:spans)text.append(pages.get(s.page()-1).text(),s.start(),s.end());
         int score=(int)words(text.toString()).stream().filter(words(title)::contains).count();
         return new Section(id,heading,List.copyOf(spans),List.copyOf(flags),score);
+    }
+    private static boolean sameGrid(String a,String b){
+        if(Objects.equals(a,b))return true;
+        if(a==null||b==null)return false;
+        String[] x=a.split(":"),y=b.split(":");
+        return x.length==3&&y.length==3&&x[0].equals(y[0])&&x[2].equals(y[2]);
     }
 
     public static String text(Detection document, Section section) {

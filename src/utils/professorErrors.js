@@ -10,7 +10,7 @@ const MESSAGES = {
   SCOPED_SOURCE_PDF_REQUIRED: "Chapter-scoped selection requires readable PDF files. Replace image sources with instructional PDFs.",
   SOURCE_CONFIRMATION_REQUIRED: "Extract and confirm the chapter-specific PDF sources before generation or approval.",
   SOURCE_EXTRACTION_FAILED: "Source extraction failed. Use a readable, unprotected PDF and try again.",
-  SOURCE_REEXTRACTION_REQUIRED: "Materials changed. Extract and confirm the sources again.",
+  SOURCE_REEXTRACTION_REQUIRED: "Materials or the extraction version changed. Use Extract / Refresh Sources, review the new boundaries, select the generation mode and confirm again. Published lessons stay unchanged.",
   SOURCE_SCOPE_UNAVAILABLE: "The saved source selection is unavailable. Re-extract and review the sources.",
   SOURCE_SELECTION_REQUIRED: "Select at least one chapter-specific source section.",
   SOURCE_TEXT_LIMIT: "Selected text exceeds the safe processing limit. Use smaller chapter-specific references.",

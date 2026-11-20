@@ -32,7 +32,8 @@ public final class ObtlPdfText {
                 stripper.setStartPage(page); stripper.setEndPage(page);
                 var writer = new LimitedWriter(remaining);
                 stripper.writeText(document,writer);
-                var extracted=ObtlTableLayout.read(document.getPage(page-1),page,writer.toString(),remaining);
+                var extracted=ObtlTableLayout.read(document.getPage(page-1),page,writer.toString(),remaining,
+                    pages.isEmpty()?null:pages.get(pages.size()-1));
                 remaining-=extracted.text().length();
                 pages.add(extracted);
             }
