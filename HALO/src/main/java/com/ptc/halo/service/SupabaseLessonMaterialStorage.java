@@ -14,6 +14,19 @@ import org.springframework.stereotype.Component;
 @Component @Primary
 @ConditionalOnProperty(name="halo.lesson-storage.provider", havingValue="supabase")
 public class SupabaseLessonMaterialStorage implements LessonMaterialStorage {
+    /** Numeric status only: never retain response bodies, URLs, keys or credentials. */
+    public static final class HttpFailure extends IOException {
+        private final int status;
+        private final String operation;
+        HttpFailure(int status, String operation) { super("Private storage request failed"); this.status=status; this.operation=operation; }
+        public int status() { return status; }
+        public String operation() { return operation; }
+    }
+    public static final class MissingResource extends FileNotFoundException {
+        private final String operation;
+        MissingResource(String operation){super("Material unavailable");this.operation=operation;}
+        public String operation(){return operation;}
+    }
     public static final String BUCKET = "halo-learning-materials";
     private final URI base;
     private final String secret;
@@ -45,8 +58,10 @@ public class SupabaseLessonMaterialStorage implements LessonMaterialStorage {
         try {
             var response=client.send(request,HttpResponse.BodyHandlers.ofInputStream());
             try(var input=response.body()) {
-                if(response.statusCode()==404) throw new FileNotFoundException("Material unavailable");
-                if(response.statusCode()<200 || response.statusCode()>299) throw new IOException("Private storage request failed ("+response.statusCode()+")");
+                String operation=request.uri().getPath().startsWith("/storage/v1/bucket/") ? "BUCKET_CHECK" : "OBJECT_REQUEST";
+                if(response.statusCode()==404) throw new MissingResource(operation);
+                if(response.statusCode()<200 || response.statusCode()>299) throw new HttpFailure(response.statusCode(),
+                    operation);
                 byte[] bytes=input.readNBytes(limit+1);
                 if(bytes.length>limit) throw new IOException("Private storage response too large");
                 return bytes;

@@ -11,13 +11,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PrivateMaterialStorageTest {
  @TempDir Path root;
+ int bucketStatus=0,objectStatus=0;
  HttpServer server; SupabaseLessonMaterialStorage storage; Map<String,byte[]> objects=new HashMap<>();List<String> calls=new ArrayList<>();boolean publicBucket=false,redirect=false;
  @BeforeEach void setup() throws Exception {
   server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
   server.createContext("/storage/v1/",exchange->{
    assertEquals("sb_secret_synthetic",exchange.getRequestHeaders().getFirst("apikey"));assertNull(exchange.getRequestHeaders().getFirst("Authorization"));
    String path=exchange.getRequestURI().getPath(),method=exchange.getRequestMethod();calls.add(method+" "+path);int status=200;byte[] result=new byte[0];
-   if(path.contains("/bucket/")) result=("{\"public\":"+publicBucket+"}").getBytes();
+   if((path.contains("/bucket/")?bucketStatus:objectStatus)!=0){status=path.contains("/bucket/")?bucketStatus:objectStatus;result="SECRET_RESPONSE_BODY".getBytes();}
+   else if(path.contains("/bucket/")) result=("{\"public\":"+publicBucket+"}").getBytes();
    else if(redirect){status=302;exchange.getResponseHeaders().add("Location","http://127.0.0.1:1/never");}
    else if(method.equals("GET")){String key=path.substring(path.indexOf("halo-learning-materials/")+24);result=objects.get(key);if(result==null){status=404;result=new byte[0];}}
    else if(method.equals("POST")){assertEquals("false",exchange.getRequestHeaders().getFirst("x-upsert"));String key=path.substring(path.indexOf("halo-learning-materials/")+24);if(objects.containsKey(key))status=409;else objects.put(key,exchange.getRequestBody().readAllBytes());}
@@ -26,6 +28,19 @@ class PrivateMaterialStorageTest {
   });server.start();storage=new SupabaseLessonMaterialStorage("http://127.0.0.1:"+server.getAddress().getPort(),"sb_secret_synthetic","C:/backup/lessons");
  }
  @AfterEach void stop(){server.stop(0);}
+ @Test void httpFailuresRetainOnlyStatusAndFixedOperation()throws Exception{
+  for(int code:List.of(401,403,500)){
+   bucketStatus=code;objectStatus=0;
+   var bucket=assertThrows(SupabaseLessonMaterialStorage.HttpFailure.class,()->storage.read("private-key"));
+   assertEquals(code,bucket.status());assertEquals("BUCKET_CHECK",bucket.operation());assertNull(bucket.getCause());
+   assertFalse(bucket.toString().contains("SECRET"));assertFalse(bucket.toString().contains("private-key"));
+   bucketStatus=0;objectStatus=code;
+   var object=assertThrows(SupabaseLessonMaterialStorage.HttpFailure.class,()->storage.read("private-key"));
+   assertEquals(code,object.status());assertEquals("OBJECT_REQUEST",object.operation());
+  }
+  objectStatus=404;assertEquals("OBJECT_REQUEST",assertThrows(SupabaseLessonMaterialStorage.MissingResource.class,()->storage.read("private-key")).operation());
+  bucketStatus=404;assertEquals("BUCKET_CHECK",assertThrows(SupabaseLessonMaterialStorage.MissingResource.class,()->storage.read("private-key")).operation());
+ }
  @Test void privateRoundTripPreservesKeysAndNeverOverwrites() throws Exception {
   storage.writeNew("abc",new byte[]{1,2},"application/pdf");assertArrayEquals(new byte[]{1,2},storage.read("uploads/lessons/abc"));assertArrayEquals(new byte[]{1,2},storage.read("C:\\backup\\lessons\\abc"));
   assertThrows(java.io.IOException.class,()->storage.writeNew("abc",new byte[]{9},"image/png"));assertArrayEquals(new byte[]{1,2},storage.read("abc"));storage.delete("abc");assertThrows(java.io.FileNotFoundException.class,()->storage.read("abc"));

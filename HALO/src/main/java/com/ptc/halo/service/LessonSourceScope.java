@@ -11,6 +11,7 @@ import org.springframework.web.server.ResponseStatusException;
 /** Versioned aggregate persisted with the module/draft and copied into immutable revision history. */
 @Service
 public class LessonSourceScope {
+    private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(LessonSourceScope.class);
     public record Document(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,String name,String checksum,ObtlSections.Detection extraction) {}
     public record Choice(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,List<String> sectionIds,boolean instructional) {}
     public enum Mode { SOURCE_GROUNDED, OBTL_EXPANSION }
@@ -43,11 +44,15 @@ public class LessonSourceScope {
         Snapshot old=module.getSourceScope()==null?null:read(module.getSourceScope());
         for(var file:module.getFiles()){
             if(!"application/pdf".equals(file.getFileType()))throw failure("SCOPED_SOURCE_PDF_REQUIRED");
+            String stage="STORAGE_READ";
             try{
                 byte[] bytes=storage.read(file.getFilePath());String checksum=hash(bytes);
+                stage="SOURCE_PROCESSING";
                 Document existing=old==null?null:old.documents().stream().filter(d->Objects.equals(d.fileId(),file.getId())&&d.checksum().equals(checksum)&&ObtlSections.VERSION.equals(d.extraction().version())).findFirst().orElse(null);
                 if(existing!=null){documents.add(existing);checkTextBudget(documents);continue;}
+                stage="WORKER";
                 var parsed=extractor.extract(bytes);
+                stage="SOURCE_PROCESSING";
                 var detection=ObtlSections.detect(parsed.detection().pages(),module.getWeek().getTitle());
                 // A single-topic supplement without headings has an explicit whole-document proposal.
                 if(detection.sections().isEmpty()){
@@ -56,7 +61,18 @@ public class LessonSourceScope {
                 }
                 documents.add(new Document(file.getId(),file.getOriginalFileName(),checksum,detection));
                 checkTextBudget(documents);
-            }catch(ResponseStatusException e){throw e;}catch(Exception e){throw failure("SOURCE_EXTRACTION_FAILED");}
+            }catch(ResponseStatusException e){throw e;}catch(Exception e){
+                String reason=stage; Integer status=null,exit=null; String operation="NONE";
+                if(e instanceof SupabaseLessonMaterialStorage.HttpFailure http){
+                    status=http.status();operation=http.operation();
+                    reason=status==401||status==403?"STORAGE_AUTHORIZATION":"STORAGE_HTTP_FAILURE";
+                }else if(e instanceof SupabaseLessonMaterialStorage.MissingResource missing){reason="STORAGE_NOT_FOUND";status=404;operation=missing.operation();}
+                else if(e instanceof java.io.FileNotFoundException){reason="STORAGE_NOT_FOUND";}
+                else if(e instanceof ObtlExtractionProcess.Failure worker){reason=worker.reason().name();exit=worker.exitCode();}
+                log.warn("obtl_extraction_failure stage={} reason={} exceptionType={} storageOperation={} httpStatus={} workerExit={}",
+                    stage,reason,e.getClass().getSimpleName(),operation,status,exit);
+                throw failure("SOURCE_EXTRACTION_FAILED");
+            }
         }
         return write(new Snapshot(1,UUID.randomUUID().toString(),module.getId(),List.copyOf(documents),List.of(),null,null,false));
     }

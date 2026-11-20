@@ -9,6 +9,14 @@ import org.springframework.stereotype.Component;
 /** One bounded child heap at a time. Deadlines terminate the parser, not just the HTTP wait. */
 @Component
 public class ObtlExtractionProcess {
+    public enum Reason { WORKER_START, WORKER_TIMEOUT, WORKER_NONZERO_EXIT, WORKER_INPUT, WORKER_OUTPUT_LIMIT, INVALID_PARSER_OUTPUT }
+    public static final class Failure extends Exception {
+        private final Reason reason; private final Integer exitCode;
+        Failure(Reason reason,Integer exitCode){super(reason.name());this.reason=reason;this.exitCode=exitCode;}
+        public Reason reason(){return reason;}
+        public Integer exitCode(){return exitCode;}
+    }
+    protected Process start(ProcessBuilder builder)throws java.io.IOException{return builder.start();}
     private static final Semaphore SLOT=new Semaphore(1);
     public ObtlPdfText.Extracted extract(byte[] bytes) throws Exception {
         if(bytes.length>3*1024*1024)throw new IllegalArgumentException("SOURCE_SIZE_INVALID");
@@ -25,7 +33,8 @@ public class ObtlExtractionProcess {
             } else command.addAll(List.of("-cp",cp,ObtlWorker.class.getName()));
             var builder=new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD);
             for(String key:List.of("JAVA_TOOL_OPTIONS","JDK_JAVA_OPTIONS","_JAVA_OPTIONS"))builder.environment().remove(key);
-            child=builder.start(); final Process process=child;
+            try { child=start(builder); } catch(java.io.IOException|SecurityException e){throw new Failure(Reason.WORKER_START,null);}
+            final Process process=child;
             Future<byte[]> output=io.submit(()->process.getInputStream().readNBytes(8*1024*1024+1));
             // Input is small and the child reads it before parsing; bound this write as well.
             CompletableFuture<Void> input=CompletableFuture.runAsync(()->{
@@ -33,11 +42,25 @@ public class ObtlExtractionProcess {
                 catch(java.io.IOException e){throw new CompletionException(e);}
             });
             long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(30);
-            input.get(5,TimeUnit.SECONDS);
+            try { input.get(5,TimeUnit.SECONDS); }
+            catch(ExecutionException e){
+                if(child.waitFor(1,TimeUnit.SECONDS)&&child.exitValue()!=0)throw new Failure(Reason.WORKER_NONZERO_EXIT,child.exitValue());
+                throw new Failure(Reason.WORKER_INPUT,null);
+            }
             byte[] result=output.get(Math.max(1,end-System.nanoTime()),TimeUnit.NANOSECONDS);
-            if(result.length>8*1024*1024||!child.waitFor(Math.max(1,end-System.nanoTime()),TimeUnit.NANOSECONDS)||child.exitValue()!=0)
-                throw new IllegalStateException("SOURCE_EXTRACTION_FAILED");
-            return new ObjectMapper().readValue(result,ObtlPdfText.Extracted.class);
+            if(result.length>8*1024*1024)throw new Failure(Reason.WORKER_OUTPUT_LIMIT,null);
+            if(!child.waitFor(Math.max(1,end-System.nanoTime()),TimeUnit.NANOSECONDS))throw new Failure(Reason.WORKER_TIMEOUT,null);
+            if(child.exitValue()!=0)throw new Failure(Reason.WORKER_NONZERO_EXIT,child.exitValue());
+            try {
+                var parsed=new ObjectMapper().readValue(result,ObtlPdfText.Extracted.class);
+                if(parsed==null||parsed.checksum()==null||parsed.detection()==null||parsed.detection().pages()==null
+                    ||parsed.detection().pages().isEmpty()||parsed.detection().pages().stream().anyMatch(p->p==null||p.text()==null))
+                    throw new IllegalArgumentException();
+                return parsed;
+            }catch(Exception e){throw new Failure(Reason.INVALID_PARSER_OUTPUT,null);}
+        } catch(TimeoutException e){throw new Failure(Reason.WORKER_TIMEOUT,null);
+        } catch(ExecutionException e){throw new Failure(Reason.INVALID_PARSER_OUTPUT,null);
+        } catch(InterruptedException e){Thread.currentThread().interrupt();throw e;
         } finally {
             try { if(child!=null){child.destroyForcibly();child.waitFor(5,TimeUnit.SECONDS);} }
             finally { io.shutdownNow();SLOT.release(); }
