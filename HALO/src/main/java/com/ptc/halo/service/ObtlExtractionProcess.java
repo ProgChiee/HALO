@@ -9,7 +9,8 @@ import org.springframework.stereotype.Component;
 /** One bounded child heap at a time. Deadlines terminate the parser, not just the HTTP wait. */
 @Component
 public class ObtlExtractionProcess {
-    public enum Reason { WORKER_START, WORKER_TIMEOUT, WORKER_NONZERO_EXIT, WORKER_INPUT, WORKER_OUTPUT_LIMIT, INVALID_PARSER_OUTPUT }
+    public enum Reason { WORKER_START, WORKER_TIMEOUT, WORKER_NONZERO_EXIT, WORKER_INPUT, WORKER_OUTPUT_LIMIT,
+        WORKER_OUTPUT_READ, EMPTY_PARSER_OUTPUT, PARSER_JSON_INVALID, PARSER_SCHEMA_INVALID }
     public static final class Failure extends Exception {
         private final Reason reason; private final Integer exitCode;
         Failure(Reason reason,Integer exitCode){super(reason.name());this.reason=reason;this.exitCode=exitCode;}
@@ -51,15 +52,18 @@ public class ObtlExtractionProcess {
             if(result.length>8*1024*1024)throw new Failure(Reason.WORKER_OUTPUT_LIMIT,null);
             if(!child.waitFor(Math.max(1,end-System.nanoTime()),TimeUnit.NANOSECONDS))throw new Failure(Reason.WORKER_TIMEOUT,null);
             if(child.exitValue()!=0)throw new Failure(Reason.WORKER_NONZERO_EXIT,child.exitValue());
+            if(result.length==0)throw new Failure(Reason.EMPTY_PARSER_OUTPUT,0);
+            ObtlPdfText.Extracted parsed;
             try {
-                var parsed=new ObjectMapper().readValue(result,ObtlPdfText.Extracted.class);
+                parsed=new ObjectMapper().enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(result,ObtlPdfText.Extracted.class);
+            }catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new Failure(Reason.PARSER_JSON_INVALID,0);}
                 if(parsed==null||parsed.checksum()==null||parsed.detection()==null||parsed.detection().pages()==null
                     ||parsed.detection().pages().isEmpty()||parsed.detection().pages().stream().anyMatch(p->p==null||p.text()==null))
-                    throw new IllegalArgumentException();
+                    throw new Failure(Reason.PARSER_SCHEMA_INVALID,0);
                 return parsed;
-            }catch(Exception e){throw new Failure(Reason.INVALID_PARSER_OUTPUT,null);}
         } catch(TimeoutException e){throw new Failure(Reason.WORKER_TIMEOUT,null);
-        } catch(ExecutionException e){throw new Failure(Reason.INVALID_PARSER_OUTPUT,null);
+        } catch(ExecutionException e){throw new Failure(Reason.WORKER_OUTPUT_READ,child!=null&&!child.isAlive()?child.exitValue():null);
         } catch(InterruptedException e){Thread.currentThread().interrupt();throw e;
         } finally {
             try { if(child!=null){child.destroyForcibly();child.waitFor(5,TimeUnit.SECONDS);} }

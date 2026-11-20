@@ -9,6 +9,15 @@ import java.io.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ObtlPdfTextTest {
+    @org.junit.jupiter.api.io.TempDir java.nio.file.Path coldFonts;
+    @Test void coldFontCacheCannotContaminateWorkerJson()throws Exception{
+        var worker=new ObtlExtractionProcess(){@Override protected Process start(ProcessBuilder builder)throws IOException{
+            builder.command().add(1,"-Duser.home="+coldFonts);
+            builder.command().add(1,"-Dpdfbox.fontcache="+coldFonts);
+            return super.start(builder);
+        }};
+        assertEquals(11,worker.extract(pdf(false,false)).detection().sections().size());
+    }
     private byte[] pdf(boolean encrypted,boolean active)throws Exception{
         try(var doc=new PDDocument();var out=new ByteArrayOutputStream()){
             for(int i=1;i<=11;i++){
