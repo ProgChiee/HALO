@@ -38,6 +38,67 @@ class LessonSourceScopeTest {
         generation=new AiGenerationService(builder,mock(AiLearningModuleRepository.class),json,mock(ModuleMaterialIndex.class),mock(ModuleGenerationState.class),storage);
         ReflectionTestUtils.setField(generation,"sourceScopes",scope);
     }
+    @Test void standardExcelDraftIsScopedBySectionAndContentRow() throws Exception {
+        String path=System.getenv("HALO_OBTL_FIXTURE");
+        Assumptions.assumeTrue(path!=null,"Set HALO_OBTL_FIXTURE to the Art Appreciation workbook");
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Path.of(path));
+        var upload=new FileUploadService(storage).validate(new org.springframework.mock.web.MockMultipartFile("files","course.xlsx",ExcelObtl.MIME,bytes));
+        var file=module.getFiles().get(0);file.setFileType(upload.mediaType());file.setOriginalFileName(upload.originalName());
+        when(storage.read("original")).thenReturn(bytes);
+        module.setSourceScope(scope.extract(module));
+        var draft=scope.read(module.getSourceScope());var workbook=draft.documents().get(0).workbook();
+        assertEquals(4,draft.format());assertNull(draft.confirmedBy());
+        assertEquals("Art Appreciation",workbook.course().get("Course Title *"));
+        assertEquals(8,workbook.pilo().size());assertEquals(9,workbook.cilo().size());assertEquals(17,workbook.sections().size());
+        for(int i:List.of(7,16))assertEquals("EXAMINATION",workbook.sections().get(i).type());
+        for(var section:workbook.sections())for(var row:section.content())assertEquals(section.id(),row.cells().get(0));
+        assertThrows(ResponseStatusException.class,()->scope.index(module,false));
+        var first=workbook.sections().get(0);
+        var choices=List.of(new LessonSourceScope.Choice(3L,List.of(first.id()),false));
+        assertThrows(ResponseStatusException.class,()->scope.confirm(module,List.of(new LessonSourceScope.Choice(3L,List.of("invalid"),false)),5L));
+        module.setSourceScope(scope.confirm(module,choices,5L,LessonSourceScope.Mode.OBTL_EXPANSION));
+        var chunks=scope.index(module,false).chunks();assertFalse(chunks.isEmpty());
+        assertTrue(chunks.stream().allMatch(c->c.id().contains(":"+first.id()+":")));
+        assertTrue(chunks.stream().anyMatch(c->c.text().contains(first.content().get(0).cells().get(2))));
+        assertTrue(scope.index(module,true).chunks().isEmpty());
+        assertThrows(ResponseStatusException.class,()->scope.requirePublishedReady(module));
+        when(storage.read("original")).thenReturn(new byte[]{0});
+        assertThrows(ResponseStatusException.class,()->scope.confirm(module,choices,5L));
+    }
+    @Test void abttMidtermCoverageIsExplicitAndExclusive() throws Exception {
+        String path=System.getenv("HALO_ABTT_XLSX");Assumptions.assumeTrue(path!=null);
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Path.of(path));
+        var file=module.getFiles().get(0);file.setFileType(ExcelObtl.MIME);file.setOriginalFileName("ABTT.xlsx");
+        when(storage.read("original")).thenReturn(bytes);
+        module.setSourceScope(scope.extract(module));
+        var exam=List.of("SEC-007");
+        assertThrows(ResponseStatusException.class,()->scope.confirm(module,List.of(new LessonSourceScope.Choice(3L,exam,false)),5L));
+        var record=new LessonSourceScope.Examination(LessonSourceScope.ExamPurpose.RECORD_ONLY,List.of());
+        var mode=LessonSourceScope.Mode.OBTL_EXPANSION;
+        module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(3L,exam,false,null,record)),5L,mode));
+        assertEquals("EXAM_RECORD_ONLY",assertThrows(ResponseStatusException.class,()->generation.generateRevision(module)).getReason());
+        for(var invalid:List.of(List.<String>of(),List.of("unknown"),List.of("SEC-007"),List.of("SEC-002","SEC-002"))){
+            var plan=new LessonSourceScope.Examination(LessonSourceScope.ExamPurpose.REVIEW_GUIDE,invalid);
+            assertThrows(ResponseStatusException.class,()->scope.confirm(module,List.of(new LessonSourceScope.Choice(3L,exam,false,null,plan)),5L,mode));
+        }
+        var ids=List.of("SEC-002","SEC-003","SEC-004","SEC-005","SEC-006");
+        var plan=new LessonSourceScope.Examination(LessonSourceScope.ExamPurpose.REVIEW_GUIDE,ids);
+        module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(3L,exam,false,null,plan)),5L,mode));
+        var snapshot=scope.read(module.getSourceScope());assertEquals(5,snapshot.format());
+        assertEquals(snapshot,scope.read(scope.write(snapshot)));
+        var chunks=scope.index(module,false).chunks();
+        assertEquals(new HashSet<>(ids),chunks.stream().map(c->c.id().split(":")[2]).collect(java.util.stream.Collectors.toSet()));
+        var spec=mock(ChatClient.ChatClientRequestSpec.class,RETURNS_DEEP_STUBS);
+        when(chat.prompt().system(startsWith("Order the supplied"))).thenReturn(spec);
+        when(spec.user(anyString())).thenReturn(spec);
+        when(spec.call().content()).thenReturn(json.writeValueAsString(Map.of("sourceIds",chunks.stream().map(ModuleMaterialIndex.Chunk::id).toList(),"knowledge","invented technical content")));
+        generation.generateRevision(module);assertFalse(module.getGeneratedKnowledge().contains("invented technical content"));
+        assertThrows(ResponseStatusException.class,()->scope.requirePublishedReady(module));
+        scope.acknowledgeExpansion(module,5L);
+        assertTrue(scope.teachingIndex(module,true).chunks().stream().allMatch(c->c.fileId()==null));
+        when(storage.read("original")).thenReturn(new byte[]{1});
+        assertThrows(ResponseStatusException.class,()->scope.index(module,false));
+    }
     void confirm(boolean instructional){
         var section=scope.read(module.getSourceScope()).documents().get(0).extraction().sections().get(0);
         module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(3L,List.of(section.id()),instructional)),5L));

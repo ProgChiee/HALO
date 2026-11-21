@@ -422,7 +422,7 @@ public class ProfessorModuleService {
             );
         }
 
-        if(module.getSourceScope()==null && module.getFiles()!=null && module.getFiles().stream().anyMatch(f->"application/pdf".equals(f.getFileType())))
+        if(module.getSourceScope()==null && module.getFiles()!=null && module.getFiles().stream().anyMatch(f->"application/pdf".equals(f.getFileType()) || ExcelObtl.MIME.equals(f.getFileType())))
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,"SOURCE_CONFIRMATION_REQUIRED");
 
         if (module.getAiGenerationStatus() != AiGenerationStatus.COMPLETED) {

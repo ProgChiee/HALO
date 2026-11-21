@@ -21,6 +21,7 @@ public class LessonAttachmentService {
     public Content student(Long id,UserEntity student) {
         var file=files.findById(id).orElseThrow(this::missing);
         progression.validateModuleAccess(file.getModule().getId(),student);
+        if(ExcelObtl.MIME.equals(file.getFileType()))throw missing();
         var content=read(file);
         // Remote fetches can be slow; recheck current access before returning bytes.
         progression.validateModuleAccess(file.getModule().getId(),student);
@@ -33,7 +34,7 @@ public class LessonAttachmentService {
         return read(files.findByIdAndModule_Week_Subject_Professor_User_Id(id,professor.getId()).orElseThrow(this::missing));
     }
     private Content read(AiLearningFileEntity file) {
-        if(file.getFileType()==null || !java.util.Set.of("application/pdf","image/png","image/jpeg").contains(file.getFileType()))
+        if(file.getFileType()==null || !java.util.Set.of("application/pdf","image/png","image/jpeg",ExcelObtl.MIME).contains(file.getFileType()))
             throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,"MATERIAL_TYPE_UNSUPPORTED");
         try {return new Content(safeName(file.getOriginalFileName()),file.getFileType(),storage.read(file.getFilePath()));}
         catch(java.io.FileNotFoundException error){throw missing();}

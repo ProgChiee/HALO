@@ -12,11 +12,17 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class LessonSourceScope {
     private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(LessonSourceScope.class);
-    public record Document(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,String name,String checksum,ObtlSections.Detection extraction) {}
+    public record Document(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,String name,String checksum,ObtlSections.Detection extraction, @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) ExcelObtl.Evidence workbook) {
+        public Document(Long fileId,String name,String checksum,ObtlSections.Detection extraction){this(fileId,name,checksum,extraction,null);}
+        boolean current(){return workbook!=null ? ExcelObtl.VERSION.equals(workbook.version()) : extraction!=null && ObtlSections.VERSION.equals(extraction.version());}
+    }
     public record Correction(String checksum,String extractionVersion,List<ObtlSections.Span> fragments,String displayLabel) {
         public Correction(String checksum,String extractionVersion,List<ObtlSections.Span> fragments){this(checksum,extractionVersion,fragments,null);}
     }
-    public record Choice(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,List<String> sectionIds,boolean instructional,Correction correction) {
+    public enum ExamPurpose { RECORD_ONLY, REVIEW_GUIDE }
+    public record Examination(ExamPurpose purpose,List<String> coverageIds) {}
+    public record Choice(@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) Long fileId,List<String> sectionIds,boolean instructional,Correction correction,@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) Examination examination) {
+        public Choice(Long fileId,List<String> ids,boolean instructional,Correction correction){this(fileId,ids,instructional,correction,null);}
         public Choice(Long fileId,List<String> sectionIds,boolean instructional){this(fileId,sectionIds,instructional,null);}
     }
     private static List<ObtlSections.Span> permitted(Document doc,Choice choice,ObtlSections.Section section){
@@ -77,7 +83,7 @@ public class LessonSourceScope {
     private final ObjectMapper json; private final LessonMaterialStorage storage;private final ObtlExtractionProcess extractor;
     public LessonSourceScope(ObjectMapper json,LessonMaterialStorage storage,ObtlExtractionProcess extractor){this.json=json;this.storage=storage;this.extractor=extractor;}
     public Snapshot read(String value){
-        try{var result=json.readValue(value,Snapshot.class);if(result.format()<1 || result.format()>3)throw new IllegalArgumentException();return result;}
+        try{var result=json.readValue(value,Snapshot.class);if(result.format()<1 || result.format()>5)throw new IllegalArgumentException();return result;}
         catch(Exception e){throw failure("SOURCE_SCOPE_UNAVAILABLE");}
     }
     public String write(Snapshot value){try{return json.writeValueAsString(value);}catch(Exception e){throw failure("SOURCE_SCOPE_UNAVAILABLE");}}
@@ -86,13 +92,15 @@ public class LessonSourceScope {
         List<Document> documents=new ArrayList<>();
         Snapshot old=module.getSourceScope()==null?null:read(module.getSourceScope());
         for(var file:module.getFiles()){
-            if(!"application/pdf".equals(file.getFileType()))throw failure("SCOPED_SOURCE_PDF_REQUIRED");
+            boolean excel=ExcelObtl.MIME.equals(file.getFileType());
+            if(!excel && !"application/pdf".equals(file.getFileType()))throw failure("SCOPED_SOURCE_PDF_REQUIRED");
             String stage="STORAGE_READ";
             try{
                 byte[] bytes=storage.read(file.getFilePath());String checksum=hash(bytes);
                 stage="SOURCE_PROCESSING";
-                Document existing=old==null?null:old.documents().stream().filter(d->Objects.equals(d.fileId(),file.getId())&&d.checksum().equals(checksum)&&ObtlSections.VERSION.equals(d.extraction().version())).findFirst().orElse(null);
+                Document existing=old==null?null:old.documents().stream().filter(d->Objects.equals(d.fileId(),file.getId())&&d.checksum().equals(checksum)&&d.current()).findFirst().orElse(null);
                 if(existing!=null){documents.add(existing);checkTextBudget(documents);continue;}
+                if(excel){documents.add(new Document(file.getId(),file.getOriginalFileName(),checksum,null,ExcelObtl.parse(bytes)));checkTextBudget(documents);continue;}
                 stage="WORKER";
                 var parsed=extractor.extract(bytes);
                 stage="SOURCE_PROCESSING";
@@ -117,10 +125,11 @@ public class LessonSourceScope {
                 throw failure("SOURCE_EXTRACTION_FAILED");
             }
         }
-        return write(new Snapshot(1,UUID.randomUUID().toString(),module.getId(),List.copyOf(documents),List.of(),null,null,false));
+        return write(new Snapshot(documents.stream().anyMatch(d->d.workbook()!=null)?4:1,UUID.randomUUID().toString(),module.getId(),List.copyOf(documents),List.of(),null,null,false));
     }
     private void checkTextBudget(List<Document> documents){
-        if(documents.stream().flatMap(d->d.extraction().pages().stream()).mapToLong(p->p.text().length()).sum()>ObtlSections.MAX_CHARS)
+        if(documents.stream().anyMatch(d->d.workbook()!=null) && write(new Snapshot(4,"budget",0L,documents,List.of(),null,null,false)).length()>ObtlSections.MAX_CHARS)throw failure("SOURCE_TEXT_LIMIT");
+        if(documents.stream().filter(d->d.extraction()!=null).flatMap(d->d.extraction().pages().stream()).mapToLong(p->p.text().length()).sum()>ObtlSections.MAX_CHARS)
             throw failure("SOURCE_TEXT_LIMIT");
     }
     public String confirm(AiLearningModuleEntity module,List<Choice> choices,Long actor){
@@ -133,14 +142,40 @@ public class LessonSourceScope {
         for(var choice:choices){
             if(choice==null||!seen.add(choice.fileId())||choice.sectionIds()==null||choice.sectionIds().isEmpty()||choice.sectionIds().size()>256||new HashSet<>(choice.sectionIds()).size()!=choice.sectionIds().size())throw failure("INVALID_SOURCE_SELECTION");
             var document=snapshot.documents().stream().filter(d->Objects.equals(d.fileId(),choice.fileId())).findFirst().orElseThrow(()->failure("INVALID_SOURCE_SELECTION"));
-            if(!ObtlSections.VERSION.equals(document.extraction().version()))throw failure("SOURCE_REEXTRACTION_REQUIRED");
+            if(!document.current())throw failure("SOURCE_REEXTRACTION_REQUIRED");
+            validateExamination(choices,choice,document);
+            if(document.workbook()!=null){
+                var selected=document.workbook().sections().stream().filter(s->choice.sectionIds().contains(s.id())).toList();
+                if(choice.correction()!=null || selected.size()!=choice.sectionIds().size())throw failure("INVALID_SOURCE_SELECTION");
+                if(selected.stream().anyMatch(s->!s.complete()))throw failure("SOURCE_BOUNDARY_REVIEW_REQUIRED");
+                continue;
+            }
             if(!document.extraction().sections().stream().map(ObtlSections.Section::id).toList().containsAll(choice.sectionIds()))throw failure("INVALID_SOURCE_SELECTION");
             if(document.extraction().sections().stream().filter(s->choice.sectionIds().contains(s.id())).anyMatch(s->s.spans().isEmpty()||s.warnings().contains("AMBIGUOUS_TABLE_BOUNDARY")||s.warnings().contains("TABLE_CONTINUATION_UNCONFIRMED")))throw failure("SOURCE_BOUNDARY_REVIEW_REQUIRED");
             document.extraction().sections().stream().filter(s->choice.sectionIds().contains(s.id())).forEach(s->permitted(document,choice,s));
         }
-        int format=choices.stream().anyMatch(c->c.sectionIds().stream().anyMatch(id->id.startsWith("region-p")))?3:
+        int format=choices.stream().anyMatch(c->c.examination()!=null)?5:snapshot.documents().stream().anyMatch(d->d.workbook()!=null)?4:choices.stream().anyMatch(c->c.sectionIds().stream().anyMatch(id->id.startsWith("region-p")))?3:
                 choices.stream().anyMatch(choice->choice.correction()!=null)?2:1;
         return write(new Snapshot(format,UUID.randomUUID().toString(),module.getId(),snapshot.documents(),List.copyOf(choices),actor,java.time.Instant.now().toString(),false,mode,null,null));
+    }
+    private static void validateExamination(List<Choice> choices,Choice choice,Document doc){
+        boolean selectedExam=doc.workbook()!=null && doc.workbook().sections().stream()
+            .anyMatch(s->choice.sectionIds().contains(s.id()) && "EXAMINATION".equals(s.type()));
+        Examination exam=choice.examination();
+        if(!selectedExam){if(exam!=null)throw failure("INVALID_SOURCE_SELECTION");return;}
+        if(exam==null || choices.size()!=1 || choice.sectionIds().size()!=1 || exam.purpose()==null || exam.coverageIds()==null)
+            throw failure("EXAM_COVERAGE_REQUIRED");
+        var ids=exam.coverageIds();
+        if(exam.purpose()==ExamPurpose.RECORD_ONLY){
+            if(!ids.isEmpty() || choice.instructional())throw failure("INVALID_SOURCE_SELECTION");
+            return;
+        }
+        if(ids.isEmpty() || ids.size()>256 || new HashSet<>(ids).size()!=ids.size())throw failure("EXAM_COVERAGE_REQUIRED");
+        long matches=doc.workbook().sections().stream().filter(s->ids.contains(s.id()) && s.complete() && !"EXAMINATION".equals(s.type())).count();
+        if(matches!=ids.size())throw failure("INVALID_SOURCE_SELECTION");
+    }
+    public boolean examinationGuide(AiLearningModuleEntity module){
+        return read(module.getSourceScope()).choices().stream().anyMatch(c->c.examination()!=null && c.examination().purpose()==ExamPurpose.REVIEW_GUIDE);
     }
     public boolean expansion(AiLearningModuleEntity module){return module.getSourceScope()!=null&&read(module.getSourceScope()).mode()==Mode.OBTL_EXPANSION;}
     public static boolean isExpansion(String snapshot){
@@ -172,7 +207,13 @@ public class LessonSourceScope {
         module.setSourceScope(write(new Snapshot(s.format(),UUID.randomUUID().toString(),s.moduleId(),s.documents(),s.choices(),s.confirmedBy(),s.confirmedAt(),true,s.mode(),s.generatedHash(),new Review(actor,java.time.Instant.now().toString(),s.generatedHash()))));
     }
     public void requireCurrentExtraction(AiLearningModuleEntity module){
-        if(read(module.getSourceScope()).documents().stream().anyMatch(d->!ObtlSections.VERSION.equals(d.extraction().version())))
+        var snapshot=read(module.getSourceScope());
+        for(var choice:snapshot.choices()){
+            var doc=snapshot.documents().stream().filter(d->Objects.equals(d.fileId(),choice.fileId())).findFirst().orElseThrow(()->failure("INVALID_SOURCE_SELECTION"));
+            validateExamination(snapshot.choices(),choice,doc);
+            if(choice.examination()!=null && choice.examination().purpose()==ExamPurpose.RECORD_ONLY)throw failure("EXAM_RECORD_ONLY");
+        }
+        if(snapshot.documents().stream().anyMatch(d->!d.current()))
             throw failure("SOURCE_REEXTRACTION_REQUIRED");
     }
     public void markInstructionVerified(AiLearningModuleEntity module){
@@ -196,6 +237,27 @@ public class LessonSourceScope {
         for(var choice:s.choices()){
             if(instructionalOnly&&!choice.instructional())continue;
             var doc=s.documents().stream().filter(d->Objects.equals(d.fileId(),choice.fileId())).findFirst().orElseThrow();
+            if(doc.workbook()!=null){
+                String[] headers=ExcelObtl.CONTENT.split("\\|");
+                var ids=choice.sectionIds();
+                if(choice.examination()!=null){
+                    validateExamination(s.choices(),choice,doc);
+                    if(choice.examination().purpose()==ExamPurpose.RECORD_ONLY)throw failure("EXAM_RECORD_ONLY");
+                    ids=choice.examination().coverageIds();
+                }
+                for(var section:doc.workbook().sections())if(ids.contains(section.id())){
+                    for(var row:section.content())for(int col=2;col<=9;col++){
+                        String value=row.at(col);
+                        for(int start=0;start<value.length();start+=2200){
+                            String id=s.id()+":"+doc.fileId()+":"+section.id()+":"+row.row()+":"+col+":"+start;
+                            chunks.add(new ModuleMaterialIndex.Chunk(id,doc.fileId(),doc.name()+" CONTENT row "+row.row(),0,
+                                headers[col]+": "+value.substring(start,Math.min(start+2200,value.length())),section.title()));
+                            if(chunks.size()>256)throw failure("SOURCE_TEXT_LIMIT");
+                        }
+                    }
+                }
+                continue;
+            }
             for(var section:doc.extraction().sections())if(choice.sectionIds().contains(section.id())){
                 for(var span:permitted(doc,choice,section)){
                     String page=doc.extraction().pages().get(span.page()-1).text();
@@ -214,6 +276,7 @@ public class LessonSourceScope {
         var snapshot=read(module.getSourceScope());
         if(!Objects.equals(snapshot.moduleId(),module.getId()))throw failure("MODULE_MATERIAL_MISMATCH");
         var doc=snapshot.documents().stream().filter(d->Objects.equals(d.fileId(),fileId)).findFirst().orElseThrow(()->failure("INVALID_SOURCE_SELECTION"));
+        if(doc.workbook()!=null)throw failure("INVALID_SOURCE_SELECTION");
         var file=module.getFiles().stream().filter(f->Objects.equals(f.getId(),fileId)).findFirst().orElseThrow(()->failure("SOURCE_REEXTRACTION_REQUIRED"));
         try{
             byte[] bytes=storage.read(file.getFilePath());

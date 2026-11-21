@@ -63,7 +63,7 @@ public class StudentLessonService {
                 module.getAiGenerationStatus()
         );
 
-        response.setFiles(module.getFiles().stream().map(file -> {
+        response.setFiles(module.getFiles().stream().filter(file -> !ExcelObtl.MIME.equals(file.getFileType())).map(file -> {
             var metadata=new com.ptc.halo.dtoResponse.AiLearningFileResponse();
             metadata.setId(file.getId());
             metadata.setOriginalFileName(LessonAttachmentService.safeName(file.getOriginalFileName()));

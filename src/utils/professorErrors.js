@@ -54,10 +54,13 @@ const MESSAGES = {
   "MODULE_FILE_LIMIT_EXCEEDED": "A module can contain at most 10 lesson files.",
   "PROFESSOR_REQUEST_FAILED": "The request could not be completed. Please try again later.",
   "VALIDATION_FAILED": "Check the required fields, text lengths, year level, positive week number, and lesson sources.",
+  "EXAM_RECORD_ONLY": "This examination is a record only. Confirm review guide coverage before generating.",
+  "EXAM_COVERAGE_REQUIRED": "Select one examination and explicitly confirm its purpose and review guide coverage.",
   "INVALID_MULTIPART_REQUEST": "The upload could not be parsed. Select your files again and retry."
 };
 export function professorErrorMessage(error, fallback = 'The request failed. Please try again.') {
   const code = error?.response?.data?.code;
+  if (code === 'INVALID_OBTL_WORKBOOK') return error.response.data.message || 'Check the HALO workbook template.';
   if (Object.hasOwn(MESSAGES, code)) return MESSAGES[code];
   const status = error?.response?.status;
   if (status === 401) return MESSAGES.AUTHENTICATION_REQUIRED;

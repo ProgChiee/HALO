@@ -52,7 +52,7 @@ export default function LessonRevision({ moduleId, onPublished, onContextChange 
  function pick(fileList) {
   if (busy || loading || !fileList?.length) return;
   const incoming = Array.from(fileList);
-  if (incoming.some(f => !['application/pdf', 'image/png', 'image/jpeg'].includes(f.type) || !f.size || f.size > 3 * 1024 * 1024)) { setError('Choose readable PDF, PNG or JPG/JPEG files up to 3 MB each.'); return; }
+  if (incoming.some(f => (!['application/pdf', 'image/png', 'image/jpeg'].includes(f.type) && !/\.xlsx$/i.test(f.name)) || !f.size || f.size > 3 * 1024 * 1024)) { setError('Choose readable PDF, PNG, JPG/JPEG or standard HALO XLSX files up to 3 MB each.'); return; }
   if (draft.keepFiles.length + files.length + incoming.length > 10) { setError('A revision can contain at most 10 files.'); return; }
   setFiles([...files, ...incoming]); setError('');
  }
@@ -82,10 +82,10 @@ export default function LessonRevision({ moduleId, onPublished, onContextChange 
     <h4>Add revision files</h4>
     <div className={styles.dropZone} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); pick(e.dataTransfer.files); }}>
      <Upload size={22} aria-hidden="true"/><span>Drop files here or <label htmlFor="revision-files">Browse Files</label></span>
-     <small id="revision-file-help">PDF, PNG or JPG/JPEG · 3 MB per file. Uploads when you save the draft.</small>
-     <input id="revision-files" ref={upload} type="file" multiple accept=".pdf,.png,.jpg,.jpeg" aria-describedby="revision-file-help" disabled={disabled} onChange={e => { pick(e.target.files); e.target.value = ''; }} />
+     <small id="revision-file-help">PDF, PNG, JPG/JPEG or standard HALO XLSX · 3 MB per file. Uploads when you save the draft.</small>
+     <input id="revision-files" ref={upload} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.xlsx" aria-describedby="revision-file-help" disabled={disabled} onChange={e => { pick(e.target.files); e.target.value = ''; }} />
     </div>
-    {!!files.length && <ul className={styles.pendingFiles}>{files.map((file,i) => <li key={i}><small>{file.type.split('/')[1].toUpperCase()}</small><span>{file.name} <small>({Math.ceil(file.size / 1024)} KB)</small></span><button type="button" disabled={disabled} aria-label={'Remove ' + file.name} onClick={() => setFiles(files.filter((_,j) => j !== i))}>Remove</button></li>)}</ul>}
+    {!!files.length && <ul className={styles.pendingFiles}>{files.map((file,i) => <li key={i}><small>{/\.xlsx$/i.test(file.name) ? 'XLSX' : file.type.split('/')[1].toUpperCase()}</small><span>{file.name} <small>({Math.ceil(file.size / 1024)} KB)</small></span><button type="button" disabled={disabled} aria-label={'Remove ' + file.name} onClick={() => setFiles(files.filter((_,j) => j !== i))}>Remove</button></li>)}</ul>}
    </div>
    <div className={styles.revisionActions}>
     <Button disabled={disabled || !changed} onClick={() => run('save')}>Save Draft</Button>

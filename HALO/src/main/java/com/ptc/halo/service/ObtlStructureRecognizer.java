@@ -45,6 +45,7 @@ public class ObtlStructureRecognizer {
     @PreDestroy void close(){executor.shutdownNow();}
 
     public List<Suggestion> suggest(LessonSourceScope.Document doc){
+        if(doc.workbook()!=null)throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,"INVALID_SOURCE_SELECTION");
         var detection=doc.extraction();
         if(!ObtlSections.VERSION.equals(detection.version()))throw new ResponseStatusException(HttpStatus.CONFLICT,"SOURCE_REEXTRACTION_REQUIRED");
         List<Fragment> catalog=new ArrayList<>();

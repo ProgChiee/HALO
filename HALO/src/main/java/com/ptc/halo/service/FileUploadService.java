@@ -50,7 +50,9 @@ public class FileUploadService {
             if (bytes.length > MAX_BYTES) throw problem(413, "UPLOAD_FILE_TOO_LARGE");
             if (bytes.length == 0) throw problem(400, "UPLOAD_FILE_UNREADABLE");
             String type;
-            if (startsWith(bytes, new byte[]{37,80,68,70,45})) {
+            if(file.getOriginalFilename().toLowerCase(java.util.Locale.ROOT).endsWith(".xlsx")){
+                ExcelObtl.parse(bytes);type=ExcelObtl.MIME;
+            } else if (startsWith(bytes, new byte[]{37,80,68,70,45})) {
                 type = "application/pdf";
                 try (var pdf = org.apache.pdfbox.Loader.loadPDF(bytes)) {
                     if (pdf.isEncrypted() || pdf.getNumberOfPages() == 0) throw problem(400, "UPLOAD_FILE_UNREADABLE");

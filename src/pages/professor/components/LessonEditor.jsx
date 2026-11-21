@@ -43,6 +43,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
   const [activeTab, setActiveTab] = useState('lesson');
   const { showToast } = useToast();
   const materialsInputRef = useRef(null);
+  const workbookInput = useRef(null);
 
   // Raw materials the professor provides
   const [lessonText, setLessonText] = useState('');
@@ -106,12 +107,12 @@ function RouteLessonEditor({ subjectId, weekId }) {
     if (
       picked.some(
         (file) =>
-          !ALLOWED_FILE_TYPES.has(file.type) ||
+          (e.target === workbookInput.current ? !/\.xlsx$/i.test(file.name) : !ALLOWED_FILE_TYPES.has(file.type)) ||
           file.size === 0
       )
     ) {
       showToast(
-        'Choose non-empty PDF, PNG, or JPG/JPEG files only.',
+        'Choose a non-empty file in a supported format.',
         'error'
       );
 
@@ -411,7 +412,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
               disabled={editingDisabled || savedFiles.length + files.length >= MAX_SOURCE_FILES}
             >
               <Upload size={22} />
-              <span className={styles.fileUploadLabel}>Upload Files</span>
+              <span className={styles.fileUploadLabel}>Upload Original OBTL PDF or supplementary materials</span>
               <span className={styles.fileUploadHint}>
               PDF, PNG, JPG/JPEG (max 3 MB each) — {savedFiles.length + files.length}/{MAX_SOURCE_FILES} added
               </span>
@@ -425,6 +426,8 @@ function RouteLessonEditor({ subjectId, weekId }) {
               onChange={handleFilesPicked}
             />
 
+            <Button variant="secondary" disabled={editingDisabled || savedFiles.length + files.length >= MAX_SOURCE_FILES} onClick={() => workbookInput.current?.click()}>Upload Standard HALO OBTL Template (.xlsx)</Button>
+            <input ref={workbookInput} type="file" accept=".xlsx" aria-label="Upload standard HALO workbook" hidden onChange={handleFilesPicked} />
             {savedFiles.length > 0 && (
               <ul className={styles.fileList}>
                 {savedFiles.map((file) => (

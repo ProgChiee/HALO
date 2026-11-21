@@ -247,3 +247,74 @@ test('filtering a selected chapter out of view preserves the confirmation payloa
     assert.deepEqual(calls[0][3], [{fileId:3, sectionIds:['one'], instructional:false}]);
   } finally { await ui.close(); }
 });
+
+test('ABTT separates recoverable chapters, partial excerpts, unresolved pages and exams', {skip: !process.env.HALO_ABTT_EXTRACTION}, async () => {
+  const {readFile} = await import('node:fs/promises');
+  const extraction = JSON.parse(await readFile(process.env.HALO_ABTT_EXTRACTION, 'utf8'));
+  const ui = await mount({getSources: async () => ({version: 1, source: {...source, documents: [{fileId: 3, name: 'ABTT.pdf', extraction}]}})});
+  try {
+    const group = name => [...ui.host.querySelectorAll('h4')].find(h => h.textContent.startsWith(name)).parentElement;
+    const cards = element => [...element.querySelectorAll('label > input[type=checkbox]')];
+    const ready = cards(group('Ready for Selection'));
+    for (const number of [2, 8, 10]) {
+      const item = ready.find(input => input.parentElement.textContent.trim().startsWith('Chapter ' + number));
+      assert.equal(item.disabled, false);
+      assert.match(item.parentElement.parentElement.textContent, /Recoverable row/);
+    }
+    const detected = group('Detected');
+    assert.ok(cards(detected).length > 0 && cards(detected).every(input => input.disabled));
+    assert.match(detected.textContent, /Partial excerpt/);
+    assert.doesNotMatch(detected.textContent, /Complete chapter boundaries/);
+    assert.ok(group('Unresolved PDF Regions').querySelector('label select option[value^="region-"]'));
+    assert.equal(cards(group('Examinations and Assessments')).length, 2);
+  } finally { await ui.close(); }
+});
+
+test('standard workbook cards preserve worksheet evidence and explicit selection', async () => {
+  const calls=[];
+  const row={id:'SEC-001',type:'WEEK',title:'Introduction to Art Appreciation',complete:true,
+    definition:{row:6,cells:['SEC-001','1','WEEK','1','1','Week 1','','Introduction to Art Appreciation','Week 1','2','Complete','Pending professor review']},
+    content:[{row:6,cells:['SEC-001','1','Introduction to Art Appreciation']}]};
+  const ui=await mount({getSources:async()=>({version:2,source:{...source,documents:[{fileId:3,name:'OBTL.xlsx',workbook:{sections:[row]}}]}}), confirmSources:async(...args)=>calls.push(args)});
+  try {
+    assert.match(ui.host.textContent,/SECTIONS row 6/);
+    assert.match(ui.host.textContent,/CONTENT row 6/);
+    assert.match(ui.host.textContent,/Pending professor review/);
+    assert.equal(ui.host.querySelector('pre').textContent,row.content[0].cells[2]);
+    assert.equal(button(ui,'Confirm Selected Sources').disabled,true);
+    await act(async()=>ui.host.querySelector('fieldset input[type=checkbox]').click());
+    await act(async()=>button(ui,'Confirm Selected Sources').click());
+    assert.deepEqual(calls[0][3],[{fileId:3,sectionIds:['SEC-001'],instructional:false}]);
+  } finally {await ui.close();}
+});
+
+test('exam guide requires explicit coverage; selecting the exam never preselects chapters', async () => {
+  const calls=[];
+  const sections=[['SEC-002','CHAPTER','Management'],['SEC-007','EXAMINATION','MIDTERM EXAMINATION'],['SEC-008','CHAPTER','Property Management System']].map(([id,type,title])=>({
+    id,type,title,complete:true,definition:{row:8,cells:[id,'1',type,'9','9','Week 9','','','Week 9']},
+    content:[{row:8,cells:[id,'1',title]}]
+  }));
+  const ui=await mount({getSources:async()=>({version:3,source:{...source,documents:[{fileId:3,name:'ABTT.xlsx',workbook:{sections}}]}}),confirmSources:async(...args)=>calls.push(args)});
+  try {
+    const label=text=>[...ui.host.querySelectorAll('label')].find(l=>l.textContent===text);
+    await act(async()=>label('MIDTERM EXAMINATION').querySelector('input').click());
+    const purpose=[...ui.host.querySelectorAll('select')].find(s=>s.value==='RECORD_ONLY');
+    assert.ok(purpose);
+    await act(async()=>{purpose.value='REVIEW_GUIDE';purpose.dispatchEvent(new Event('change',{bubbles:true}));});
+    assert.equal(button(ui,'Confirm Selected Sources').disabled,true);
+    const exam=purpose.closest('fieldset');
+    const coverage=exam.querySelectorAll('input[type=checkbox]');
+    assert.ok([...coverage].every(input=>!input.checked));
+    const preview=exam.querySelector('details');
+    await act(async()=>preview.querySelector('summary').click());
+    assert.equal(preview.open,true);
+    assert.equal(exam.querySelector('dd').textContent,'Management');
+    assert.equal(button(ui,'Confirm Selected Sources').disabled,true);
+    await act(async()=>coverage[1].click());
+    await act(async()=>preview.querySelector('summary').click());
+    const filter=ui.host.querySelectorAll('select')[1];
+    await act(async()=>{filter.value='Examinations';filter.dispatchEvent(new Event('change',{bubbles:true}));});
+    await act(async()=>button(ui,'Confirm Selected Sources').click());
+    assert.deepEqual(calls[0][3][0].examination,{purpose:'REVIEW_GUIDE',coverageIds:['SEC-008']});
+  } finally {await ui.close();}
+});

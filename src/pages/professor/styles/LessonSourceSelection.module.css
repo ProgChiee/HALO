@@ -2,6 +2,10 @@
 .panel p { font-size: .875rem; line-height: 1.5; }
 .document { min-width: 0; margin-block: 1rem; border: 1px solid var(--color-border-panel); border-radius: 8px; padding: .75rem; }
 .document legend { max-width: 100%; overflow-wrap: anywhere; font-weight: 600; }
+.examCoverage { min-inline-size: 0; margin: 1rem 0; padding: .75rem; border: 1px solid var(--color-border-panel); border-radius: .75rem; }
+.coverageFields { display: grid; grid-template-columns: minmax(0, 1fr); gap: .7rem; margin: .5rem 0 1rem; }
+.coverageFields dt { font-weight: 600; font-size: .875rem; }
+.coverageFields dd { margin: .2rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
 .document label { display: flex; gap: .5rem; align-items: baseline; line-height: 1.5; }
 .section { margin-block: .75rem; }
 .section small { display: block; margin-block: .25rem; }

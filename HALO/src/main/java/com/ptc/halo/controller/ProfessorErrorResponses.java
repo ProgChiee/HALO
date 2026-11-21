@@ -7,6 +7,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 public class ProfessorErrorResponses {
     private static final Map<String, String> MESSAGES = Map.ofEntries(
+        Map.entry("EXAM_RECORD_ONLY","Examination record saved. Confirm review guide coverage to generate a lesson."),
+        Map.entry("EXAM_COVERAGE_REQUIRED","Select one examination and explicitly confirm its purpose and review guide coverage."),
         Map.entry("OBTL_RECOGNITION_UNVERIFIED", "The suggested boundaries could not be verified. Review the PDF using the existing source controls."),
         Map.entry("OBTL_RECOGNITION_BUDGET", "This extraction exceeds the recognition budget. Use manual source review."),
         Map.entry("OBTL_RECOGNITION_UNAVAILABLE", "Structure recognition is busy or unavailable. Manual source review is available."),
@@ -66,6 +68,7 @@ public class ProfessorErrorResponses {
     }
     public static ResponseEntity<Map<String, Object>> status(ResponseStatusException error) {
         int status = error.getStatusCode().value();
+        if(status==422 && error.getReason()!=null && error.getReason().startsWith("INVALID_OBTL_WORKBOOK: "))return ResponseEntity.status(status).body(Map.of("code","INVALID_OBTL_WORKBOOK","status",status,"message",error.getReason()));
         // Preserve the publication conflict contract for materials that cannot be prepared.
         if (java.util.Set.of("MODULE_MATERIAL_UNREADABLE", "MODULE_MATERIAL_UNSUPPORTED", "MODULE_MATERIAL_MISMATCH", "MODULE_MATERIALS_TOO_LARGE")
                 .contains(error.getReason() == null ? "" : error.getReason()) && status != 401 && status != 403) status = 409;
