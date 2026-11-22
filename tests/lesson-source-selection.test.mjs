@@ -318,3 +318,32 @@ test('exam guide requires explicit coverage; selecting the exam never preselects
     assert.deepEqual(calls[0][3][0].examination,{purpose:'REVIEW_GUIDE',coverageIds:['SEC-008']});
   } finally {await ui.close();}
 });
+test('Art Appreciation pagination retains every selected section in confirmation', async () => {
+  // The SECTIONS worksheet in HALO_OBTL_Art_Appreciation_Filled.xlsx.
+  const titles = ["Introduction to Art Appreciation","Art, Artists, and the Audience","The Elements of Art","Principles of Art","Art Criticism and Art Appreciation","Visual Arts: Painting and Drawing","Sculpture and Architecture","MIDTERM EXAM","Performing Arts: Music, Dance, and Theater","Literary and Digital Arts","Art and Culture","Philippine Art and Artists","Indigenous and Traditional Philippine Arts","Art Movements and Styles","Modern and Contemporary Art","Art, Identity, and Society","FINAL EXAM"];
+  const sections = titles.map((title,index) => {
+    const week=index+1, id='SEC-'+String(week).padStart(3,'0'),type=[8,17].includes(week)?'EXAMINATION':'WEEK';
+    return {id,title,type,complete:true,content:[],definition:{row:week+5,cells:[id,week,type,week,week,'Week '+week,'',title,'Week '+week]}};
+  });
+  const calls=[];
+  const ui=await mount({getSources:async()=>({version:4,source:{documents:[{fileId:3,name:'HALO_OBTL_Art_Appreciation_Filled.xlsx',workbook:{sections}}]}}),confirmSources:async(...args)=>calls.push(args)});
+  try {
+    const labels=()=>[...ui.host.querySelectorAll('label')];
+    const box=i=>labels().find(l=>l.textContent===titles[i])?.querySelector('input');
+    const click=el=>act(async()=>el.click());
+    const select=async(label,value)=>{const el=labels().find(l=>l.textContent.startsWith(label)).querySelector('select');await act(async()=>{el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));});};
+    assert.match(ui.host.textContent,/Showing 1–5 of 17 sections · Page 1 of 4/);
+    assert.ok(button(ui,'Previous').disabled);
+    await click(box(0)); await click(button(ui,'Next')); await click(box(6));
+    assert.ok(box(7).disabled);
+    await click(button(ui,'Previous')); assert.ok(box(0).checked);
+    await click(ui.host.querySelector('[aria-label="Page 4"]')); assert.ok(button(ui,'Next').disabled);
+    await select('Sections per page','10'); assert.match(ui.host.textContent,/Showing 1–10 of 17/);
+    assert.ok(box(6).checked);
+    await select('Sections per page','20'); assert.equal(button(ui,'Next'),undefined);
+    await select('Show','Examinations'); assert.ok(box(7).disabled && box(16).disabled);
+    await select('Show','Chapters'); assert.match(ui.host.textContent,/No matching sections/);
+    await click(button(ui,'Confirm Selected Sources'));
+    assert.deepEqual(calls[0][3],[{fileId:3,sectionIds:['SEC-001','SEC-007'],instructional:false}]);
+  } finally { await ui.close(); }
+});

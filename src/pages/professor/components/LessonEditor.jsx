@@ -1,5 +1,6 @@
-import Breadcrumb from '../../../components/shared/Breadcrumb';
+import LessonProgress from './LessonProgress';
 import Topbar from '../../../components/shared/Topbar';
+import Breadcrumb from '../../../components/shared/Breadcrumb';
 import LessonRevision from './LessonRevision';
 import LessonSourceSelection from './LessonSourceSelection';
 import QuizRevision from './QuizRevision';
@@ -39,6 +40,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
   approveLesson,
   declineLesson, } = workflow.api;
   const { state } = useLocation();
+  const lessonTitle = state?.lessonTitle?.trim() || '';
   const [revisionContext, setRevisionContext] = useState(null);
   const [activeTab, setActiveTab] = useState('lesson');
   const { showToast } = useToast();
@@ -88,6 +90,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
   const isDeclining = pendingAction === 'decline';
   const isBusy = pendingAction !== null || loading || !!loadError;
   const isPublished = module?.status === 'APPROVED';
+  const [sourceProgress,setSourceProgress] = useState(null);
   const savedFiles = module?.files ?? [];
   const textChanged = !!module && (
     lessonText !== (module.lessonText ?? '') ||
@@ -95,6 +98,8 @@ function RouteLessonEditor({ subjectId, weekId }) {
     aiNotes !== (module.aiNotes ?? '')
   );
   const hasUnsavedChanges = textChanged || files.length > 0;
+  const saved = !!module && !hasUnsavedChanges && !isSaving && !!(module.lessonText?.trim() || module.youtubeLink?.trim() || savedFiles.length);
+  const structured = [...savedFiles,...files].some(file => /\.(pdf|xlsx)$/i.test(file.originalFileName || file.name));
   const editingDisabled = isBusy || isPublished || workflow.preview;
 
   function handleFilesPicked(e) {
@@ -309,6 +314,12 @@ function RouteLessonEditor({ subjectId, weekId }) {
   const aiStatus = module?.aiGenerationStatus; // 'PENDING' | 'COMPLETED' | 'DECLINED' | 'FAILED'
   const lessonStatus = module?.status; // 'PENDING' | 'APPROVED' | 'DECLINED'
   const hasGeneratedContent = aiStatus === 'COMPLETED';
+  const subjectName = state?.subjectName?.trim();
+  const weekNumber = module?.weekNumber ?? state?.weekNumber;
+  // A saved module title may name a chapter or a shared schedule independently of its week number.
+  const titleLabel = lessonTitle.match(/^(?:weeks?|chapters?)\s+\d+(?:\s*(?:[-–—&,]|and\b|to\b)\s*\d+)*(?=$|\s*[:.()–—-]|\s+\p{L})/iu)?.[0];
+  const schedule = titleLabel || (Number.isInteger(weekNumber) && weekNumber > 0 ? `Week ${weekNumber}` : '');
+  const metadata = [subjectName, schedule].filter(Boolean).join(' · ') || lessonTitle;
 
   const currentPage = loading || loadError ? 'Lesson Management'
     : activeTab === 'history' ? 'Revision History' : activeTab === 'assessment' ? 'Assessment'
@@ -323,21 +334,23 @@ function RouteLessonEditor({ subjectId, weekId }) {
   return (
     <PageShell responsive navItems={PROFESSOR_NAV_ITEMS} sectionLabel="Prof" roleBadge="Professor">
       <Topbar>
-        <div className={styles.topHeaderLeft}>
-          <div style={{ minWidth: 0, maxWidth: '100%' }}>
-            <Breadcrumb onNavigate={guardNavigation} items={[
-              { label: 'Dashboard', to: workflow.basePath },
-              { label: 'Subjects', to: workflow.basePath + '/subjects' },
-              { label: currentPage, title: typeof state?.lessonTitle === 'string' ? state.lessonTitle : '' }
-            ]} />
-            <p className={styles.eyebrow}>Subject #{module?.subjectId ?? subjectId} · {module?.weekNumber != null ? `Week ${module.weekNumber}` : `Week record #${weekId}`}</p>
-            <h1 className={styles.title}>Lesson Management</h1>
-          </div>
+        <div>
+          <h1>Lesson Management</h1>
+          {metadata && <p className={styles.metadata}>{metadata}</p>}
         </div>
-        {!loading && !loadError && <span className={`${styles.statusBadge} ${isPublished ? styles.statusApproved : styles.statusPending}`}>{isPublished ? 'Published' : lessonStatus === 'DECLINED' ? 'Declined' : 'Draft'}</span>}
+        {!loading && !loadError && <span className={`${styles.statusBadge} ${isPublished ? styles.statusApproved : styles.statusPending}`}>{isPublished ? 'Approved' : lessonStatus === 'DECLINED' ? 'Declined' : 'Draft'}</span>}
       </Topbar>
-
       <main className={styles.main}>
+        <div className={styles.lessonLocation}>
+          <Breadcrumb onNavigate={guardNavigation} items={[
+            { label: 'Dashboard', to: workflow.basePath },
+            { label: 'Subjects', to: workflow.basePath + '/subjects' },
+            { label: currentPage }
+          ]} />
+          {lessonTitle && lessonTitle !== schedule && lessonTitle !== metadata && <h2 className={styles.title}>{lessonTitle}</h2>}
+          {!loading && !loadError && !workflow.preview && !isPublished && activeTab === 'lesson' &&
+            <LessonProgress saved={saved} structured={structured} source={structured ? sourceProgress : null} generated={hasGeneratedContent} failed={aiStatus === 'FAILED'} outline={module?.outlineDraft} />}
+        </div>
         {loading && <p role="status">Loading saved lesson...</p>}
         {loadError && (
           <div role="alert">
@@ -357,7 +370,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
           history={module && !workflow.preview ? <section className={styles.panelCard}><RevisionHistory key={module.id + '-' + reloadKey} moduleId={module.id} embedded /></section> : <section className={styles.panelCard}><h2 className={styles.panelTitle}>Revision History</h2><p className={styles.panelSubtitle}>{workflow.preview ? 'Revision history is not available in read-only Professor Preview.' : 'Published revision snapshots will appear here when available.'}</p></section>}>
         {isPublished && !workflow.preview && <LessonRevision onContextChange={setRevisionContext} key={module.id} moduleId={module.id} onPublished={() => { setLoading(true); setReloadKey(key => key + 1); }} />}
         {/* --- Step 1: Raw materials --- */}
-        {isPublished ? <PublishedMaterials module={module} /> : <div className={styles.panelCard}>
+        {isPublished ? <PublishedMaterials module={module} /> : <div id="lesson-materials" tabIndex={-1} className={styles.panelCard}>
           <div className={styles.panelHeader}>
             <span className={styles.panelIcon}><FileText size={16} /></span>
             <div>
@@ -463,19 +476,20 @@ function RouteLessonEditor({ subjectId, weekId }) {
           {!isPublished && !workflow.preview && (
             <div className={styles.saveRow}>
               <Button onClick={handleSaveMaterials} isLoading={isSaving} disabled={workflow.preview || isBusy || (!!module && !hasUnsavedChanges)}>Save Materials</Button>
+              {saved && <small>Saved</small>}
             </div>
           )}
         </div>}
 
         {/* --- Step 2: Generate + review --- */}
-        {module && savedFiles.length > 0 && !isPublished && !workflow.preview && <LessonSourceSelection key={`sources-${module.id}-${reloadKey}-${sourceRefresh}`} moduleId={module.id} disabled={isBusy || hasUnsavedChanges} onChanged={() => { setLoading(true); setReloadKey(key => key + 1); }} />}
+        {module && savedFiles.length > 0 && !isPublished && !workflow.preview && <LessonSourceSelection key={`sources-${module.id}-${reloadKey}-${sourceRefresh}`} moduleId={module.id} savedFiles={savedFiles} onProgress={setSourceProgress} disabled={isBusy || hasUnsavedChanges} onChanged={() => { setLoading(true); setReloadKey(key => key + 1); }} />}
         {module && (
-          <div className={styles.panelCard}>
+          <div id="lesson-generation" tabIndex={-1} className={styles.panelCard}>
             <div className={styles.panelHeader}>
               <span className={styles.panelIcon}><Sparkles size={16} /></span>
               <div>
                 <h2 className={styles.panelTitle}>{module?.outlineDraft ? 'Professor-only Outline Draft' : 'AI-Generated Lesson'}</h2>
-                <p className={styles.panelSubtitle}>{isPublished ? 'Published content available to eligible Students. Expand a section to read it.' : 'Review before approving — this is what students will see.'}</p>
+                <p className={styles.panelSubtitle}>{isPublished ? 'Published content available to eligible Students.' : 'Review before approving — this is what students will see.'}</p>
               </div>
             </div>
 

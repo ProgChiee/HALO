@@ -1,15 +1,33 @@
+import { useId, useState } from 'react';
 import { FileText } from 'lucide-react';
 import LessonMarkdown from '../../../components/shared/LessonMarkdown';
 import { VideoPreview } from '../../../components/shared/VideoLearning';
 import styles from '../styles/LessonEditor.module.css';
 
+const sections = ['Objectives', 'Knowledge', 'Examples', 'Summary'];
+
 export function GeneratedLessonSections({ lesson }) {
+  const id = useId();
+  const [active, setActive] = useState(0);
+  function navigate(event, index) {
+    const next = { ArrowLeft: (index + 3) % 4, ArrowRight: (index + 1) % 4, Home: 0, End: 3 }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    setActive(next);
+    event.currentTarget.parentElement.children[next].focus();
+  }
   return <div className={styles.contentSections}>
     {lesson.generationMode === 'OBTL_EXPANSION' && <p>AI-generated elaborations guided by confirmed OBTL curriculum; not directly extracted PDF facts. Professor academic review is required before publication.</p>}
-    {['Objectives', 'Knowledge', 'Examples', 'Summary'].map(label => <details key={label} className={styles.contentDisclosure}>
-      <summary>{label}</summary>
-      <div className={styles.aiGeneratedText}><LessonMarkdown>{lesson[`generated${label}`]}</LessonMarkdown></div>
-    </details>)}
+    <div role="tablist" aria-label="Generated lesson sections" className={styles.generatedTabs}>
+      {sections.map((label,index) => <button key={label} type="button" role="tab"
+        id={id+'-tab-'+index} aria-controls={id+'-panel-'+index} aria-selected={active === index}
+        tabIndex={active === index ? 0 : -1} onClick={() => setActive(index)}
+        onKeyDown={event => navigate(event,index)}>{label}</button>)}
+    </div>
+    {sections.map((label,index) => <div key={label} role="tabpanel" id={id+'-panel-'+index}
+      aria-labelledby={id+'-tab-'+index} hidden={index !== active} tabIndex={0} className={styles.generatedPanel}>
+      <LessonMarkdown>{lesson['generated'+label]}</LessonMarkdown>
+    </div>)}
   </div>;
 }
 

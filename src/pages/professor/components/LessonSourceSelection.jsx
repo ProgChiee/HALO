@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import SubjectPagination from '../../../components/shared/SubjectPagination';
+import { useSubjectPagination } from '../../../hooks/useSubjectPagination';
+import { useEffect, useId, useRef, useState } from 'react';
 import Button from '../../../components/shared/Button';
 import ManualSourceReview from './ManualSourceReview';
 import LessonMarkdown from '../../../components/shared/LessonMarkdown';
@@ -48,7 +50,65 @@ function SourceExcerpt({ pages, spans }) {
   </details>;
 }
 
-export default function LessonSourceSelection({ moduleId, revisionVersion, disabled, onChanged }) {
+function matchingGroups(doc, query, filter) {
+  if (doc.workbook) {
+    return [['', doc.workbook.sections.filter(s => {
+      const label = [s.id,s.title,s.definition.cells[5],s.definition.cells[6],s.definition.cells[8]].join(' ').toLowerCase();
+      return label.includes(query.trim().toLowerCase()) && (filter === 'All Sections' ||
+        (filter === 'Chapters' && (s.type === 'CHAPTER' || !!s.definition.cells[6])) ||
+        (filter === 'Weeks' && !!s.definition.cells[3]) || (filter === 'Examinations' && s.type === 'EXAMINATION') ||
+        (filter === 'Needs Review' && (!s.complete || s.definition.cells[11] !== 'Verified')));
+    })]];
+  }
+  const visible = doc.extraction.sections.filter(section => {
+    const title = chapterTitle(doc, section);
+    return title.toLowerCase().includes(query.trim().toLowerCase()) &&
+      (filter === 'All Sections' || (filter === 'Needs Review' && boundaryBlocked(section)) ||
+       (filter === 'Examinations' && sectionKind(section) === 'Examination') ||
+       (filter === 'Chapters' && /\bchapters?\b/i.test(title)) || (filter === 'Weeks' && /\bweeks?\b/i.test(title)));
+  });
+  return [
+    ['Ready for Selection', visible.filter(s => !boundaryBlocked(s) && sectionKind(s) !== 'Examination')],
+    ['Examinations and Assessments', visible.filter(s => sectionKind(s) === 'Examination')],
+    ['Detected — Needs Verification', visible.filter(s => boundaryBlocked(s) && s.spans.length && sectionKind(s) !== 'Examination')],
+    ['Unresolved PDF Regions', visible.filter(s => !s.spans.length && sectionKind(s) !== 'Examination')]
+  ];
+}
+
+const reviewFields = [
+  ['objectives', 'Objectives'], ['knowledge', 'Explanations and key concepts'],
+  ['examples', 'Examples and hospitality scenarios'], ['summary', 'Summary']
+];
+
+function AcademicReviewTabs({ lesson, onEdit }) {
+  const [tab, setTab] = useState('Edit');
+  const id = useId();
+  function navigate(event) {
+    if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 'Edit' : event.key === 'End' ? 'Preview' : tab === 'Edit' ? 'Preview' : 'Edit';
+    setTab(next);
+    document.getElementById(id + next).focus();
+  }
+  return <>
+    <div role="tablist" aria-label="Academic review" className={styles.reviewTabs}>
+      {['Edit','Preview'].map(name => <button key={name} type="button" role="tab" id={id+name}
+        aria-controls={id+name+'Panel'} aria-selected={tab === name} tabIndex={tab === name ? 0 : -1}
+        onClick={() => setTab(name)} onKeyDown={navigate}>{name}</button>)}
+    </div>
+    <div role="tabpanel" id={id+'EditPanel'} aria-labelledby={id+'Edit'} hidden={tab !== 'Edit'}>
+      {reviewFields.map(([field,label]) => <label className={styles.reviewField} key={field}>{label}
+        <textarea rows={5} maxLength={30000} value={lesson[field] || ''} onChange={e => onEdit(field,e.target.value)} />
+      </label>)}
+    </div>
+    <div role="tabpanel" id={id+'PreviewPanel'} aria-labelledby={id+'Preview'} hidden={tab !== 'Preview'} tabIndex={0}>
+      <p>Preview of your current edits. Use Save Academic Review to record them.</p>
+      {tab === 'Preview' && reviewFields.map(([field,label]) => <section key={field}><h4>{label}</h4><LessonMarkdown>{lesson[field]}</LessonMarkdown></section>)}
+    </div>
+  </>;
+}
+
+export default function LessonSourceSelection({ moduleId, revisionVersion, disabled, onChanged, savedFiles, onProgress }) {
   const { api, preview } = useProfessorWorkflow();
   const [view, setView] = useState(null), [choices, setChoices] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -70,7 +130,7 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
     if (!preview) load();
     return () => { alive.current = false; controller.abort(); };
   }, [api, moduleId, revisionVersion, preview]);
-  if (preview) return null;
+
   const blocked = disabled || loading || busy || !view;
   const canonical = values => JSON.stringify(values.map(c => ({ fileId: String(c.fileId), instructional: !!c.instructional, sectionIds: [...c.sectionIds].sort(), examination: c.examination || null, correction: c.correction || null })).sort((a, b) => a.fileId.localeCompare(b.fileId)));
   const unchanged = !!view?.source?.confirmedBy && canonical(choices) === canonical(view.source.choices || []) && mode === (view.source.mode || 'SOURCE_GROUNDED');
@@ -83,6 +143,27 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
   });
   const selectedExam = choices.some(c => c.examination);
   const missingCoverage = choices.some(c => c.examination?.purpose === 'REVIEW_GUIDE' && !c.examination.coverageIds.length);
+  const documents = view?.source?.documents || [];
+  const filesMatch = !savedFiles || savedFiles.filter(f => /\.(pdf|xlsx)$/i.test(f.originalFileName)).every(f => documents.some(d => String(d.fileId) === String(f.id)));
+  const extracted = filesMatch && documents.length > 0 && documents.every(doc => (doc.workbook || doc.extraction)?.sections?.length > 0);
+  const recordOnly = choices.some(c => c.examination?.purpose === 'RECORD_ONLY');
+  const missingInstruction = unchanged && !recordOnly && mode === 'SOURCE_GROUNDED' && !view.source.instructionVerified;
+  const hint = missingCoverage ? 'Select and confirm examination review coverage.' : missingInstruction ? 'Confirm substantive instructional sources for Source-Grounded generation.' :
+    recoveryIncomplete ? 'Finish reviewing the selected source boundaries.' : 'Review and confirm the current sections and generation mode.';
+  const [failedAction,setFailedAction] = useState('');
+  const extraction = loading || busy ? 'Pending' : failedAction === 'extract' || (!view && error) || (view?.source && !extracted) ? 'Needs attention' : extracted ? 'Completed' : 'Current';
+  const confirmation = unchanged && choices.length && !missingInstruction && !missingCoverage && !recoveryIncomplete && !error ? 'Completed' : 'Needs attention';
+  const academicReview = unchanged && mode === 'OBTL_EXPANSION' && !!lesson && !!view?.source?.instructionVerified;
+  useEffect(() => {
+    onProgress?.({confirmed: unchanged && !blocked && !error && !missingCoverage && !recoveryIncomplete && view?.source?.documents.every(d => d.current !== false), extraction,confirmation,recordOnly,reviewed,academicReview,hint});
+    return () => onProgress?.(null);
+  },[onProgress,unchanged,blocked,error,missingCoverage,recoveryIncomplete,view,extraction,confirmation,recordOnly,reviewed,academicReview,hint]);
+  const listStart = useRef(null);
+  const grouped = documents.map(doc => ({doc, groups: matchingGroups(doc, query, filter)}));
+  const pagination = useSubjectPagination(grouped.flatMap(({groups}) => groups.flatMap(([,items]) => items)),
+    JSON.stringify([view?.source?.id, query, filter]));
+  const displayed = new Set(pagination.items);
+  if (preview) return null;
   function updateExam(fileId, examination) {
     setChoices(items => items.map(c => c.fileId === fileId ? {...c, examination, instructional:false} : c));
   }
@@ -90,7 +171,7 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
     setChoices(previous => {
       const item = previous.find(c => c.fileId === fileId) || { fileId, sectionIds: [], instructional: false };
       const sectionIds = selected ? [...item.sectionIds, sectionId] : item.sectionIds.filter(id => id !== sectionId);
-      const next = {...item, sectionIds};
+      const next = {...item, sectionIds, instructional: false};
       delete next.correction;
       if (isExam && selected) next.examination = {purpose:'RECORD_ONLY', coverageIds:[]};
       else if (isExam) delete next.examination;
@@ -99,7 +180,7 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
   }
   async function run(action, fileId) {
     if (blocked || lock.current) return;
-    lock.current = true; setBusy(true); setError('');
+    lock.current = true; setBusy(true); setFailedAction(''); setError('');
     try {
       if (action === 'recognize') {
         const result = await api.recognizeSources(moduleId, fileId, view.source.id, revisionVersion);
@@ -110,10 +191,10 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
       else if (action === 'review') await api.reviewExpansion(moduleId, view.version, revisionVersion, lesson, acknowledged);
       else await api.confirmSources(moduleId, view.version, revisionVersion, choices, mode);
       if (alive.current) onChanged();
-    } catch (e) { if (alive.current) setError(professorErrorMessage(e)); }
+    } catch (e) { if (alive.current) { setFailedAction(action); setError(professorErrorMessage(e)); } }
     finally { lock.current = false; if (alive.current) setBusy(false); }
   }
-  return <section className={styles.panel} aria-label="Chapter and week source selection">
+  return <section id={onProgress ? "lesson-sources" : undefined} tabIndex={onProgress ? -1 : undefined} className={styles.panel} aria-label="Chapter and week source selection">
     <h3>Chapter / Week Sources</h3>
     <p>Extract saved PDFs or standard HALO workbooks, inspect the exact text and confirm only this module's sections. Week and chapter numbers do not necessarily match.</p>
     <details className={styles.help}><summary>Source selection guidance</summary><p>Keep curriculum plans marked as outline-only. OBTL-Guided expansion accepts confirmed outlines without supplementary PDFs. Source-Grounded lessons require substantive instructional references. Use readable PDFs and check table boundaries against the original pages.</p></details>
@@ -127,23 +208,18 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
       </select></label>
       {mode === 'OBTL_EXPANSION' && <p>AI-generated elaborations use educational knowledge within the confirmed curriculum. They are not text extracted from the OBTL. Review and correct academic accuracy before approval.</p>}
       <p role="status">{unchanged ? 'Sources confirmed. Generate, review and explicitly approve before Students can access the lesson.' : 'Review required. Confirm the current boundaries and generation mode; detection does not approve them.'}</p>
-      <div className={styles.tools}>
+      <div className={styles.tools} ref={listStart} tabIndex={-1} role="group" aria-label="Section list controls">
         <label>Search sections<input type="search" placeholder="Chapter, week or title" value={query} onChange={e => setQuery(e.target.value)}/></label>
         <label>Show<select value={filter} onChange={e => setFilter(e.target.value)}>{['All Sections','Chapters','Weeks','Examinations','Needs Review'].map(item => <option key={item}>{item}</option>)}</select></label>
+        {pagination.total > 5 && <label>Sections per page<select value={pagination.size} onChange={e => pagination.setSize(Number(e.target.value))}>{[5,10,20].map(size => <option key={size}>{size}</option>)}</select></label>}
       </div>
-      {view.source.documents.map(doc => {
+      {grouped.map(({doc, groups}) => {
         const choice = choices.find(c => c.fileId === doc.fileId);
         const hints = suggestions[view.source.id+'/'+doc.fileId];
         if (doc.workbook) {
-          const rows = doc.workbook.sections.filter(s => {
-            const label = [s.id,s.title,s.definition.cells[5],s.definition.cells[6],s.definition.cells[8]].join(' ').toLowerCase();
-            return label.includes(query.trim().toLowerCase()) && (filter === 'All Sections' ||
-              (filter === 'Chapters' && (s.type === 'CHAPTER' || !!s.definition.cells[6])) ||
-              (filter === 'Weeks' && !!s.definition.cells[3]) || (filter === 'Examinations' && s.type === 'EXAMINATION') ||
-              (filter === 'Needs Review' && (!s.complete || s.definition.cells[11] !== 'Verified')));
-          });
+          const rows = groups[0][1].filter(section => displayed.has(section));
           return <fieldset key={doc.fileId} disabled={blocked} className={styles.document}><legend>{doc.name}</legend>
-            {!rows.length && <p>No matching sections in this workbook.</p>}
+
             {rows.map(s => <div key={s.id} className={styles.section}>
               <label><input type="checkbox" disabled={!s.complete || (!choice?.sectionIds.includes(s.id) && (selectedExam || (s.type === 'EXAMINATION' && !!choices.length)))} checked={!!choice?.sectionIds.includes(s.id)} onChange={e=>choose(doc.fileId,s.id,e.target.checked,s.type === 'EXAMINATION')}/>{s.title}</label>
               <small>{[s.type,s.definition.cells[5],s.definition.cells[6] && 'Chapter '+s.definition.cells[6],s.definition.cells[8],s.definition.cells[10],s.definition.cells[11]].filter(Boolean).join(' · ')}</small>
@@ -177,22 +253,10 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
                 })}
               </>}
             </fieldset>}
-            <label><input type="checkbox" disabled={!choice || choice.examination?.purpose === 'RECORD_ONLY'} checked={!!choice?.instructional} onChange={e=>setChoices(items=>items.map(c=>c.fileId===doc.fileId?{...c,instructional:e.target.checked}:c))}/>Selected sections contain substantive instructional explanations, not only curriculum outlines.</label>
+            <label><input type="checkbox" disabled={!choice || choice.examination?.purpose === 'RECORD_ONLY'} checked={!!choice?.instructional} onChange={e=>setChoices(items=>items.map(c=>c.fileId===doc.fileId?{...c,instructional:e.target.checked}:c))}/>I verified that these selected sections explain the material in detail.</label>
+            <small>Topics, outcomes, and activities alone are an outline. Leave the declaration unchecked for outlines and choose OBTL-Guided expansion for Professor-reviewed AI explanations.</small>
           </fieldset>;
         }
-        const visible = doc.extraction.sections.filter(section => {
-          const title = chapterTitle(doc, section);
-          return title.toLowerCase().includes(query.trim().toLowerCase()) &&
-            (filter === 'All Sections' || (filter === 'Needs Review' && boundaryBlocked(section)) ||
-             (filter === 'Examinations' && sectionKind(section) === 'Examination') ||
-             (filter === 'Chapters' && /\bchapters?\b/i.test(title)) || (filter === 'Weeks' && /\bweeks?\b/i.test(title)));
-        });
-        const groups = [
-          ['Ready for Selection', visible.filter(s => !boundaryBlocked(s) && sectionKind(s) !== 'Examination')],
-          ['Examinations and Assessments', visible.filter(s => sectionKind(s) === 'Examination')],
-          ['Detected — Needs Verification', visible.filter(s => boundaryBlocked(s) && s.spans.length && sectionKind(s) !== 'Examination')],
-          ['Unresolved PDF Regions', visible.filter(s => !s.spans.length && sectionKind(s) !== 'Examination')]
-        ];
         return <fieldset key={doc.fileId} disabled={blocked} className={styles.document}>
           <legend>{doc.name}</legend>
           {view.recognitionEnabled && <div>
@@ -200,8 +264,8 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
             {hints && <div role="status">{hints.length ? <ul>{hints.map((h,i) =>
               <li key={i}>{h.heading} · PDF page {h.pages.join(', ')} · {h.sectionId ? 'Review the extracted section below' : 'Boundary unresolved; inspect the original page'}</li>)}</ul> : 'No evidence-backed suggestions.'}</div>}
           </div>}
-          {!visible.length && <p role="status">No matching sections in this PDF.</p>}
-          {groups.filter(([,items]) => items.length).map(([group,items]) => <section key={group} className={styles.group}><h4>{group} <small>({items.length})</small></h4>{items.map(section => {
+
+          {groups.map(([name,items]) => [name,items.filter(section => displayed.has(section))]).filter(([,items]) => items.length).map(([group,items]) => <section key={group} className={styles.group}><h4>{group} <small>({items.length})</small></h4>{items.map(section => {
             const first = section.spans[0];
             const region = first && doc.extraction.pages[first.page-1]?.rows?.find(r => r.start === first.start && r.end === first.end);
             const schedule = region?.gridKey?.startsWith('recovery:merged|') && region.gridKey.split('|')[1];
@@ -239,19 +303,17 @@ export default function LessonSourceSelection({ moduleId, revisionVersion, disab
             </div>}
             </details>
           </div>;})}</section>)}
-          <label><input type="checkbox" disabled={!choice} checked={!!choice?.instructional} onChange={e => setChoices(items => items.map(c => c.fileId === doc.fileId ? { ...c, instructional: e.target.checked } : c))} /> Selected sections contain substantive instructional explanations, not only curriculum outlines.</label>
+          <label><input type="checkbox" disabled={!choice} checked={!!choice?.instructional} onChange={e => setChoices(items => items.map(c => c.fileId === doc.fileId ? { ...c, instructional: e.target.checked } : c))} /> I verified that these selected sections explain the material in detail.</label>
         </fieldset>;
       })}
+      {!pagination.total && <p>No matching sections.</p>}
+      <SubjectPagination pagination={pagination} label="Curriculum section pages" itemName="sections" compact onNavigate={() => listStart.current?.focus()} />
       <p>By confirming, you approve the displayed boundaries for this module. Generation checks relevance and completeness according to the selected mode. Confirming changes clears any previous generated draft.</p>
       <Button disabled={blocked || !choices.length || unchanged || missingCoverage || recoveryIncomplete || choices.some(c => c.correction && (c.sectionIds.length !== 1 || !c.correction.fragments.length))} onClick={() => run('confirm')}>{unchanged ? 'Sources Confirmed' : 'Confirm Selected Sources'}</Button>
-      {mode === 'OBTL_EXPANSION' && unchanged && view.source.instructionVerified && lesson && <fieldset disabled={blocked} className={styles.document}>
+      {mode === 'OBTL_EXPANSION' && unchanged && view.source.instructionVerified && lesson && <fieldset id="lesson-academic-review" tabIndex={-1} disabled={blocked} className={styles.document}>
         <legend>Review AI-generated elaborations</legend>
         <p>The original confirmed curriculum is shown above. Edit the lesson below, check accuracy and scope, then acknowledge your review. This does not publish the lesson.</p>
-        {['objectives', 'knowledge', 'examples', 'summary'].map(field => <label className={styles.reviewField} key={field}>{field === 'knowledge' ? 'Explanations and key concepts' : field === 'examples' ? 'Examples and hospitality scenarios' : field}<textarea rows={5} maxLength={30000} value={lesson[field] || ''} onChange={e => { setLesson({ ...lesson, [field]: e.target.value }); setAcknowledged(false); }} /></label>)}
-        <details><summary>Formatted lesson preview</summary>
-          <p>Edit Markdown in the fields above. Backslashes before Markdown punctuation make it literal; remove intentional formatting escapes in the editor only after reviewing the result. Saving preserves exactly what you entered.</p>
-          {['objectives', 'knowledge', 'examples', 'summary'].map(field => <section key={field} aria-label={`${field} preview`}><h4>{field}</h4><LessonMarkdown>{lesson[field]}</LessonMarkdown></section>)}
-        </details>
+        <AcademicReviewTabs lesson={lesson} onEdit={(field,value) => { setLesson({...lesson,[field]:value}); setAcknowledged(false); }} />
         <label><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)} /> I reviewed these AI-generated elaborations and accept responsibility for academic accuracy and curriculum alignment.</label>
         <Button disabled={blocked || !acknowledged || reviewed} onClick={() => run('review')}>{reviewed ? 'Academic Review Saved' : 'Save Academic Review'}</Button>
         <p role="status">{reviewed ? 'Review saved. Use Approve & Publish or Publish Revision to make this lesson available.' : 'Academic review is required before publication.'}</p>

@@ -258,7 +258,9 @@ export default function SubjectManagement() {
   }
 
   function goToLessonEditor(subject, week) {
-    navigate(`${workflow.basePath}/subjects/${subject.id}/week/${week.id}`, { state: { lessonTitle: week.title } });
+    navigate(`${workflow.basePath}/subjects/${subject.id}/week/${week.id}`, {
+      state: { subjectName: subject.subjectName, weekNumber: week.weekNumber, lessonTitle: week.title }
+    });
   }
 
   return (

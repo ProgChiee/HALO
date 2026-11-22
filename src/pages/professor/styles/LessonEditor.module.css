@@ -75,17 +75,26 @@
 }
 
 .main {
-  composes: focused from "../../../components/shared/PageLayout.module.css";
+  composes: wide from "../../../components/shared/PageLayout.module.css";
   padding: var(--space-xl);
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
 }
 
+main.main { max-width: 1200px; }
+
 .loadingText {
   composes: loading from "../../../components/shared/UIPrimitives.module.css";
   padding: var(--space-xl);
 }
+
+.lessonLocation { display: grid; min-width: 0; gap: var(--space-2); }
+.lessonLocation h2, .metadata, .workflowSteps { margin: 0; }
+.metadata { color: var(--nav-muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.workflowSteps { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.workflowSteps { list-style: none; padding: 0; }
+.workflowSteps li + li::before { content: '\2192' / ''; margin-right: var(--space-2); }
 
 /* --- Panel shared --- */
 .panelCard {
@@ -552,3 +561,38 @@
 .pendingFiles li { display: flex; align-items: center; gap: .65rem; padding: .55rem 0; border-bottom: 1px solid var(--color-border-panel); }
 .pendingFiles span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .pendingFiles button { color: inherit; background: transparent; border: 0; cursor: pointer; text-decoration: underline; }
+.progress {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.stages, .substeps { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: var(--space-3); padding: 0; margin: 0; }
+.stages { list-style: none; }
+.stages li { display: flex; align-items: center; gap: var(--space-2); }
+.stages li:not(:last-child)::after { content: ''; height: 1px; flex: 1; background: var(--color-border); }
+.stages button { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: var(--space-2); padding: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); text-align: left; }
+.stages button span { grid-row: span 2; display: grid; place-items: center; width: 1.7rem; height: 1.7rem; border: 1px solid currentColor; border-radius: 50%; }
+.stages button[aria-current], .stages button[data-state="Completed"] { color: var(--color-primary); }
+.stages button[aria-current] { background: var(--color-primary-soft); border-color: currentColor; }
+.stages button[data-state="Needs attention"] span { color: var(--color-warning-text, #805600); }
+.stages button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.substeps { border-top: 1px solid var(--color-border); padding-top: var(--space-3); margin-top: var(--space-3); }
+.substeps dd, .progress p { margin: 0; color: var(--color-text-secondary); }
+.substeps, .progress p { font-size: var(--text-sm); }
+.progress p { margin-top: var(--space-3); }
+@media (max-width: 680px) {
+  .stages, .substeps { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .stages button { width: 100%; }
+  .stages li:not(:last-child)::after { display: none; }
+  .substeps div { display: flex; justify-content: space-between; gap: var(--space-2); }
+}
+.generatedTabs { display: flex; flex-wrap: wrap; gap: var(--space-1); border-bottom: 1px solid var(--color-border); margin-block: var(--space-3); }
+.generatedTabs button { padding: var(--space-2) var(--space-3); min-height: 44px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.generatedTabs button:hover { background: var(--color-primary-soft); }
+.generatedTabs button[aria-selected="true"] { background: var(--color-primary-soft); border-bottom-color: var(--color-primary); color: var(--color-primary); font-weight: 600; }
+.generatedTabs button:focus-visible, .generatedPanel:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.generatedPanel { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .generatedTabs { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.revisionSummary { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; margin: var(--space-3) 0; padding: 0; }
+.revisionSummary li { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); color: var(--color-text-secondary); font-size: var(--text-sm); }

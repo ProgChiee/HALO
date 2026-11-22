@@ -11,6 +11,7 @@ import LessonSourceSelection from './LessonSourceSelection';
 import { Upload } from 'lucide-react';
 
 export default function LessonRevision({ moduleId, onPublished, onContextChange }) {
+ const [progress,setProgress] = useState(null);
  const { api, preview } = useProfessorWorkflow();
  const [revision, setRevision] = useState(null), [draft, setDraft] = useState(null), [files, setFiles] = useState([]);
  const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState(''), [confirm, setConfirm] = useState(null), [reload, setReload] = useState(0);
@@ -57,6 +58,9 @@ export default function LessonRevision({ moduleId, onPublished, onContextChange 
   setFiles([...files, ...incoming]); setError('');
  }
  const disabled = busy || loading;
+ const currentMaterials = !changed && !disabled && !error;
+ const sourcesConfirmed = currentMaterials && progress?.confirmed;
+ const reviewSaved = sourcesConfirmed && progress.academicReview && progress.reviewed;
  return <section ref={workspace} tabIndex={-1} className={styles.panelCard} aria-label="Published lesson revision">
   <div className={styles.sectionHeading}>
     <h2 className={styles.panelTitle}>{revision ? `Revision ${revision.revisionNumber}` : 'Published Lesson'}</h2>
@@ -68,6 +72,12 @@ export default function LessonRevision({ moduleId, onPublished, onContextChange 
   {!revision && !loading && <Button disabled={busy} onClick={() => setConfirm('start')}>Revise Lesson</Button>}
   {error && <Button variant="secondary" disabled={busy} onClick={() => { setError(''); setLoading(true); setReload(n => n + 1); }}>Reload revision</Button>}
   {revision && draft && <>
+   <ul className={styles.revisionSummary} aria-label="Revision status">
+    <li>{changed ? 'Materials unsaved' : currentMaterials ? 'Materials saved' : 'Checking materials'}</li>
+    <li>{sourcesConfirmed ? 'Sources confirmed' : changed ? 'Check sources after saving' : progress ? 'Sources require attention' : 'Sources unverified'}</li>
+    <li>{reviewSaved ? 'Academic review saved' : progress?.academicReview || changed ? 'Academic review pending' : 'Academic review unverified'}</li>
+    <li>Revision unpublished</li>
+   </ul>
    <ol className={styles.revisionStages} aria-label="Revision stages">
     <li aria-current={changed || revision.state !== 'REVIEWED' ? 'step' : undefined}><span>1</span> Edit Materials</li>
     <li aria-current={!changed && revision.state === 'REVIEWED' ? 'step' : undefined}><span>2</span> Review Changes</li>
@@ -92,7 +102,7 @@ export default function LessonRevision({ moduleId, onPublished, onContextChange 
     <Button variant="secondary" disabled={disabled} onClick={() => setConfirm('discard')}>Discard Revision</Button>
    </div>
    {busy && <p role="status">Processing revision...</p>}
-   {revision.files.length > 0 && <LessonSourceSelection key={`sources-${revision.version}`} moduleId={moduleId} revisionVersion={revision.version} disabled={disabled || changed} onChanged={() => { setLoading(true); setReload(n => n + 1); }} />}
+   {revision.files.length > 0 && <LessonSourceSelection key={`sources-${revision.version}`} moduleId={moduleId} revisionVersion={revision.version} onProgress={setProgress} disabled={disabled || changed} onChanged={() => { setLoading(true); setReload(n => n + 1); }} />}
    {revision.state === 'DRAFT' && revision.generatedKnowledge && <section aria-label="Outline draft"><h4>Professor-only outline plan</h4><GeneratedLessonSections lesson={revision} /></section>}
    {changed && <p className={styles.panelSubtitle}>Save Draft before reviewing or publishing. Your edits stay here when you switch tabs.</p>}
    <section className={styles.revisionReview} aria-label="Review and publish revision">

@@ -38,14 +38,26 @@ async function mount(overrides = {}, mode = {}) {
   return { host, calls, close: async () => { await act(async () => root.unmount()); host.remove(); } };
 }
 
-test('workspace has accessible keyboard tabs, published content is read-only and long sections collapse', async () => {
+test('workspace has accessible keyboard tabs, published content is read-only and generated sections have independent tabs', async () => {
   const ui = await mount();
   try {
-    assert.match(ui.host.textContent, /Subject #7 · Week 3/);
+    assert.equal(ui.host.querySelector('[data-page-topbar] p').textContent, 'Week 3');
     assert.equal(tab('Lesson').getAttribute('aria-selected'), 'true');
     assert.equal(ui.host.querySelectorAll('textarea').length, 0);
     assert.equal(ui.host.querySelectorAll('details[open]').length, 0);
     assert.ok(button('Revise Lesson')); assert.deepEqual(ui.calls, []);
+    const list=ui.host.querySelector('[aria-label="Generated lesson sections"]');
+    assert.equal(list.querySelector('[aria-selected=true]').textContent,'Objectives');
+    for (const label of ['Objectives','Knowledge','Examples','Summary']) {
+      await click(label);
+      const panel=document.getElementById(tab(label).getAttribute('aria-controls'));
+      assert.equal(panel.hidden,false);
+      assert.equal(panel.textContent,lesson['generated'+label]);
+      assert.equal(panel.getAttribute('aria-labelledby'),tab(label).id);
+    }
+    await act(async()=>tab('Summary').dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})));
+    assert.equal(document.activeElement,tab('Objectives'));
+    assert.deepEqual(ui.calls,[]);
     const tabs = ['Lesson', 'Assessment', 'Revision History'];
     for (const label of tabs) assert.ok(document.getElementById(tab(label).getAttribute('aria-controls')));
     tab('Lesson').focus();
@@ -57,7 +69,7 @@ test('workspace has accessible keyboard tabs, published content is read-only and
     assert.match(ui.host.textContent, /No published revision history/);
     await act(async () => tab('Revision History').dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
     assert.equal(document.activeElement, tab('Lesson'));
-    assert.equal(ui.host.querySelectorAll('[role="tabpanel"]:not([hidden])').length, 1);
+    assert.equal(ui.host.querySelectorAll('main > [role="tabpanel"]:not([hidden])').length, 1);
   } finally { await ui.close(); }
 });
 
@@ -68,7 +80,7 @@ test('unsaved revision fields and files survive tab switches, preserving version
     const text = ui.host.querySelector('#revision-text'); await fill(text, 'Unsaved revision');
     const input = ui.host.querySelector('#revision-files'); Object.defineProperty(input, 'files', { configurable: true, value: [file] });
     await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-    await click('Assessment'); await click('Revision History'); await click('Lesson');
+    await click('Knowledge'); await click('Summary'); await click('Assessment'); await click('Revision History'); await click('Lesson');
     assert.equal(ui.host.querySelector('#revision-text'), text); assert.equal(text.value, 'Unsaved revision');
     assert.equal(button('Review Changes').disabled, true); assert.equal(button('Publish Revision').disabled, true);
     assert.equal(saved, undefined); await click('Save Draft');
@@ -138,4 +150,39 @@ test('Admin Preview stays read-only and Acting uses its supplied workflow API', 
   const acting = await mount({ getRevision: async id => { assert.equal(id, 37); read++; return draft; } }, { acting: true, target: { name: 'Selected Professor' }, basePath: '/admin/professor-mode', leave() {} });
   try { assert.equal(read, 1); assert.ok(button('Save Draft')); assert.match(acting.host.textContent, /Changes affect real academic data and are audited/); }
   finally { await acting.close(); }
+});
+test('Art Appreciation revision keeps outline declarations, live preview and saved review distinct',async()=>{
+ const title='The Elements of Art';
+ const file={key:'art',originalFileName:'HALO_OBTL_Art_Appreciation_Filled.xlsx'};
+ const row={id:'SEC-003',type:'WEEK',complete:true,title,definition:{row:8,cells:[]},content:[]};
+ const fields={objectives:title,knowledge:'Line and shape',examples:'Sketch',summary:'Review'};
+ const source={confirmedBy:5,mode:'OBTL_EXPANSION',instructionVerified:true,review:{},
+   documents:[{fileId:3,name:file.originalFileName,workbook:{sections:[row]}}],
+   choices:[{fileId:3,sectionIds:[row.id],instructional:false}]};
+ const writes=[];
+ const ui=await mount({getRevision:async()=>({...draft,files:[file]}),getSources:async()=>({version:4,source,lesson:fields}),
+   reviewExpansion:async(...args)=>writes.push(args)});
+ try {
+  const status=()=>ui.host.querySelector('[aria-label="Revision status"]').textContent;
+  assert.match(status(),/Sources confirmedAcademic review savedRevision unpublished/);
+  assert.match(ui.host.textContent,/activities alone are an outline/);
+  const declaration=[...ui.host.querySelectorAll('label')].find(el=>el.textContent.startsWith('I verified'));
+  assert.equal(declaration.querySelector('input').checked,false);
+  const field=ui.host.querySelector('#lesson-academic-review textarea');
+  await fill(field,'Study **colour**');
+  const tabs=ui.host.querySelector('[aria-label="Academic review"]');
+  await act(async()=>tabs.querySelector('button').dispatchEvent(new window.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})));
+  assert.equal(document.activeElement.textContent,'Preview');
+  assert.equal(ui.host.querySelector('#lesson-academic-review [role=tabpanel]:not([hidden]) strong').textContent,'colour');
+  assert.match(status(),/Academic review pending/);
+  assert.equal(button('Save Academic Review').disabled,true);
+  assert.deepEqual(writes,[]);
+  await click('Edit');assert.equal(field.value,'Study **colour**');
+  await fill(ui.host.querySelector('#revision-text'),'Changed materials');
+  assert.match(status(),/Materials unsavedCheck sources after saving/);
+  await fill(ui.host.querySelector('#revision-text'),draft.lessonText);
+  await act(async()=>ui.host.querySelector('#lesson-academic-review input[type=checkbox]').click());
+  await click('Save Academic Review');
+  assert.deepEqual(writes,[[37,4,8,{...fields,objectives:'Study **colour**'},true]]);
+ }finally{await ui.close();}
 });

@@ -17,13 +17,13 @@ before(async () => {
 });
 after(async()=>{await server?.close();dom?.window.close();});
 const moduleData=(id,text)=>({id,lessonText:text,files:[],status:'PENDING',aiGenerationStatus:'PENDING'});
-async function fixture(run) {
+async function fixture(run, state) {
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const old=api.defaults.adapter;
  const pending=[],toasts=[];let navigate;
  api.defaults.adapter=config=>new Promise((resolve,reject)=>pending.push({config,resolve:data=>resolve({data,status:200,headers:{},config}),reject}));
  function Nav(){navigate=Router.useNavigate();return null;}
  try {
-  await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Professor'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast:(...args)=>toasts.push(args)}},React.createElement(Router.MemoryRouter,{initialEntries:['/professor/subjects/1/week/10']},React.createElement(Nav),React.createElement(Router.Routes,{},React.createElement(Router.Route,{path:'/professor/subjects/:subjectId/week/:weekId',element:React.createElement(Editor)})))))));
+  await act(async()=>root.render(React.createElement(AuthContext.Provider,{value:{user:{name:'Professor'},logout(){}}},React.createElement(ToastContext.Provider,{value:{showToast:(...args)=>toasts.push(args)}},React.createElement(Router.MemoryRouter,{initialEntries:[{pathname:'/professor/subjects/1/week/10',state}]},React.createElement(Nav),React.createElement(Router.Routes,{},React.createElement(Router.Route,{path:'/professor/subjects/:subjectId/week/:weekId',element:React.createElement(Editor)})))))));
   await run({host,pending,toasts,go:async path=>act(async()=>navigate(path)),resolve:async(index,data)=>act(async()=>pending[index].resolve(data)),root});
  }finally{await act(async()=>root.unmount());host.remove();api.defaults.adapter=old;}
 }
@@ -168,3 +168,58 @@ test('published lesson breadcrumb follows the existing revision state',async()=>
  await resolve(index,{version:1,revisionNumber:2,state:'REVIEWED',files:[]});
  assert.equal(current(),'Review Revision');
 }));
+test('Edit Draft places the full lesson title below the breadcrumb and before instructions',async()=>{
+ const lessonTitle='A long lesson title for the Professor draft workspace '.repeat(5);
+ await fixture(async({host,resolve})=>{
+  await resolve(0,moduleData(1,'Draft materials'));
+  const heading=host.querySelector('h1').closest('header');
+  const trail=host.querySelector('main nav[aria-label="Breadcrumb"]');
+  const title=trail.nextElementSibling;
+  assert.equal(heading.querySelector('h1').textContent,'Lesson Management');
+  assert.equal(heading.nextElementSibling,trail.closest('main'));
+  assert.equal(heading.querySelector('nav'),null);
+  assert.ok(trail.compareDocumentPosition(title)&window.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.match(heading.textContent,/Draft/);
+  assert.equal(trail.querySelector('[aria-current="page"]').textContent,'Edit Draft');
+  assert.equal(title.nextElementSibling.getAttribute('aria-label'),'Lesson creation progress');
+  assert.match(title.nextElementSibling.querySelector('[aria-current=step]').textContent,/Generate with AI/);
+  assert.equal(title.textContent,lessonTitle.trim());
+  assert.match(trail.parentElement.nextElementSibling.textContent,/Draft: Save Materials/);
+ },{lessonTitle,subjectName:'Hospitality'});
+});
+test('draft progress follows saved sources, current confirmation and unsaved mode changes',async()=>fixture(async({host,pending,resolve})=>{
+ const file={id:3,originalFileName:'OBTL.pdf'};
+ await resolve(0,{...moduleData(1,'Draft'),files:[file],aiGenerationStatus:'COMPLETED'});
+ const progress=()=>host.querySelector('[aria-label="Lesson creation progress"]');
+ const states=()=>[...progress().querySelectorAll('dd')].map(el=>el.textContent);
+ const section={id:'one',heading:'Week 1',spans:[{page:1,start:0,end:5}],titleMatches:1,warnings:[]};
+ const source={id:'selection',confirmedBy:1,mode:'OBTL_EXPANSION',instructionVerified:true,choices:[{fileId:3,sectionIds:['one']}],documents:[{fileId:3,name:'OBTL.pdf',extraction:{pages:[{text:'Topic'}],sections:[section]}}]};
+ assert.deepEqual(states(),['Completed','Pending','Pending']);
+ await resolve(pending.findIndex(p=>p.config.url.endsWith('/sources')),{version:1,source});
+ assert.deepEqual(states(),['Completed','Completed','Completed']);
+ assert.match(progress().querySelector('[aria-current]').textContent,/Review & Publish/);
+ const mode=host.querySelector('[aria-label="Chapter and week source selection"] select');
+ await act(async()=>{mode.value='SOURCE_GROUNDED';mode.dispatchEvent(new Event('change',{bubbles:true}));});
+ assert.deepEqual(states(),['Completed','Completed','Needs attention']);
+ assert.equal(progress().querySelectorAll('button')[1].disabled,true);
+ await act(async()=>progress().querySelector('button').click());
+ assert.equal(document.activeElement.id,'lesson-sources');
+}));
+test('header uses saved curriculum labels independently of route IDs and draft status',async()=>{
+ const cases=[
+  [{subjectName:'Art Appreciation',weekNumber:3,lessonTitle:'The Elements of Art'},'Art Appreciation · Week 3'],
+  [{subjectName:'Applied Business Tools',weekNumber:7,lessonTitle:'Chapter 2: Service Operations'},'Applied Business Tools · Chapter 2'],
+  [{subjectName:'Bar & Beverage Management',lessonTitle:'Weeks 3–4 — Service'},'Bar & Beverage Management · Weeks 3–4'],
+  [{subjectName:'Art Appreciation'},'Art Appreciation'],
+  [{lessonTitle:'The Elements of Art'},'The Elements of Art'],
+  [{},null]
+ ];
+ for(const [state,expected] of cases) await fixture(async({host,pending,resolve})=>{
+  assert.match(pending[0].config.url,/10/);
+  await resolve(0,moduleData(1,'Lesson'));
+  const header=host.querySelector('[data-page-topbar]');
+  assert.equal(header.querySelector('p')?.textContent ?? null,expected);
+  assert.match(header.textContent,/Draft/);
+  assert.doesNotMatch(header.textContent,/Subject #|Week record #|undefined|null/);
+ },state);
+});
