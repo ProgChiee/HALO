@@ -84,7 +84,6 @@ function ModuleLessonChat({ topicId, weekId }) {
   useEffect(() => {
     const controller = new AbortController();
     requestScope.current = controller;
-    const openedAt = Date.now();
     sendLock.current = false;
     loadLessonChat({
       subjectId: topicId, weekId, signal: controller.signal, getLesson: getWeekLesson, openMentor: openSession,
@@ -96,12 +95,10 @@ function ModuleLessonChat({ topicId, weekId }) {
       },
       onMentor: (conversation) => {
         const first = conversation.messages[0];
-        // Normal/Support timestamps are Manila wall time; Preview uses server-local time.
-        // Do not guess freshness for Preview or for missing timestamps.
-        const createdAt = first?.createdAt && !workflow.preview
-          ? Date.parse(first.createdAt + (/[zZ]|[+-]\d\d:\d\d$/.test(first.createdAt) ? '' : '+08:00')) : NaN;
-        const fresh = !conversation.hasOlder && (conversation.messages.length === 0
-          || (conversation.messages.length === 1 && first.sender === 'HALO' && createdAt >= openedAt && createdAt <= Date.now()));
+        // A session containing only its initial server greeting has no student exchange yet.
+        const fresh = !conversation.hasOlder && (conversation.messages.length === 0 ||
+          (conversation.messages.length === 1 && first.sender === 'HALO' &&
+            first.message === "Hi! I'm HALO. What would you like to work on in this lesson?"));
         setShowSuggestions(fresh);
         setBeforeId(conversation.hasOlder ? conversation.nextBeforeId : null);
         setSessionId(conversation.sessionId);

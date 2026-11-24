@@ -129,7 +129,12 @@ public final class ExcelObtl {
         var sections=new ArrayList<Section>();
         for(var r:defs){
             var rows=content.get(r.at(0));check(!rows.isEmpty(),"SECTIONS row "+r.row+" missing CONTENT");
-            sections.add(new Section(r.at(0),r.at(2),r.at(7),r,rows,"Complete".equalsIgnoreCase(r.at(10))));
+            // Transfer status permits review of validated rows; professor confirmation is stored separately.
+            boolean selectable = switch (r.at(10).strip().toLowerCase(Locale.ROOT)) {
+                case "complete", "transferred", "source transferred" -> true;
+                default -> false;
+            };
+            sections.add(new Section(r.at(0),r.at(2),r.at(7),r,rows,selectable));
         }
         return new Evidence(VERSION,course,outcomes(sheets,"PILO"),outcomes(sheets,"CILO"),sheets.containsKey("COURSE_DETAILS")?table(sheets,"COURSE_DETAILS","Category *|Item Label *|Official OBTL Text *|Source PDF Page(s)|Transfer Review"):List.of(),sections);
     }

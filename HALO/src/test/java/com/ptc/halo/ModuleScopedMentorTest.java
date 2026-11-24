@@ -100,9 +100,12 @@ class ModuleScopedMentorTest {
         assertThrows(ResponseStatusException.class,()->index.getOrBuild(module));scope.acknowledgeExpansion(module,5L);
         var old=new MentorMessageEntity();old.setSender(MessageSender.HALO);old.setMessage("SECRET_ITALIAN prior revision");old.setSourceSelectionId(UUID.randomUUID().toString());when(messages.findTop10BySessionIdOrderByCreatedAtDesc(21L)).thenReturn(List.of(old));
         var selected=ids();decision(true,selected,"Cumin adds earthy flavor.");
-        assertTrue(mentor.sendMessage(21L,student,"Explain cumin.").getHaloMessage().contains("Professor-approved AI-generated lesson"));
+        assertEquals("Cumin adds earthy flavor.",mentor.sendMessage(21L,student,"Explain cumin.").getHaloMessage());
         var input=ArgumentCaptor.forClass(String.class);verify(replySpec).user(input.capture());
         assertTrue(input.getValue().contains("approvedLessonExcerpts"));assertTrue(input.getValue().contains("APPROVED_ELABORATION"));assertFalse(input.getValue().contains("SECRET_ITALIAN"));
+        String markdown = "### Middle Eastern spices\n\n- **Cumin** adds an earthy flavor.\n\nSource: Chapter 1, approved lesson.";
+        decision(true,selected,markdown);
+        assertEquals(markdown,mentor.sendMessage(21L,student,"Give a chapter example.").getHaloMessage());
         decision(false,List.of(),"");assertEquals(MentorService.OUT_OF_SCOPE,mentor.sendMessage(21L,student,"Teach Italian cuisine.").getHaloMessage());
         decision(true,List.of("other-selection:lesson:0"),"Foreign");assertThrows(ResponseStatusException.class,()->mentor.sendMessage(21L,student,"Explain another chapter."));
     }

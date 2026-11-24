@@ -29,11 +29,11 @@ after(async () => { await server.close(); dom.window.close(); });
 
 test('fresh welcome suggestions share send locking and never appear on restored history', async () => {
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
-  let resolveSend, calls = [], history = [], freshTimestamp = false;
+  let resolveSend, calls = [], history = [], seedOnly = false;
   const api = {
     getWeekLesson: async () => ({ id: 2, subjectId: 1, weekId: 2, weekNumber: 1, status: 'APPROVED', aiGenerationStatus: 'COMPLETED', files: [] }),
-    openSession: async () => ({ moduleId: 2, sessionId: 1, messages: freshTimestamp
-      ? [{ id: 1, sender: 'HALO', message: 'Server welcome', createdAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace('Z', '') }]
+    openSession: async () => ({ moduleId: 2, sessionId: 1, messages: seedOnly
+      ? [{ id: 1, sender: 'HALO', message: "Hi! I'm HALO. What would you like to work on in this lesson?", createdAt: '2020-01-01T00:00:00' }]
       : history }),
     recordLessonStudy: async () => {},
     sendMessage: (...args) => { calls.push(args); return new Promise(resolve => { resolveSend = resolve; }); },
@@ -63,7 +63,7 @@ test('fresh welcome suggestions share send locking and never appear on restored 
     await act(async () => render('restored'));
     assert.equal(host.querySelector('[aria-label="Explore this lesson"]'), null);
     assert.ok(host.textContent.includes('Original greeting'));
-    freshTimestamp = true;
+    seedOnly = true;
     await act(async () => render('new-server-session'));
     assert.equal(host.querySelectorAll('[aria-label="Explore this lesson"] button').length, 4);
   } finally { await act(async () => root.unmount()); host.remove(); }

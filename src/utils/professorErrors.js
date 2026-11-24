@@ -13,7 +13,7 @@ const MESSAGES = {
   INVALID_EXPANSION_CONTENT: "Complete objectives, explanations, examples and summary (up to 30,000 characters each).",
   SOURCE_BOUNDARY_REVIEW_REQUIRED: "Table boundaries could not be isolated safely. Review the original PDF and provide a clearly bounded chapter-specific reference, then extract again.",
   SCOPED_SOURCE_PDF_REQUIRED: "Chapter-scoped selection requires readable PDF files. Replace image sources with instructional PDFs.",
-  SOURCE_CONFIRMATION_REQUIRED: "Extract and confirm the chapter-specific PDF sources before generation or approval.",
+  SOURCE_CONFIRMATION_REQUIRED: "Extract the saved PDF or HALO workbook and confirm the selected sections before generation or approval.",
   SOURCE_EXTRACTION_FAILED: "Source extraction failed. Use a readable, unprotected PDF and try again.",
   SOURCE_REEXTRACTION_REQUIRED: "Materials or the extraction version changed. Use Extract / Refresh Sources, review the new boundaries, select the generation mode and confirm again. Published lessons stay unchanged.",
   SOURCE_SCOPE_UNAVAILABLE: "The saved source selection is unavailable. Re-extract and review the sources.",

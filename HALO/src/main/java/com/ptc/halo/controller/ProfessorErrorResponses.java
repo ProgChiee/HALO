@@ -22,7 +22,7 @@ public class ProfessorErrorResponses {
         Map.entry("INSTRUCTIONAL_SOURCES_REQUIRED", "Source-Grounded mode requires instructional references. Add and confirm them, or explicitly confirm OBTL-Guided AI Lesson Expansion and regenerate before review and publication."),
         Map.entry("INVALID_SOURCE_SELECTION", "The selected source sections are invalid. Reload and review them."),
         Map.entry("SCOPED_SOURCE_PDF_REQUIRED", "Chapter-scoped selection requires readable PDF files. Replace image sources with instructional PDFs."),
-        Map.entry("SOURCE_CONFIRMATION_REQUIRED", "Extract and confirm the chapter-specific PDF sources before generation or approval."),
+        Map.entry("SOURCE_CONFIRMATION_REQUIRED", "Extract the saved PDF or HALO workbook and confirm the selected sections before generation or approval."),
         Map.entry("SOURCE_EXTRACTION_FAILED", "Source extraction failed. Use a readable, unprotected PDF and try again."),
         Map.entry("SOURCE_REEXTRACTION_REQUIRED", "Materials changed. Extract and confirm the sources again."),
         Map.entry("SOURCE_SCOPE_UNAVAILABLE", "The saved source selection is unavailable. Re-extract and review the sources."),

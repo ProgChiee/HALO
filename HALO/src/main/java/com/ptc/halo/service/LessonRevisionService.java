@@ -17,6 +17,7 @@ import java.util.*;
 /** Called inside the normal Professor/acting authorization transaction, except AI preparation. */
 @Service
 public class LessonRevisionService {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(LessonRevisionService.class);
  private final LessonRevisionRepository revisions;
  private final LessonRevisionHistoryRepository history;
  @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
@@ -66,8 +67,8 @@ public class LessonRevisionService {
   m.getFiles().size();m.getWeek().getSubject().getSubjectName();
   return m;
  }
- private Payload payload(LessonRevisionEntity r){try{return json.readValue(r.payload,Payload.class);}catch(Exception e){throw new IllegalStateException("Revision unavailable",e);}}
- private void payload(LessonRevisionEntity r,Payload p){try{r.payload=json.writeValueAsString(p);}catch(Exception e){throw new IllegalStateException("Revision unavailable",e);}}
+ private Payload payload(LessonRevisionEntity r){try{return json.readValue(r.payload,Payload.class);}catch(Exception e){LOG.warn("lesson_upload_failure stage=REVISION_JSON_DECODE exceptionType={}",e.getClass().getSimpleName());throw new IllegalStateException("Revision unavailable",e);}}
+ private void payload(LessonRevisionEntity r,Payload p){try{r.payload=json.writeValueAsString(p);}catch(Exception e){LOG.warn("lesson_upload_failure stage=REVISION_JSON_ENCODE exceptionType={}",e.getClass().getSimpleName());throw new IllegalStateException("Revision unavailable",e);}}
  private Payload publishedPayload(AiLearningModuleEntity m){
   return new Payload(m.getLessonText(),m.getYoutubeLink(),m.getAiNotes(),m.getFiles().stream().map(f->new Attachment(UUID.randomUUID().toString(),f.getId(),f.getOriginalFileName(),f.getStoredFileName(),f.getFilePath(),f.getFileType(),true)).toList(),m.getGeneratedObjectives(),m.getGeneratedKnowledge(),m.getGeneratedExamples(),m.getGeneratedSummary(),null,m.getSourceScope());
  }

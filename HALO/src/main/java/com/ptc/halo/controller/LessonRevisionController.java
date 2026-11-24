@@ -21,6 +21,7 @@ import java.util.*;
 @RequestMapping({"/api/professor/ai-learning-modules/{id}/revision","/api/admin/acting/professor/ai-learning-modules/{id}/revision"})
 @PreAuthorize("hasAnyRole('PROFESSOR','ADMIN')")
 public class LessonRevisionController extends ProfessorErrorResponses {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(LessonRevisionController.class);
  private final LessonRevisionService revisions;private final UserRepository users;private final AdminProfessorModeService acting;private final TransactionTemplate tx;
  public LessonRevisionController(LessonRevisionService revisions,UserRepository users,AdminProfessorModeService acting,PlatformTransactionManager manager){this.revisions=revisions;this.users=users;this.acting=acting;tx=new TransactionTemplate(manager);}
  @FunctionalInterface interface Work<T>{T run(UserEntity professor,AdminActingSessionEntity session)throws Exception;}
@@ -42,7 +43,12 @@ public class LessonRevisionController extends ProfessorErrorResponses {
  @GetMapping("/history/{revisionNumber}") public Object historyVersion(@PathVariable Long id,@PathVariable int revisionNumber,Authentication auth,HttpServletRequest request){return access(auth,request,(p,a)->revisions.historyVersion(id,revisionNumber,p));}
  @PostMapping public Object start(@PathVariable Long id,Authentication auth,HttpServletRequest request){return access(auth,request,(p,a)->revisions.start(id,p,a));}
  @PutMapping(consumes="multipart/form-data") public Object save(@PathVariable Long id,@Valid @RequestPart("revision") Save save,@RequestPart(value="files",required=false) List<MultipartFile> files,Authentication auth,HttpServletRequest request){
-  return access(auth,request,(p,a)->revisions.save(id,save.version(),save.materials(),save.keepFiles(),files,p,a));
+  try {
+   return access(auth,request,(p,a)->revisions.save(id,save.version(),save.materials(),save.keepFiles(),files,p,a));
+  } catch(org.springframework.dao.DataAccessException | org.springframework.transaction.TransactionException | jakarta.persistence.PersistenceException failure) {
+   LOG.warn("lesson_upload_failure stage=DATABASE_ACCESS_OR_COMMIT exceptionType={}",failure.getClass().getSimpleName());
+   throw failure;
+  }
  }
  @DeleteMapping @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
  public void discard(@PathVariable Long id,@RequestParam Long version,Authentication auth,HttpServletRequest request){access(auth,request,(p,a)->{revisions.discard(id,version,p,a);return null;});}

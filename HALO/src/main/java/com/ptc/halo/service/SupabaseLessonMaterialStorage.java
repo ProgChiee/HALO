@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 @Component @Primary
 @ConditionalOnProperty(name="halo.lesson-storage.provider", havingValue="supabase")
 public class SupabaseLessonMaterialStorage implements LessonMaterialStorage {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(SupabaseLessonMaterialStorage.class);
     /** Numeric status only: never retain response bodies, URLs, keys or credentials. */
     public static final class HttpFailure extends IOException {
         private final int status;
@@ -79,9 +80,20 @@ public class SupabaseLessonMaterialStorage implements LessonMaterialStorage {
         return bytes;
     }
     @Override public void writeNew(String key,byte[] bytes,String mediaType) throws IOException {
-        String path=encoded(key); requirePrivate();
-        send(request("object/"+BUCKET+"/"+path).header("Content-Type",mediaType).header("x-upsert","false")
-            .POST(HttpRequest.BodyPublishers.ofByteArray(bytes)).build(),64*1024);
+        String stage = "BUCKET_CHECK";
+        try {
+            requirePrivate();
+            stage = "OBJECT_UPLOAD";
+            String path = encoded(key);
+            send(request("object/"+BUCKET+"/"+path).header("Content-Type",mediaType).header("x-upsert","false")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(bytes)).build(),64*1024);
+        } catch (IOException | RuntimeException failure) {
+            String status = failure instanceof HttpFailure http ? Integer.toString(http.status())
+                : failure instanceof MissingResource ? "404" : "unknown";
+            LOG.warn("lesson_upload_failure stage={} exceptionType={} storageHttpStatus={}",
+                stage, failure.getClass().getSimpleName(), status);
+            throw failure;
+        }
     }
     @Override public void delete(String reference) throws IOException {
         String key=key(reference); requirePrivate();

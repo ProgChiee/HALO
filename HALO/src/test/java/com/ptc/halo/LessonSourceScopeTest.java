@@ -65,6 +65,28 @@ class LessonSourceScopeTest {
         when(storage.read("original")).thenReturn(new byte[]{0});
         assertThrows(ResponseStatusException.class,()->scope.confirm(module,choices,5L));
     }
+    @Test void cateringTransferredRowsRequireExplicitConfirmationAndReview() throws Exception {
+        String path=System.getenv("HALO_CATERING_XLSX");
+        Assumptions.assumeTrue(path!=null);
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Path.of(path));
+        var upload=new FileUploadService(storage).validate(new org.springframework.mock.web.MockMultipartFile("files","catering.xlsx",ExcelObtl.MIME,bytes));
+        var file=module.getFiles().get(0);file.setFileType(upload.mediaType());file.setOriginalFileName(upload.originalName());
+        when(storage.read("original")).thenReturn(bytes);
+        module.setSourceScope(scope.extract(module));
+        var snapshot=scope.read(module.getSourceScope());
+        var section=snapshot.documents().get(0).workbook().sections().get(0);
+        assertTrue(section.complete());
+        assertTrue(section.definition().cells().get(10).toLowerCase(java.util.Locale.ROOT).contains("transferred"));
+        assertNull(snapshot.confirmedBy());
+        assertThrows(ResponseStatusException.class,()->scope.index(module,false));
+        module.setSourceScope(scope.confirm(module,List.of(new LessonSourceScope.Choice(file.getId(),List.of(section.id()),false)),5L,LessonSourceScope.Mode.OBTL_EXPANSION));
+        expansionProvider(true);
+        generation.generateRevision(module);
+        assertThrows(ResponseStatusException.class,()->scope.requirePublishedReady(module));
+        scope.acknowledgeExpansion(module,5L);
+        scope.requirePublishedReady(module);
+        assertEquals(scope.read(module.getSourceScope()),scope.read(scope.write(scope.read(module.getSourceScope()))));
+    }
     @Test void abttMidtermCoverageIsExplicitAndExclusive() throws Exception {
         String path=System.getenv("HALO_ABTT_XLSX");Assumptions.assumeTrue(path!=null);
         byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Path.of(path));

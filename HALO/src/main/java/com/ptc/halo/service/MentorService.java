@@ -687,7 +687,7 @@ JsonNode reply = json(chatClient.prompt().system("""
             String answer = reply.path("answer").asText();
             if (answer.length() > 12000) throw new IllegalStateException("Answer too long");
             // Sources above remain mandatory and validated; only the natural answer is displayed.
-            return LessonSourceScope.isExpansion(module.getSourceScope())?answer+"\n\n*Teaching reference: Professor-approved AI-generated lesson; OBTL defines curriculum scope.*":answer;
+            return answer;
         } catch (Exception error) {
             log.error("module_mentor_failure moduleId={} exceptionType={}", module.getId(), error.getClass().getSimpleName());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "MENTOR_PROVIDER_UNAVAILABLE");
