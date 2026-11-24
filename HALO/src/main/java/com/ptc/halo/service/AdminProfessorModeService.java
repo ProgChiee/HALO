@@ -67,7 +67,7 @@ public class AdminProfessorModeService {
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     public ResponseEntity<AiLearningModuleResponse> approve(Authentication authentication,String sessionId,Long moduleId) {
         var captured=execute(authentication,sessionId,s -> {
-            var module=modules.findModule(moduleId,s.getTarget());
+            var module=modules.writableModule(moduleId,s.getTarget());
             modules.requireApprovalReady(module);
             return module;
         });
@@ -75,7 +75,7 @@ public class AdminProfessorModeService {
         index.getOrBuild(captured);
         var prepared=assessments.prepareAssessment(captured);
         return execute(authentication,sessionId,s -> {
-            var current=modules.findModule(moduleId,s.getTarget());
+            var current=modules.writableModule(moduleId,s.getTarget());
             if (!Objects.equals(current.getVersion(),captured.getVersion()))
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"STALE_MODULE_OPERATION");
             modules.requireApprovalReady(current);

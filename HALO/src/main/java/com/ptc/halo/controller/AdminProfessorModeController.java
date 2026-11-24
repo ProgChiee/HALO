@@ -52,6 +52,12 @@ public class AdminProfessorModeController {
     public Object updateSubject(@PathVariable @Positive Long id, @Valid @RequestBody SubjectUpdateRequest request, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
         return mode.execute(authentication,sessionId.toString(),s -> academic.updateSubject(id,request,s.getTarget(),s));
     }
+    @PutMapping("/subjects/{id}/{state:archive|restore}")
+    public Object changeArchive(@PathVariable @Positive Long id, @PathVariable String state, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
+        boolean archive = state.equals("archive");
+        return mode.execute(authentication,sessionId.toString(),s -> academic.setArchived(id,archive,s.getTarget(),s));
+    }
+
     @DeleteMapping("/subjects/{id}")
     public Object deleteSubject(@PathVariable @Positive Long id, @RequestHeader("X-Acting-Session") java.util.UUID sessionId, Authentication authentication) {
         return mode.execute(authentication,sessionId.toString(),s -> { academic.deleteSubject(id,s.getTarget(),s); return "Subject deleted successfully"; });

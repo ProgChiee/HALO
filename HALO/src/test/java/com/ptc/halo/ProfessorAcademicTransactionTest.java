@@ -40,6 +40,18 @@ class ProfessorAcademicTransactionTest {
  SubjectUpdateRequest editSubject() {var r=new SubjectUpdateRequest();r.setSubjectCode("CHANGED");r.setSubjectName("Changed");r.setYearLevel(YearLevel.SECOND_YEAR);return r;}
  WeekRequest week() {var r=new WeekRequest();r.setWeekNumber(1);r.setTitle("Original week");return r;}
  WeekUpdateRequest editWeek() {var r=new WeekUpdateRequest();r.setWeekNumber(2);r.setTitle("Changed week");return r;}
+ @Test void archiveLocksEditingAndRestoreKeepsTheSameSubjectAndWeek(){
+  var id=service.createSubject(subject("ARCHIVE"),actor).getId();
+  var weekId=service.createWeek(id,week(),actor).getId();
+  service.setArchived(id,true,actor,null);
+  var archived=service.viewSubjectById(id,actor).getArchivedAt();
+  assertNotNull(archived);
+  assertEquals(archived,service.setArchived(id,true,actor,null).getArchivedAt());
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.updateWeek(weekId,editWeek(),actor));
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->service.updateSubject(id,editSubject(),actor));
+  assertNull(service.setArchived(id,false,actor,null).getArchivedAt());
+  assertEquals(weekId,service.updateWeek(weekId,editWeek(),actor).getId());
+ }
  @Test void allSixSuccessfulMutationsCommitWithTheirAuditRecords() {
   assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
   Long subject=service.createSubject(subject("S"),actor).getId();assertTrue(subjects.existsById(subject));assertEquals(1,logs.count());

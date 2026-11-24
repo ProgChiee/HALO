@@ -31,6 +31,12 @@ public class SubjectEntity {
     @Enumerated(EnumType.STRING)
     private YearLevel yearLevel;
 
+    @Column(name = "archived_at")
+    private java.time.LocalDateTime archivedAt;
+
+    public java.time.LocalDateTime getArchivedAt() { return archivedAt; }
+    public void setArchivedAt(java.time.LocalDateTime archivedAt) { this.archivedAt = archivedAt; }
+
     public SubjectEntity() {
     }
 

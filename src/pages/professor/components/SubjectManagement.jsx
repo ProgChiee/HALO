@@ -1,3 +1,5 @@
+import SubjectPagination from '../../../components/shared/SubjectPagination';
+import { useSubjectPagination } from '../../../hooks/useSubjectPagination';
 import SubjectCover from '../../../components/shared/SubjectCover';
 import SubjectCoverDialog from './SubjectCoverDialog';
 import Breadcrumb from '../../../components/shared/Breadcrumb';
@@ -7,7 +9,7 @@ import { professorErrorMessage } from '../../../utils/professorErrors';
 import { logProfessorError } from '../../../utils/professorDiagnostics';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
+import { Archive, ArchiveRestore, BookOpen, Plus, Pencil, Trash2, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
 import PageShell from './ProfessorPageShell';
 import Button from '../../../components/shared/Button';
 import { useToast } from '../../../context/notifications/useToast';
@@ -35,6 +37,10 @@ export default function SubjectManagement() {
   const navigate = useNavigate();
 
   const { data: subjects, setData: setSubjects, isLoading, error: loadError, reload: loadSubjects } = useRemoteData(getSubjects, []);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const visibleSubjects = subjects.filter(subject => Boolean(subject.archivedAt) === showArchived);
+  const pagination = useSubjectPagination(visibleSubjects, showArchived);
   const [coverSubject,setCoverSubject]=useState(null);
   const [coverRevisions,setCoverRevisions]=useState({});
   const [expandedId, setExpandedId] = useState(null);
@@ -164,6 +170,24 @@ export default function SubjectManagement() {
     }
   }
 
+  async function changeArchive() {
+    const current = startOperation();
+    if (!current) return;
+    setIsSubmitting(true);
+    try {
+      const archive = !archiveTarget.archivedAt;
+      await workflow.api.setSubjectArchived(archiveTarget.id, archive);
+      if (!current()) return;
+      setArchiveTarget(null);
+      showToast(archive ? 'Subject archived.' : 'Subject restored.', 'success');
+      await refetchSubjects(current);
+    } catch (error) {
+      if (current()) showToast(professorErrorMessage(error), 'error');
+    } finally {
+      if (current()) { pendingOperation.current = null; setIsSubmitting(false); }
+    }
+  }
+
   async function handleConfirmDelete() {
     if (isDeleting) return;
     setIsDeleting(true);
@@ -287,25 +311,50 @@ export default function SubjectManagement() {
             </button>
           </div>
         ) : (
-          <div className={styles.subjectsList}>
-            {subjects.map((subject) => {
+          <>
+            <div className={styles.statusTabs} role="tablist" aria-label="Subject status">
+              {['Active Subjects', 'Archived Subjects'].map((label, index) => {
+                const archived = index === 1;
+                const selected = showArchived === archived;
+                return (
+                  <button key={label} type="button" role="tab" id={archived ? 'archived-subjects-tab' : 'active-subjects-tab'}
+                    aria-selected={selected} aria-controls="subject-results" tabIndex={selected ? 0 : -1}
+                    onClick={() => setShowArchived(archived)}
+                    onKeyDown={event => {
+                      const positions = { ArrowRight: 1 - index, ArrowLeft: 1 - index, Home: 0, End: 1 };
+                      if (!Object.hasOwn(positions, event.key)) return;
+                      event.preventDefault();
+                      event.currentTarget.parentElement.children[positions[event.key]].focus();
+                      setShowArchived(positions[event.key] === 1);
+                    }}>{label}</button>
+                );
+              })}
+            </div>
+          <div className={styles.subjectsList} role="tabpanel" id="subject-results" tabIndex={0}
+            aria-labelledby={showArchived ? 'archived-subjects-tab' : 'active-subjects-tab'}>
+            {pagination.items.map((subject) => {
               const isExpanded = expandedId === subject.id;
               const weeks = weeksBySubject[subject.id];
               return (
                 <div key={subject.id} className={styles.subjectCard}>
                   <SubjectCover subjectId={subject.id} load={subject.coverUrl ? workflow.api.getSubjectCover : undefined} revision={coverRevisions[subject.id] ?? 0} />
                   <div className={styles.subjectHeader}>
-                    <button className={styles.subjectHeaderClickable} onClick={() => toggleExpand(subject.id)}>
+                    <button className={styles.subjectHeaderClickable} aria-expanded={isExpanded} onClick={() => toggleExpand(subject.id)}>
                       <BookOpen size={16} className={styles.subjectIcon} />
                       <span className={styles.subjectTitle}>
-                        {subject.subjectCode} — {subject.subjectName}
+                        <span className={styles.cardLabel}>{subject.subjectCode}</span>
+                        {subject.subjectName}
                       </span>
                       {isExpanded ? <ChevronUp size={16} className={styles.chevron} /> : <ChevronDown size={16} className={styles.chevron} />}
                     </button>
 
                     <div className={styles.subjectActions}>
-                      {!workflow.preview && <button type="button" className={styles.coverAction} disabled={isSubmitting} onClick={()=>setCoverSubject(subject)}>Change cover</button>}
-                      <button className={styles.iconBtn} disabled={isSubmitting || workflow.preview} onClick={() => openEditSubject(subject)} aria-label="Edit subject">
+                      {!workflow.preview && <button type="button" className={styles.coverAction} disabled={isSubmitting}
+                        onClick={() => { if (beginModal()) setArchiveTarget(subject); }}>
+                        {subject.archivedAt ? <ArchiveRestore size={16} aria-hidden="true" /> : <Archive size={16} aria-hidden="true" />}
+                        {subject.archivedAt ? 'Restore' : 'Archive'}</button>}
+                      {!workflow.preview && !subject.archivedAt && <button type="button" className={styles.coverAction} disabled={isSubmitting} onClick={()=>setCoverSubject(subject)}>Change cover</button>}
+                      <button className={styles.iconBtn} disabled={isSubmitting || workflow.preview || Boolean(subject.archivedAt)} onClick={() => openEditSubject(subject)} aria-label="Edit subject">
                         <Pencil size={14} />
                       </button>
                       <button
@@ -327,17 +376,19 @@ export default function SubjectManagement() {
                       {weeks?.map((week) => (
                         <div key={week.id} className={styles.weekRow}>
                           <Sparkles size={14} className={styles.weekIcon} />
-                          <span className={styles.weekTitle}>Week {week.weekNumber}: {week.title}</span>
-                          <button className={styles.weekEditLink} disabled={isSubmitting || workflow.preview} onClick={() => openEditWeek(subject, week)} aria-label={`Edit module title: ${week.title}`}>
+                          <span className={styles.weekTitle}><span className={styles.cardLabel}>Week {week.weekNumber}</span>{week.title}</span>
+                          <div className={styles.weekActions}>
+                          <button className={styles.weekEditLink} disabled={isSubmitting || workflow.preview || Boolean(subject.archivedAt)} onClick={() => openEditWeek(subject, week)} aria-label={`Edit module title: ${week.title}`}>
                             Edit title
                           </button>
-                          <button className={styles.weekEditLink} onClick={() => goToLessonEditor(subject, week)}>
+                          <button className={styles.weekEditLink} disabled={Boolean(subject.archivedAt)} onClick={() => goToLessonEditor(subject, week)}>
                             {workflow.preview ? "View Lesson" : "Author Lesson"}
                           </button>
+                          </div>
                         </div>
                       ))}
 
-                      <button className={styles.addWeekBtn} disabled={isSubmitting || workflow.preview} onClick={() => openAddWeek(subject)}>
+                      <button className={styles.addWeekBtn} disabled={isSubmitting || workflow.preview || Boolean(subject.archivedAt)} onClick={() => openAddWeek(subject)}>
                         <Plus size={14} />
                         Add New Module
                       </button>
@@ -347,10 +398,12 @@ export default function SubjectManagement() {
               );
             })}
 
-            {subjects.length === 0 && (
-              <p className={styles.emptyState}>{workflow.preview ? "No subjects yet." : 'No subjects yet. Click "Create Subject" to add one.'}</p>
+            {visibleSubjects.length === 0 && (
+              <p className={styles.emptyState}>{showArchived ? "No archived subjects." : workflow.preview ? "No subjects yet." : 'No subjects yet. Click "Create Subject" to add one.'}</p>
             )}
           </div>
+          {pagination.total > 0 && <SubjectPagination compact pagination={pagination} label="Subject pages" />}
+          </>
         )}
       </main>
 
@@ -416,11 +469,21 @@ export default function SubjectManagement() {
         </Dialog>
       )}
 
+      {archiveTarget && (
+        <Dialog labelledBy="archive-subject-dialog" busy={isSubmitting} onClose={() => { if (!isSubmitting) setArchiveTarget(null); }} className={styles.modal}>
+          <h3 id="archive-subject-dialog">{archiveTarget.archivedAt ? 'Restore' : 'Archive'} {archiveTarget.subjectName}?</h3>
+          <p>{archiveTarget.archivedAt ? 'Editing will reopen. Eligible students can enroll when published lessons and an active Professor are available.' : 'Enrollment and editing will close. Enrolled students keep access to published lessons and their learning history.'}</p>
+          <div className={styles.modalActions}>
+            <Button variant="secondary" disabled={isSubmitting} onClick={() => setArchiveTarget(null)}>Cancel</Button>
+            <Button isLoading={isSubmitting} onClick={changeArchive}>{archiveTarget.archivedAt ? 'Restore' : 'Archive'}</Button>
+          </div>
+        </Dialog>
+      )}
       {deletingSubject && (
         <Dialog labelledBy="delete-subject-dialog" busy={isDeleting} onClose={() => { if (!isDeleting) setDeletingSubject(null); }} className={styles.modal} initialFocus="button">
             <h3 id="delete-subject-dialog" className={styles.modalTitle}>Delete "{deletingSubject.subjectName}"?</h3>
             <p className={styles.modalWarning}>
-              Only an empty subject can be deleted. Remove its weeks and learning modules first. Deleting an empty subject cannot be undone.
+              Only an empty subject with no enrollment history can be deleted. Deleting an empty subject cannot be undone.
             </p>
             <div className={styles.modalActions}>
               <Button variant="secondary" onClick={() => setDeletingSubject(null)} disabled={isDeleting}>Cancel</Button>

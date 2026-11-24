@@ -5,6 +5,9 @@ import com.ptc.halo.enums.YearLevel;
 public class SubjectResponse {
 
     private Long id;
+    private java.time.LocalDateTime archivedAt;
+    public java.time.LocalDateTime getArchivedAt() { return archivedAt; }
+    public void setArchivedAt(java.time.LocalDateTime archivedAt) { this.archivedAt = archivedAt; }
 
     private String subjectCode;
 

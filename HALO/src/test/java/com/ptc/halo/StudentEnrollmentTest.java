@@ -17,10 +17,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest(properties="spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",showSql=false)
-@Import({LessonStudyService.class,StudentLessonService.class,StudentCurriculumService.class,StudentEnrollmentService.class,StudentSubjectService.class,StudentLessonAccessService.class,StudentLearningProgressionService.class})
+@Import({ProfessorAcademicService.class,LessonStudyService.class,StudentLessonService.class,StudentCurriculumService.class,StudentEnrollmentService.class,StudentSubjectService.class,StudentLessonAccessService.class,StudentLearningProgressionService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class StudentEnrollmentTest {
  @Autowired StudentEnrollmentService service;
+ @Autowired ProfessorAcademicService academic;
+
  @Autowired LessonStudyService study;
  @Autowired StudentCurriculumService curriculum;
  @Autowired StudentSubjectService summaries;
@@ -40,7 +42,9 @@ class StudentEnrollmentTest {
   new TransactionTemplate(manager).executeWithoutResult(tx->{eligible=subject(YearLevel.FIRST_YEAR,true);foreign=subject(YearLevel.SECOND_YEAR,true);draft=subject(YearLevel.FIRST_YEAR,false);});
  }
  SubjectEntity subject(YearLevel year,boolean published){
-  var s=new SubjectEntity();s.setSubjectCode(UUID.randomUUID().toString());s.setSubjectName("Synthetic subject");s.setYearLevel(year);em.persist(s);
+  var owner=new UserEntity();owner.setName("Test Professor");owner.setEmail(UUID.randomUUID()+"@example.test");owner.setPassword("synthetic");owner.setRole(Role.PROFESSOR);owner.setStatus(Status.ACTIVE);em.persist(owner);
+  var professor=new ProfessorEntity();professor.setUser(owner);em.persist(professor);
+  var s=new SubjectEntity();s.setProfessor(professor);s.setSubjectCode(UUID.randomUUID().toString());s.setSubjectName("Synthetic subject");s.setYearLevel(year);em.persist(s);
   var w=new WeekEntity();w.setSubject(s);w.setWeekNumber(1);w.setTitle("Week 1");em.persist(w);
   var m=new AiLearningModuleEntity();m.setWeek(w);m.setStatus(published?LessonStatus.APPROVED:LessonStatus.PENDING);m.setAiGenerationStatus(AiGenerationStatus.COMPLETED);em.persist(m);if(year==YearLevel.FIRST_YEAR && published)module=m;return s;
  }
@@ -71,6 +75,23 @@ class StudentEnrollmentTest {
   assertEquals(409,assertThrows(org.springframework.web.server.ResponseStatusException.class,()->curriculum.preview(student,eligible.getId())).getStatusCode().value());
   p.setSection("BSHM 1A");profiles.saveAndFlush(p);enroll(eligible.getId());
   assertEquals(404,assertThrows(org.springframework.web.server.ResponseStatusException.class,()->curriculum.preview(student,eligible.getId())).getStatusCode().value());
+ }
+ @Test void archivedMembershipAndHistoricalEnrollmentSurviveRestore(){
+  Long id=eligible.getId();
+  var professor=eligible.getProfessor().getUser();
+  enroll(id);
+  assertNotNull(academic.setArchived(id,true,professor,null).getArchivedAt());
+  assertTrue(service.list(student,true).get(0).getLearningAvailable());
+  new TransactionTemplate(manager).executeWithoutResult(tx->progression.validateModuleAccess(module.getId(),student));
+  service.unenroll(TestIdentity.auth(student),id);
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->enroll(id));
+  assertEquals("SUBJECT_HAS_ENROLLMENTS",assertThrows(org.springframework.web.server.ResponseStatusException.class,()->academic.deleteSubject(id,professor)).getReason());
+  assertNull(academic.setArchived(id,false,professor,null).getArchivedAt());
+  professor.setStatus(Status.INACTIVE);users.saveAndFlush(professor);
+  assertFalse(service.list(student,false).stream().anyMatch(s->s.getSubjectId().equals(id)));
+  assertThrows(org.springframework.web.server.ResponseStatusException.class,()->enroll(id));
+  professor.setStatus(Status.ACTIVE);users.saveAndFlush(professor);enroll(id);
+  assertEquals(1,jdbc.queryForObject("select count(*) from student_subject_enrollments where student_id=? and subject_id=?",Integer.class,student.getId(),id));
  }
  void enroll(Long id){service.enroll(TestIdentity.auth(student),id);}
  @Test void activeMembershipSurvivesYearChangeWithoutGrantingLearning(){
@@ -149,6 +170,9 @@ class StudentEnrollmentTest {
   var candidates=jdbc.queryForList(review).stream().filter(row->((Number)row.get("student_id")).longValue()==student.getId()).toList();
   assertEquals(1,candidates.size());assertEquals("ASSESSMENT_ATTEMPT,COMPLETED_PROGRESS,LESSON_STUDY_DAY,STUDENT_MENTOR_MESSAGE",candidates.get(0).get("evidence_sources"));
   var before=snapshot();enroll(eligible.getId());assertEquals(before,snapshot());assertEquals(100,service.list(student,true).get(0).getProgressPercentage());
+  academic.setArchived(eligible.getId(),true,eligible.getProfessor().getUser(),null);
+  assertEquals(before,snapshot());assertEquals(100,service.list(student,true).get(0).getProgressPercentage());
+  academic.setArchived(eligible.getId(),false,eligible.getProfessor().getUser(),null);
   service.unenroll(TestIdentity.auth(student),eligible.getId());assertEquals(before,snapshot());assertTrue(service.list(student,true).isEmpty());
   enroll(eligible.getId());assertEquals(before,snapshot());assertEquals(100,service.list(student,true).get(0).getProgressPercentage());
  }

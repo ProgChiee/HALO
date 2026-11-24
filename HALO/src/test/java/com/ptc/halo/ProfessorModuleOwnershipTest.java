@@ -84,7 +84,7 @@ class ProfessorModuleOwnershipTest {
   week.getSubject().setProfessor(null);subjects.saveAndFlush(week.getSubject());allDenied(owner);
  }
  @Test void ownerReadsUpdatesGeneratesDeclinesAndApproves() {
-  module.setSourceScope("confirmed-test-snapshot"); // Scope validation is mocked in this ownership fixture.
+  module.setSourceScope("{\"mode\":\"SOURCE_GROUNDED\"}"); // Scope validation is mocked in this ownership fixture.
   assertEquals(module.getId(),controller.getModuleByWeek(week.getId(),owner).getBody().getId());
   assertEquals(module.getId(),controller.getModuleById(module.getId(),owner).getBody().getId());
   var edit=new AiLearningModuleUpdateRequest();edit.setLessonText("updated");controller.updateModule(module.getId(),edit,owner);

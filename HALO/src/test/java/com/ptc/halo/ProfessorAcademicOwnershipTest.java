@@ -56,6 +56,8 @@ class ProfessorAcademicOwnershipTest {
         var update = new SubjectUpdateRequest(); update.setSubjectCode("CHANGED"); update.setSubjectName("Changed");
         unavailable(() -> service.updateSubject(subjectId, update, b));
         unavailable(() -> service.deleteSubject(subjectId, b));
+        unavailable(() -> service.setArchived(subjectId, true, b, null));
+        unavailable(() -> service.setArchived(subjectId, false, b, null));
         unavailable(() -> service.createWeek(subjectId, week(), b));
         unavailable(() -> service.viewAllWeeks(subjectId, b));
         verifyNoInteractions(audit);

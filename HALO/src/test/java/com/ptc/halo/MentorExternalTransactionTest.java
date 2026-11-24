@@ -20,6 +20,7 @@ import static org.mockito.Mockito.*;
 @Import({StudentEnrollmentService.class,StudentSubjectService.class,MentorService.class,com.fasterxml.jackson.databind.ObjectMapper.class,AssessmentService.class,BadgeService.class,StudentLearningProgressionService.class,StudentLessonAccessService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class MentorExternalTransactionTest {
+ @MockBean LessonSourceScope sourceScopes;
  @Autowired AssessmentService service;
  @Autowired MentorService mentor;
  @Autowired StudentEnrollmentService enrollmentService;
@@ -30,6 +31,7 @@ class MentorExternalTransactionTest {
  @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
  @Autowired UserRepository users;
  @Autowired SubjectRepository subjects;
+ @Autowired ProfessorRepository professors;
  @Autowired WeekRepository weeks;
  @Autowired AiLearningModuleRepository modules;
  @Autowired AssessmentRepository assessments;
@@ -45,9 +47,11 @@ class MentorExternalTransactionTest {
  UserEntity student;AssessmentAttemptEntity attempt;AssessmentQuestionEntity q1,q2,foreign;
  @BeforeEach void setup(){
   enrollments.deleteAll();
-  reset(audit);messages.deleteAll();sessions.deleteAll();badges.deleteAll();progress.deleteAll();answers.deleteAll();attempts.deleteAll();questions.deleteAll();assessments.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();profiles.deleteAll();users.deleteAll();
+  reset(audit);messages.deleteAll();sessions.deleteAll();badges.deleteAll();progress.deleteAll();answers.deleteAll();attempts.deleteAll();questions.deleteAll();assessments.deleteAll();modules.deleteAll();weeks.deleteAll();subjects.deleteAll();professors.deleteAll();profiles.deleteAll();users.deleteAll();
   student=new UserEntity();student.setEmail("student@test.example");student.setName("Student");student.setRole(Role.STUDENT);student.setStatus(Status.ACTIVE);student=users.saveAndFlush(student);
-  var subject=new SubjectEntity();subject.setYearLevel(YearLevel.FIRST_YEAR);subject.setSubjectCode("S");subject.setSubjectName("Subject");subject=subjects.saveAndFlush(subject);
+  var owner=new UserEntity();owner.setEmail("owner@example.test");owner.setRole(Role.PROFESSOR);owner.setStatus(Status.ACTIVE);owner=users.saveAndFlush(owner);
+  var professor=new ProfessorEntity();professor.setUser(owner);professor=professors.saveAndFlush(professor);
+  var subject=new SubjectEntity();subject.setProfessor(professor);subject.setYearLevel(YearLevel.FIRST_YEAR);subject.setSubjectCode("S");subject.setSubjectName("Subject");subject=subjects.saveAndFlush(subject);
   var week=new WeekEntity();week.setSubject(subject);week.setWeekNumber(1);week.setTitle("Week");week=weeks.saveAndFlush(week);
   var module=new AiLearningModuleEntity();module.setWeek(week);module.setAiGenerationStatus(AiGenerationStatus.COMPLETED);module.setStatus(LessonStatus.APPROVED);module=modules.saveAndFlush(module);
   var assessment=new AssessmentEntity();assessment.setModule(module);assessment.setTitle("Quiz");assessment.setPassingScore(70);assessment.setStatus(AssessmentStatus.AVAILABLE);assessment.setCreatedAt(LocalDateTime.now());assessment=assessments.saveAndFlush(assessment);
@@ -75,6 +79,18 @@ class MentorExternalTransactionTest {
    assertFalse(active(),"AI must run outside a database transaction");duringAi.run();return "{\"inScope\":false,\"chunkIds\":[]}";
   }).when(response).content();
   stubIntent();
+ }
+ @Test void archivedSubjectRetainsConversationsAndAllowsAssessmentCompletion(){
+  prepareIndex();var moduleId=modules.findAll().get(0).getId();
+  var opened=mentor.openSession(moduleId,student);
+  var subject=subjects.findAll().get(0);subject.setArchivedAt(LocalDateTime.now());subjects.saveAndFlush(subject);
+  respond(()->{});
+  mentor.sendMessage(opened.getSessionId(),student,"Unrelated question");
+  assertEquals(opened.getSessionId(),mentor.openSession(moduleId,student).getSessionId());
+  assertEquals(3,mentor.getConversation(opened.getSessionId(),student).getMessages().size());
+  service.submitAttempt(attempt.getId(),student,request(item(q1.getId(),"A"),item(q2.getId(),"B")));
+  assertEquals(100,attempts.findById(attempt.getId()).orElseThrow().getScore());
+  assertEquals(100,enrollmentService.list(student,true).get(0).getProgressPercentage());
  }
  @Test void normalOpenAndSendUseShortTransactions(){
   prepareIndex();Long id=modules.findAll().get(0).getId();

@@ -103,6 +103,7 @@ public class ProfessorModuleService {
 
 
         WeekEntity week = requireWeek(weekId, professor);
+        SubjectWriteGuard.requireWritable(entityManager, week.getSubject());
 
         // Check before writing any uploaded files.
         if (aiLearningModuleRepository.findByWeekId(weekId).isPresent()) {
@@ -177,7 +178,7 @@ public class ProfessorModuleService {
             Long id,
             UserEntity professor, AdminActingSessionEntity acting
     ) {
-        AiLearningModuleEntity module = findModule(id, professor);
+        AiLearningModuleEntity module = writableModule(id, professor);
 
         requireApprovalReady(module);
         if(module.getSourceScope()!=null)sourceScopes.requirePublishedReady(module);
@@ -205,7 +206,7 @@ public class ProfessorModuleService {
             Long id,
             UserEntity professor, AdminActingSessionEntity acting
     ) {
-        AiLearningModuleEntity module = findModule(id, professor);
+        AiLearningModuleEntity module = writableModule(id, professor);
 
         requireEditable(module);
 
@@ -236,7 +237,7 @@ public class ProfessorModuleService {
             MultipartFile file,
             UserEntity professor, AdminActingSessionEntity acting
     ) throws Exception {
-        AiLearningModuleEntity module = findModule(moduleId, professor);
+        AiLearningModuleEntity module = writableModule(moduleId, professor);
 
         requireEditable(module);
 
@@ -273,6 +274,7 @@ public class ProfessorModuleService {
                 .orElseThrow(this::resourceNotFound);
 
         AiLearningModuleEntity module = file.getModule();
+        SubjectWriteGuard.requireWritable(entityManager, module.getWeek().getSubject());
         requireEditable(module);
 
         fileUploadService.deleteFile(file.getFilePath());
@@ -296,7 +298,7 @@ public class ProfessorModuleService {
             AiLearningModuleUpdateRequest request,
             UserEntity professor, AdminActingSessionEntity acting
     ) {
-        AiLearningModuleEntity module = findModule(id, professor);
+        AiLearningModuleEntity module = writableModule(id, professor);
 
         requireEditable(module);
 
@@ -331,6 +333,14 @@ public class ProfessorModuleService {
     private WeekEntity requireWeek(Long id, UserEntity professor) {
         return weekRepository.findByIdAndSubject_Professor_User_Id(id, professor.getId())
                 .orElseThrow(this::resourceNotFound);
+    }
+
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+
+    public AiLearningModuleEntity writableModule(Long id, UserEntity professor) {
+        var module = findModule(id, professor);
+        SubjectWriteGuard.requireWritable(entityManager, module.getWeek().getSubject());
+        return module;
     }
 
     public AiLearningModuleEntity findModule(Long id, UserEntity professor) {

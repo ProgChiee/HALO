@@ -29,7 +29,7 @@ public class QuizRevisionService {
  public record Prepared(Long moduleVersion,Long currentId,int latestQuizVersion,AiLearningModuleEntity module){}
  private ResponseStatusException stale(){return new ResponseStatusException(HttpStatus.CONFLICT,"STALE_MODULE_OPERATION");}
  private AiLearningModuleEntity module(Long id,UserEntity professor,boolean lock){
-  var m=ownership.findModule(id,professor);
+  var m=lock ? ownership.writableModule(id,professor) : ownership.findModule(id,professor);
   if(lock)m=modules.findForMentorOpenById(id).orElseThrow(this::stale);
   if(m.getStatus()!=LessonStatus.APPROVED)throw new ResponseStatusException(HttpStatus.CONFLICT,"REVISION_REQUIRES_PUBLISHED");
   m.getFiles().size(); return m;

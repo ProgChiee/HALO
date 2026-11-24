@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
     ProfessorModuleService.class,ModuleGenerationState.class,ActivityLogService.class,AssessmentService.class})
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class AdminProfessorModeTest {
+ @MockBean LessonSourceScope sourceScopes;
  @Autowired AdminProfessorPreviewService preview;
  @Autowired AdminProfessorModeService mode;
  @Autowired AdminActingSessionService acting;
@@ -66,8 +67,15 @@ class AdminProfessorModeTest {
  Long week(Long id){var r=new WeekRequest();r.setWeekNumber(1);r.setTitle("Week");return mode.execute(auth,session,s->academic.createWeek(id,r,s.getTarget(),s)).getId();}
  Long module(){return mode.execute(auth,session,s->modules.createModule(week(subject()),"Lesson",null,null,List.of(),s.getTarget(),s)).getBody().getId();}
  void tx(java.util.function.Consumer<org.springframework.transaction.TransactionStatus> f){new TransactionTemplate(manager).executeWithoutResult(f);}
- void ready(Long id){tx(t->{var m=moduleRepo.findById(id).orElseThrow();m.setAiGenerationStatus(AiGenerationStatus.COMPLETED);m.setGeneratedKnowledge("Knowledge");var file=new AiLearningFileEntity();file.setOriginalFileName("lesson.pdf");file.setStoredFileName("opaque.pdf");file.setFilePath("opaque.pdf");file.setFileType("application/pdf");m.addFile(file);moduleRepo.saveAndFlush(m);});}
+ void ready(Long id){tx(t->{var m=moduleRepo.findById(id).orElseThrow();m.setAiGenerationStatus(AiGenerationStatus.COMPLETED);m.setGeneratedKnowledge("Knowledge");m.setSourceScope("{\"mode\":\"SOURCE_GROUNDED\"}");var file=new AiLearningFileEntity();file.setOriginalFileName("lesson.pdf");file.setStoredFileName("opaque.pdf");file.setFilePath("opaque.pdf");file.setFileType("application/pdf");m.addFile(file);moduleRepo.saveAndFlush(m);});}
  GeneratedAssessment generated(){var result=new GeneratedAssessment();var list=new ArrayList<GeneratedAssessmentQuestion>();for(int n=1;n<=10;n++){var q=new GeneratedAssessmentQuestion();q.setQuestionNumber(n);q.setQuestion("Question "+n+"?");q.setOptionA("A");q.setOptionB("B");q.setOptionC("C");q.setOptionD("D");q.setCorrectAnswer("A");list.add(q);}result.setQuestions(list);return result;}
+ @Test void actingCanArchiveAndRestoreOnlyItsTargetSubject(){
+  Long id=subject();
+  assertNotNull(mode.execute(auth,session,s->academic.setArchived(id,true,s.getTarget(),s)).getArchivedAt());
+  var foreign=academic.createSubject(subjectRequest("OTHER"),other).getId();
+  assertThrows(ResponseStatusException.class,()->mode.execute(auth,session,s->academic.setArchived(foreign,true,s.getTarget(),s)));
+  assertNull(mode.execute(auth,session,s->academic.setArchived(id,false,s.getTarget(),s)).getArchivedAt());
+ }
  @Test void previewRechecksTokenVersionsExpiryAndUsesReadOnlyTransactions() {
   var p=preview.create(auth,professor.getId());
   assertEquals(Boolean.TRUE,preview.read(auth,p.id(),s->org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()));

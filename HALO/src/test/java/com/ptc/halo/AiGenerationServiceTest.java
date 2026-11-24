@@ -32,7 +32,12 @@ class AiGenerationServiceTest {
         ChatClient.Builder builder = mock(ChatClient.Builder.class);
         when(builder.build()).thenReturn(client);
         var state = mock(com.ptc.halo.service.ModuleGenerationState.class);
-        when(state.begin(15L)).thenAnswer(i -> new com.ptc.halo.service.ModuleGenerationState(repository).begin(15L));
+        var week = new com.ptc.halo.entity.WeekEntity();
+        week.setSubject(new com.ptc.halo.entity.SubjectEntity());
+        module.setWeek(week);
+        var persistence = new com.ptc.halo.service.ModuleGenerationState(repository);
+        org.springframework.test.util.ReflectionTestUtils.setField(persistence, "entityManager", mock(jakarta.persistence.EntityManager.class));
+        when(state.begin(15L)).thenAnswer(i -> persistence.begin(15L));
         when(state.finish(eq(15L), any())).thenAnswer(i -> repository.save(i.getArgument(1)));
         when(repository.saveAndFlush(module)).thenAnswer(i -> { savedStatuses.add(module.getAiGenerationStatus()); return module; });
         service = new AiGenerationService(builder, repository, new ObjectMapper(), mock(com.ptc.halo.component.ModuleMaterialIndex.class), state, mock(com.ptc.halo.service.LessonStoragePaths.class));

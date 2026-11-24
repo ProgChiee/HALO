@@ -34,7 +34,7 @@ public class SubjectCoverService {
     @Transactional
     public void change(UserEntity actor,long id,MultipartFile upload,AdminActingSessionEntity acting){
         professor(actor);
-        subjects.findCoverForUpdate(id,actor.getId()).orElseThrow(this::missing);
+        ProfessorAcademicService.requireActive(subjects.findCoverForUpdate(id,actor.getId()).orElseThrow(this::missing));
         final Path staged;
         try{staged=upload==null?null:storage.prepare(upload);}catch(IOException failure){throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"COVER_STORAGE_UNAVAILABLE");}
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){

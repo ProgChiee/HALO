@@ -26,7 +26,8 @@ public class StudentEnrollmentService {
   if(profile.getYearLevel()==null || profile.getStudentId()==null || profile.getStudentId().isBlank() || profile.getSection()==null || profile.getSection().isBlank())
    throw new ResponseStatusException(HttpStatus.CONFLICT,"PROFILE_INCOMPLETE");
   // Reuse published/generated module eligibility and unchanged progress calculation.
-  return summaries.getStudentSubjects(student).stream().filter(s->s.getEligibleModuleCount()!=null && s.getEligibleModuleCount()>0).toList();
+  var browsable = subjects.browsableSubjects(profile.getYearLevel());
+  return summaries.summarizeSubjects(student,browsable).stream().filter(s->s.getEligibleModuleCount()!=null && s.getEligibleModuleCount()>0).toList();
  }
  public List<StudentSubjectResponse> list(UserEntity student,boolean mine){
   if(mine)return mySubjects(student);
@@ -60,6 +61,7 @@ public class StudentEnrollmentService {
   validateId(subjectId);
   // The same user lock serializes retries and lifecycle changes across backend instances.
   var student=AuthenticatedAccount.lock(users,authentication);
+  var subject=subjects.lockForEnrollment(subjectId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"SUBJECT_UNAVAILABLE"));
   var eligible=eligible(student);
   if(eligible.stream().noneMatch(s->s.getSubjectId().equals(subjectId)))throw new ResponseStatusException(HttpStatus.NOT_FOUND,"SUBJECT_UNAVAILABLE");
   var existing=enrollments.findForUpdate(student.getId(),subjectId);
@@ -70,7 +72,6 @@ public class StudentEnrollmentService {
    activity.createLog(student,com.ptc.halo.enums.ActivityType.ACCOUNT,"Re-enrolled in subject ID "+subjectId);
    return;
   }
-  var subject=subjects.findById(subjectId).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"SUBJECT_UNAVAILABLE"));
   enrollments.saveAndFlush(new StudentSubjectEnrollmentEntity(student,subject));
   activity.createLog(student,com.ptc.halo.enums.ActivityType.ACCOUNT,"Enrolled in subject "+subject.getSubjectCode());
  }

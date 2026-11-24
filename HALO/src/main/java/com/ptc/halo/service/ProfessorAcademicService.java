@@ -113,8 +113,9 @@ public class ProfessorAcademicService {
     @Transactional
     public SubjectResponse updateSubject(Long id, SubjectUpdateRequest request, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
-        SubjectEntity subject = requireSubject(id, professor);
+        SubjectEntity subject = lockOwned(id, professor);
 
+        requireActive(subject);
         subject.setSubjectCode(request.getSubjectCode());
         subject.setSubjectName(request.getSubjectName());
         subject.setDescription(request.getDescription());
@@ -141,11 +142,14 @@ public class ProfessorAcademicService {
     @Transactional
     public void deleteSubject(Long id, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
-        SubjectEntity subject = requireSubject(id, professor);
+        SubjectEntity subject = lockOwned(id, professor);
 
         String subjectName =
                 subject.getSubjectName();
 
+        if (subjectRepository.enrollmentCount(id) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "SUBJECT_HAS_ENROLLMENTS");
+        }
         if (weekRepository.existsBySubject_Id(id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "SUBJECT_HAS_CONTENT");
         }
@@ -178,7 +182,8 @@ public class ProfessorAcademicService {
     @Transactional
     public WeekResponse createWeek(Long subjectId, WeekRequest request, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
-        SubjectEntity subject = requireSubject(subjectId, professor);
+        SubjectEntity subject = lockOwned(subjectId, professor);
+        requireActive(subject);
 
         if (weekRepository.existsBySubject_IdAndWeekNumber(subjectId, request.getWeekNumber())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "WEEK_NUMBER_ALREADY_EXISTS");
@@ -234,6 +239,7 @@ public class ProfessorAcademicService {
     public WeekResponse updateWeek(Long id, WeekUpdateRequest request, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         WeekEntity week = requireWeek(id, professor);
+        SubjectWriteGuard.requireWritable(entityManager, week.getSubject());
 
         if (weekRepository.existsBySubject_IdAndWeekNumberAndIdNot(week.getSubject().getId(), request.getWeekNumber(), id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "WEEK_NUMBER_ALREADY_EXISTS");
@@ -265,6 +271,7 @@ public class ProfessorAcademicService {
     public void deleteWeek(Long id, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
 
         WeekEntity week = requireWeek(id, professor);
+        SubjectWriteGuard.requireWritable(entityManager, week.getSubject());
 
         Integer weekNumber =
                 week.getWeekNumber();
@@ -305,6 +312,27 @@ public class ProfessorAcademicService {
         }
     }
 
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+
+    private SubjectEntity lockOwned(Long id, UserEntity professor) {
+        return subjectRepository.findCoverForUpdate(id, professor.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND"));
+    }
+
+    static void requireActive(SubjectEntity subject) {
+        if (subject.getArchivedAt() != null) throw new ResponseStatusException(HttpStatus.CONFLICT, "SUBJECT_ARCHIVED");
+    }
+
+    @Transactional
+    public SubjectResponse setArchived(Long id, boolean archived, UserEntity professor, com.ptc.halo.entity.AdminActingSessionEntity acting) {
+        var subject = lockOwned(id, professor);
+        if ((subject.getArchivedAt() != null) != archived) {
+            subject.setArchivedAt(archived ? java.time.LocalDateTime.now(java.time.Clock.systemUTC()) : null);
+            log(professor, acting, ActivityType.MODULE, (archived ? "Archived subject ID " : "Restored subject ID ") + id);
+        }
+        return toSubjectResponse(subject);
+    }
+
     private SubjectEntity requireSubject(Long id, UserEntity professor) {
         return subjectRepository.findByIdAndProfessor_User_Id(id, professor.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND"));
@@ -321,6 +349,7 @@ public class ProfessorAcademicService {
         SubjectResponse response =
                 new SubjectResponse();
 
+        response.setArchivedAt(subject.getArchivedAt());
         response.setId(subject.getId());
         response.setSubjectCode(
                 subject.getSubjectCode()

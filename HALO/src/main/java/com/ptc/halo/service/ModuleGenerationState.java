@@ -13,12 +13,14 @@ import java.util.UUID;
 /** Short persistence phases only; external generation runs between these transactions. */
 @Service
 public class ModuleGenerationState {
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     private final AiLearningModuleRepository modules;
     public ModuleGenerationState(AiLearningModuleRepository modules) { this.modules = modules; }
 
     @Transactional
     public AiLearningModuleEntity begin(Long id) {
         var module = modules.findWithFilesById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND"));
+        SubjectWriteGuard.requireWritable(entityManager, module.getWeek().getSubject());
         if (module.getStatus() == LessonStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Published lessons cannot be regenerated through the draft editor.");
         }
@@ -29,6 +31,7 @@ public class ModuleGenerationState {
     @Transactional
     public AiLearningModuleEntity finish(Long id, AiLearningModuleEntity result) {
         var current = modules.findWithFilesById(id).orElseThrow(this::stale);
+        SubjectWriteGuard.requireWritable(entityManager, current.getWeek().getSubject());
         if (!Objects.equals(current.getVersion(), result.getVersion())
                 || !Objects.equals(current.getWeek().getTitle(), result.getWeek().getTitle())
                 || !Objects.equals(current.getWeek().getWeekNumber(), result.getWeek().getWeekNumber())

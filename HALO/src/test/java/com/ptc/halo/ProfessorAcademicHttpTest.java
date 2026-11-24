@@ -41,6 +41,11 @@ class ProfessorAcademicHttpTest {
   mvc.perform(get("/api/professor/subjects/1").header("Authorization","Bearer test-token")).andExpect(status().isOk());
   mvc.perform(get("/api/professor/subjects/1/weeks").header("Authorization","Bearer test-token")).andExpect(status().isOk());
   mvc.perform(get("/api/professor/weeks/2").header("Authorization","Bearer test-token")).andExpect(status().isOk());
+  for(String action:List.of("archive","restore")){
+   mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/professor/subjects/1/"+action)
+     .header("Authorization","Bearer test-token")).andExpect(status().isOk());
+   verify(service).setArchived(1L,action.equals("archive"),actor,null);
+  }
   verify(service).viewAllSubjects(actor);verify(service).viewSubjectById(1L,actor);verify(service).viewAllWeeks(1L,actor);verify(service).viewWeekById(2L,actor);
  }
  @Test void scopedFailuresAreSafe404ForDirectRequests() throws Exception {
@@ -56,7 +61,8 @@ class ProfessorAcademicHttpTest {
  @Test void roleRestrictionsRemain() throws Exception {
   mvc.perform(get("/api/professor/subjects")).andExpect(status().isUnauthorized());
   for(String role:List.of("ADMIN","SUPER_ADMIN","STUDENT")) {
-   token(role);mvc.perform(get("/api/professor/subjects").header("Authorization","Bearer test-token")).andExpect(status().isForbidden());
+   token(role);mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/professor/subjects/1/archive").header("Authorization","Bearer test-token")).andExpect(status().isForbidden());
+   mvc.perform(get("/api/professor/subjects").header("Authorization","Bearer test-token")).andExpect(status().isForbidden());
   }
   verifyNoInteractions(service);
  }
@@ -68,7 +74,7 @@ class ProfessorAcademicHttpTest {
     .when(service).deleteSubject(1L,actor);
   mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/professor/subjects/1").header("Authorization","Bearer test-token"))
    .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("SUBJECT_HAS_CONTENT"))
-   .andExpect(jsonPath("$.message").value("This subject still contains weeks or learning modules. Remove its content before deleting the subject."));
+   .andExpect(jsonPath("$.message").value("This subject has protected academic records. Archive it to close enrollment."));
  }
 
  @Test void duplicateWeekReturnsSafe409() throws Exception {

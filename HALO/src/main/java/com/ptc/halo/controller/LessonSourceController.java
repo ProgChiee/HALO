@@ -70,7 +70,7 @@ public class LessonSourceController extends ProfessorErrorResponses {
         return access(auth,request,(p,a)->{var m=candidate(id,revisionVersion,p);return new View(revisionVersion==null?m.getVersion():revisionVersion,m.getSourceScope()==null?null:sources.read(m.getSourceScope()),LessonSourceScope.Lesson.of(m),recognizer!=null);});
     }
     private void save(Long id,Request command,String snapshot,UserEntity p,AdminActingSessionEntity a){
-        modules.findModule(id,p);
+        modules.writableModule(id,p);
         if(command.revisionVersion()!=null){if(!Objects.equals(command.version(),command.revisionVersion()))throw staleSource();revisions.saveSource(id,command.revisionVersion(),snapshot,p,a);return;}
         var m=repository.findForMentorOpenById(id).orElseThrow();
         if(m.getStatus()==LessonStatus.APPROVED||!Objects.equals(m.getVersion(),command.version()))throw staleSource();
@@ -101,7 +101,7 @@ public class LessonSourceController extends ProfessorErrorResponses {
             sources.acknowledgeExpansion(captured,a==null?p.getId():a.getAdmin().getId());
             if(command.revisionVersion()!=null)revisions.saveExpansionReview(id,command.version(),captured,p,a);
             else {
-                modules.findModule(id,p);var m=repository.findForMentorOpenById(id).orElseThrow();
+                modules.writableModule(id,p);var m=repository.findForMentorOpenById(id).orElseThrow();
                 if(m.getStatus()==LessonStatus.APPROVED||!Objects.equals(m.getVersion(),command.version()))throw staleSource();
                 command.lesson().apply(m);m.setSourceScope(captured.getSourceScope());m.setAiGenerationStatus(AiGenerationStatus.COMPLETED);m.setGenerationToken(UUID.randomUUID().toString());repository.saveAndFlush(m);
                 if(a==null)audit.createLog(p,ActivityType.MODULE,"Acknowledged AI expansion accuracy for module ID "+id);

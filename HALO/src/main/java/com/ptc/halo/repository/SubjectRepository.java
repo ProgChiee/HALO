@@ -12,6 +12,16 @@ public interface SubjectRepository
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select s from SubjectEntity s where s.id=:id and s.professor.user.id=:owner")
     Optional<SubjectEntity> findCoverForUpdate(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("owner") Long owner);
+    @org.springframework.data.jpa.repository.Query("select s from SubjectEntity s where s.archivedAt is null and s.professor.user.status = com.ptc.halo.enums.Status.ACTIVE and s.yearLevel=:year")
+    List<SubjectEntity> browsableSubjects(@org.springframework.data.repository.query.Param("year") YearLevel year);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select s from SubjectEntity s join fetch s.professor p join fetch p.user u where s.id=:id and s.archivedAt is null and u.status=com.ptc.halo.enums.Status.ACTIVE")
+    Optional<SubjectEntity> lockForEnrollment(@org.springframework.data.repository.query.Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Query("select count(e) from StudentSubjectEnrollmentEntity e where e.subject.id=:id")
+    long enrollmentCount(@org.springframework.data.repository.query.Param("id") Long id);
+
     long countByProfessor_User_Id(Long professorId);
 
     List<SubjectEntity> findByProfessor_User_Id(Long userId);

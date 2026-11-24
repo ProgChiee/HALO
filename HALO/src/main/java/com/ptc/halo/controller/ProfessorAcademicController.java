@@ -95,6 +95,12 @@ public class ProfessorAcademicController {
     }
 
 
+    @PutMapping("/subjects/{id}/{state:archive|restore}")
+    public Object changeArchive(@PathVariable @Positive Long id, @PathVariable String state, Authentication authentication) {
+        boolean archive = state.equals("archive");
+        return professorAcademicService.setArchived(id, archive, getCurrentProfessor(authentication), null);
+    }
+
     @DeleteMapping("/subjects/{id}")
     public ResponseEntity<String> deleteSubject(
             @PathVariable("id") @Positive Long id,

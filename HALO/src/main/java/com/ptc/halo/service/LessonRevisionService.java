@@ -61,7 +61,7 @@ public class LessonRevisionService {
  public boolean assessmentChanged(Prepared prepared){return prepared.filesChanged()||changes.changed(prepared.previousContent(),assessed(prepared.candidate()));}
  private ResponseStatusException conflict(String code){return new ResponseStatusException(HttpStatus.CONFLICT,code);}
  private AiLearningModuleEntity live(Long id,UserEntity professor,boolean lock) {
-  professorModules.findModule(id,professor); // ownership before locking
+  if(lock) professorModules.writableModule(id,professor);
   var m=lock?modules.findForMentorOpenById(id).orElseThrow():professorModules.findModule(id,professor);
   if(m.getStatus()!=LessonStatus.APPROVED)throw conflict("REVISION_REQUIRES_PUBLISHED");
   m.getFiles().size();m.getWeek().getSubject().getSubjectName();
