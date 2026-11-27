@@ -10,11 +10,20 @@ FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
 COPY pom.xml .
-# Keep downloaded dependencies in the build-stage cache across source-only edits.
-RUN mvn -B -DskipTests dependency:go-offline
+COPY docker/maven-settings.xml /app/maven-settings.xml
+# Exercise compiler, annotation processor, jar and Boot repackage resolution
+# before copying frequently changing sources. Packaging never starts the app.
+COPY src/main/java/com/ptc/halo/HaloApplication.java src/main/java/com/ptc/halo/HaloApplication.java
+RUN set -eu; \
+    for delay in 0 15 45; do \
+      sleep "$delay"; \
+      if mvn -B -ntp -C -U -s maven-settings.xml -DskipTests package; then break; fi; \
+      if [ "$delay" = 45 ]; then exit 1; fi; \
+    done; \
+    rm -rf /app/target
 
 COPY src ./src
-RUN mvn -B -DskipTests package
+RUN mvn -B -ntp -C -o -s maven-settings.xml -DskipTests package
 
 
 # STAGE 2: Run Spring Boot application
