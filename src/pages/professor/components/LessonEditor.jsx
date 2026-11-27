@@ -1,3 +1,4 @@
+import ObtlTemplateDownload from './ObtlTemplateDownload';
 import LessonProgress from './LessonProgress';
 import Topbar from '../../../components/shared/Topbar';
 import Breadcrumb from '../../../components/shared/Breadcrumb';
@@ -419,6 +420,7 @@ function RouteLessonEditor({ subjectId, weekId }) {
           </div>
 
           <div className={styles.materialsSection}>
+            <ObtlTemplateDownload />
             <button
               className={styles.fileUploadBox}
               onClick={() => materialsInputRef.current?.click()}

@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /** Private, normalized raster files. No client filename or URL is used as a path. */
 @Service
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="halo.subject-cover.provider", havingValue="local", matchIfMissing=true)
 public class SubjectCoverStorage {
     public static final int MAX_BYTES=3*1024*1024;
     private final Path root;
@@ -47,14 +48,31 @@ public class SubjectCoverStorage {
                 if(image==null)throw invalid();
             } finally {reader.dispose();}
         } catch(IOException|IllegalArgumentException malformed){throw invalid();}
-        double scale=Math.min(1,1600.0/Math.max(image.getWidth(),image.getHeight()));
-        var clean=new BufferedImage(Math.max(1,(int)(image.getWidth()*scale)),Math.max(1,(int)(image.getHeight()*scale)),BufferedImage.TYPE_INT_ARGB);
+        double scale=Math.min(1,800.0/Math.max(image.getWidth(),image.getHeight()));
+        boolean alpha=image.getColorModel().hasAlpha();
+        var clean=new BufferedImage(Math.max(1,(int)(image.getWidth()*scale)),Math.max(1,(int)(image.getHeight()*scale)),alpha ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);
         var graphics=clean.createGraphics();
         try{graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);graphics.drawImage(image,0,0,clean.getWidth(),clean.getHeight(),null);}finally{graphics.dispose();}
+        // Some photographic PNGs have an alpha channel with no transparent pixels.
+        if (alpha && opaque(clean)) {
+            var rgb=new BufferedImage(clean.getWidth(),clean.getHeight(),BufferedImage.TYPE_INT_RGB);
+            var g=rgb.createGraphics();
+            try {g.drawImage(clean,0,0,null);} finally {g.dispose();}
+            clean=rgb;
+            alpha=false;
+        }
         Files.createDirectories(root);
         Path temp=Files.createTempFile(root,".cover-",".tmp");
-        try{if(!ImageIO.write(clean,"png",temp.toFile()))throw invalid();return temp;}
+        try{if(!ImageIO.write(clean,alpha ? "png" : "jpeg",temp.toFile()))throw invalid();return temp;}
         catch(Exception failure){Files.deleteIfExists(temp);throw failure;}
+    }
+    private static boolean opaque(BufferedImage image) {
+        int[] pixels=new int[image.getWidth()];
+        for(int y=0;y<image.getHeight();y++) {
+            image.getRGB(0,y,image.getWidth(),1,pixels,0,image.getWidth());
+            for(int pixel:pixels) if((pixel>>>24)!=255) return false;
+        }
+        return true;
     }
     public void install(long id,Path staged) throws IOException {
         Files.move(staged,path(id),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);

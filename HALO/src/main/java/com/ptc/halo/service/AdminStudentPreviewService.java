@@ -168,7 +168,8 @@ public class AdminStudentPreviewService {
                 item.setQuestionText(q.getQuestionText()); item.setStudentAnswer(submitted.get(q.getId())); item.setCorrectAnswer(q.getCorrectAnswer()); item.setCorrect(matches); feedback.add(item);
             }
             var result=new PreviewAssessmentResult(); result.setAttemptId(quiz.id); result.setCorrectCount(correct); result.setTotalQuestions(expected.size());
-            result.setScore((int)Math.round(100.0*correct/expected.size())); result.setPassed(result.getScore()>=assessment.getPassingScore()); result.setFeedback(feedback);
+            var grade = AssessmentGrade.calculate(correct, expected.size(), assessment.getPassingScore());
+            result.setScore(grade.percent()); result.setPassed(grade.passed()); result.setFeedback(feedback);
             quiz.result=result; quiz.submitted=LocalDateTime.now(); return result;
         }));
     }

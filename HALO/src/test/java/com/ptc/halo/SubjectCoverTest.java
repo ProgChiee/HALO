@@ -61,15 +61,32 @@ class SubjectCoverTest {
         try(var files=Files.list(directory)){assertTrue(files.noneMatch(p->p.getFileName().toString().endsWith(".tmp")));}
     }
     @Test void studentsUseExistingMembershipOrBrowseVisibilityOnly() throws Exception {
-        var student=user(Role.STUDENT);var row=new StudentSubjectResponse();row.setSubjectId(id);
-        when(enrollment.list(student,true)).thenReturn(java.util.List.of(row));assertNull(covers.studentCover(student,id));verify(enrollment,never()).list(student,false);
-        when(enrollment.list(student,true)).thenReturn(java.util.List.of());when(enrollment.list(student,false)).thenReturn(java.util.List.of(row));assertNull(covers.studentCover(student,id));
-        when(enrollment.list(student,false)).thenReturn(java.util.List.of());assertThrows(ResponseStatusException.class,()->covers.studentCover(student,id));verifyNoInteractions(audit);
+        var student=user(Role.STUDENT);
+        when(enrollment.canViewCover(student,id)).thenReturn(true,false);
+        assertNull(covers.studentCover(student,id));
+        assertThrows(ResponseStatusException.class,()->covers.studentCover(student,id));verifyNoInteractions(audit);
     }
-    @Test void webpIsDecodedAndReencodedAsPng() throws Exception {
+    @Test void webpIsDecodedAndNormalized() throws Exception {
         byte[] webp=java.util.Base64.getDecoder().decode("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA");
         covers.change(owner,id,new MockMultipartFile("image","image.webp","image/webp",webp),null);
-        assertNotNull(ImageIO.read(new ByteArrayInputStream(storage.read(id))));assertEquals(137,storage.read(id)[0]&255);
+        assertNotNull(ImageIO.read(new ByteArrayInputStream(storage.read(id))));assertTrue(storage.read(id).length > 0);
+    }
+    @Test void opaquePhotoWithAlphaChannelIsSizedAndCompressed() throws Exception {
+        var source=new BufferedImage(1200,675,BufferedImage.TYPE_INT_ARGB);
+        var noise=new java.util.Random(42);
+        for(int y=0;y<675;y++) for(int x=0;x<1200;x++) {
+            int light=noise.nextInt(80);
+            source.setRGB(x,y,new java.awt.Color((x/8+light)%256,(y/4+light)%256,light+80).getRGB());
+        }
+        var out=new ByteArrayOutputStream();
+        ImageIO.write(source,"png",out);
+        covers.change(owner,id,new MockMultipartFile("image",out.toByteArray()),null);
+        byte[] stored=new SubjectCoverStorage(directory.toString()).read(id);
+        assertEquals(255,stored[0]&255);
+        var decoded=ImageIO.read(new ByteArrayInputStream(stored));
+        assertEquals(800,decoded.getWidth());assertEquals(450,decoded.getHeight());
+        System.out.printf("cover_size input=%d optimized=%d%n",out.size(),stored.length);
+        assertTrue(stored.length<150000);
     }
     @Test void creatingSubjectNeedsNoCoverAndReturnsBackwardCompatibleResource() throws Exception {
         var request=new com.ptc.halo.dtoRequest.SubjectRequest();request.setSubjectCode("NEW-"+id);request.setSubjectName("New subject "+id);request.setYearLevel(YearLevel.FIRST_YEAR);

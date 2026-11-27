@@ -93,6 +93,32 @@ class StudentEnrollmentTest {
   professor.setStatus(Status.ACTIVE);users.saveAndFlush(professor);enroll(id);
   assertEquals(1,jdbc.queryForObject("select count(*) from student_subject_enrollments where student_id=? and subject_id=?",Integer.class,student.getId(),id));
  }
+ @Test void measuredCoverPolicyMatchesMembershipAndBrowse() {
+  var statistics=em.getEntityManagerFactory().unwrap(org.hibernate.SessionFactory.class).getStatistics();
+  boolean enabled=statistics.isStatisticsEnabled();
+  statistics.setStatisticsEnabled(true);
+  try {
+   long id=eligible.getId();
+   for(boolean enrolled:List.of(false,true)){
+    if(enrolled) enroll(id);
+    long before=statistics.getPrepareStatementCount();
+    boolean old=service.list(student,true).stream().anyMatch(s->s.getSubjectId()==id)
+      || service.list(student,false).stream().anyMatch(s->s.getSubjectId()==id);
+    long afterLists=statistics.getPrepareStatementCount();
+    assertTrue(old);
+    assertTrue(service.canViewCover(student,id));
+    long targeted=statistics.getPrepareStatementCount()-afterLists;
+    System.out.printf("cover_authorization enrolled=%s listQueries=%d targetedQueries=%d%n",enrolled,afterLists-before,targeted);
+    assertTrue(targeted<afterLists-before);
+   }
+   assertFalse(service.canViewCover(student,foreign.getId()));
+   assertFalse(service.canViewCover(student,draft.getId()));
+   academic.setArchived(id,true,eligible.getProfessor().getUser(),null);
+   assertTrue(service.canViewCover(student,id));
+   service.unenroll(TestIdentity.auth(student),id);
+   assertFalse(service.canViewCover(student,id));
+  } finally {statistics.setStatisticsEnabled(enabled);}
+ }
  void enroll(Long id){service.enroll(TestIdentity.auth(student),id);}
  @Test void activeMembershipSurvivesYearChangeWithoutGrantingLearning(){
   enroll(eligible.getId());

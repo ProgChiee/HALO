@@ -52,7 +52,7 @@ public class AssessmentAiService {
                 %s
 
                 ASSESSMENT RULES:
-                - Generate exactly 10 questions.
+                - Generate exactly %d questions.
                 - Each question must have exactly 4 choices.
                 - Choices must be labeled A, B, C, and D.
                 - Only one answer may be correct.
@@ -62,7 +62,7 @@ public class AssessmentAiService {
                 - Do not ask about information that is not contained
                   in the provided lesson.
                 - Avoid trick questions.
-                - Avoid duplicate questions.
+                - Use distinct knowledge or application tasks. Do not rephrase the same question. Keep stems and choices concise.
                 - Keep questions clear and appropriate for students.
                 - Do not make the correct answer obviously longer
                   than the other choices.
@@ -94,7 +94,7 @@ public class AssessmentAiService {
                 objectives,
                 knowledge,
                 examples,
-                summary
+                summary, GeneratedAssessmentValidator.QUESTION_COUNT
         );
 
         String response;
@@ -102,6 +102,7 @@ public class AssessmentAiService {
             response = chatClient
                 .prompt()
                 .user(prompt)
+                .options(org.springframework.ai.chat.prompt.ChatOptions.builder().maxTokens(8192).build())
                 .call()
                 .content();
         } catch (RuntimeException error) {
@@ -121,7 +122,7 @@ public class AssessmentAiService {
                     .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                     .with(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY).readValue(response);
             if (root == null || !root.isObject() || root.size() != 1
-                    || !root.path("questions").isArray() || root.path("questions").size() != 10)
+                    || !root.path("questions").isArray() || root.path("questions").size() != GeneratedAssessmentValidator.QUESTION_COUNT)
                 throw GeneratedAssessmentValidator.invalid();
             for (JsonNode question : root.path("questions")) {
                 if (!question.isObject() || question.size() != 7

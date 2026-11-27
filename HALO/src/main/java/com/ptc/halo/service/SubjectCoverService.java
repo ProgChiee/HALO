@@ -25,10 +25,7 @@ public class SubjectCoverService {
     private byte[] bytes(long id){try{return storage.read(id);}catch(IOException failure){throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"COVER_UNAVAILABLE");}}
     public byte[] professorCover(UserEntity actor,long id){professor(actor);subjects.findByIdAndProfessor_User_Id(id,actor.getId()).orElseThrow(this::missing);return bytes(id);}
     public byte[] studentCover(UserEntity student,long id){
-        // Exactly the existing management/Browse visibility; a cover never grants lesson access.
-        boolean visible=enrollment.list(student,true).stream().anyMatch(s->s.getSubjectId()==id);
-        if(!visible)visible=enrollment.list(student,false).stream().anyMatch(s->s.getSubjectId()==id);
-        if(!visible)throw missing();
+        if (!enrollment.canViewCover(student,id)) throw missing();
         return bytes(id);
     }
     @Transactional

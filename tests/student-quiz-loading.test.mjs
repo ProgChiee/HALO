@@ -34,13 +34,13 @@ test('fixed error messages distinguish HTTP failures from network failures and h
   }
   assert.doesNotMatch(quizLoadError(new Error('Unexpected local validation failure')),/connection/);
 });
-async function mount(getAssessment) {
+async function mount(getAssessment, overrides = {}) {
   let reads=0,writes=0;
   const api={
     getWeekLesson:async()=>({id:3,subjectId:1,weekId:2,weekNumber:1,status:'APPROVED',aiGenerationStatus:'COMPLETED'}),
     getAssessmentStatus:async()=>({assessmentExists:true,assessmentAvailable:true,canTakeAssessment:true}),
     getAssessment:(...args)=>{reads++;return getAssessment(...args);},
-    startAttempt:async()=>{writes++;},submitAttempt:async()=>{writes++;},getAttemptResult:async()=>{throw new Error('Unexpected result read');},
+    startAttempt:async()=>{writes++;},submitAttempt:async()=>{writes++;},getAttemptResult:async()=>{throw new Error('Unexpected result read');}, ...overrides,
   };
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
   await act(async()=>root.render(React.createElement(Auth.Provider,{value:{user:{name:'Test'},logout(){}}},
@@ -75,4 +75,30 @@ test('initial successful load displays quiz without an error or automatic attemp
   const view=await mount(async()=>assessment);
   try{assert.match(view.host.textContent,/Synthetic Quiz/);assert.equal(view.host.querySelector('[role="alert"]'),null);assert.equal(view.reads(),1);assert.equal(view.writes(),0);}
   finally{await view.cleanup();}
+});
+
+for (const correct of [13,14]) test('all 20 answers reach submission and render the server result: '+correct,async()=>{
+  const questions=Array.from({length:20},(_,i)=>({...assessment.questions[0],id:i+1,questionText:'Item '+(i+1)}));
+  let submitted;
+  const result={attemptId:8,score:correct*5,passed:correct===14};
+  const view=await mount(async()=>({...assessment,passingScore:70,questions}),{
+    startAttempt:async()=>({attemptId:8,assessmentId:4}),
+    submitAttempt:async(id,answers)=>{assert.equal(id,8);submitted=answers;return result;},
+    getAttemptResult:async()=>result,
+  });
+  const click=async element=>act(async()=>element.click());
+  const button=label=>[...view.host.querySelectorAll('button')].find(b=>b.textContent.trim()===label);
+  try{
+    await click(button('Start quiz'));
+    for(let i=1;i<=20;i++){
+      assert.match(view.host.textContent,new RegExp('Question '+i+' of 20'));
+      assert.equal(view.host.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'),String(i));
+      await click(view.host.querySelectorAll('[role="group"] button')[i%4]);
+      assert.match(view.host.textContent,new RegExp(i+' of 20 answered'));
+      await click(button(i===20?'Submit quiz':'Next question'));
+    }
+    assert.deepEqual(submitted,questions.map(q=>({questionId:q.id,answer:'ABCD'[q.id%4]})));
+    assert.match(view.host.textContent,new RegExp(result.score+'%'));
+    assert.match(view.host.textContent,result.passed?/Passed/:/Not passed/);
+  }finally{await view.cleanup();}
 });

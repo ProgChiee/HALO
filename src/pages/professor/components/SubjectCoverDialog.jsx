@@ -46,6 +46,7 @@ export default function SubjectCoverDialog({ subject, api, onClose, onSaved }) {
     try {
       if (remove) await api.removeSubjectCover(subject.id);
       else await api.saveSubjectCover(subject.id, file);
+      window.dispatchEvent(new window.CustomEvent('halo:subject-cover-changed', { detail: subject.id }));
       if (alive.current) onSaved();
     } catch (failure) {
       if (alive.current) setError(failure.response?.status === 400 ? 'Choose a valid JPEG, PNG or WebP up to 3 MB and 16 megapixels.' : 'Could not confirm the cover update. Please retry or refresh to check the current cover.');

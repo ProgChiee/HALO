@@ -351,6 +351,7 @@ function WeekQuiz({ subjectId, weekId }) {
               {result.feedback && result.feedback.length > 0 && (
                 <div className={styles.reviewList}>
                   <h2 className={styles.reviewTitle}>Review your answers</h2>
+                  <p>{result.feedback.filter(item => item.correct).length} of {result.feedback.length} correct</p>
                   {result.feedback.map((item) => (
                     <div
                       key={item.questionId}

@@ -1,3 +1,4 @@
+import ObtlTemplateDownload from './ObtlTemplateDownload';
 import { useEffect, useRef, useState } from 'react';
 import Dialog from '../../../components/shared/Dialog';
 import Button from '../../../components/shared/Button';
@@ -90,6 +91,7 @@ export default function LessonRevision({ moduleId, onPublished, onContextChange 
    <ul>{revision.files.filter(f => draft.keepFiles.includes(f.key)).map(f => <li key={f.key} className={styles.revisionFile}><span>{f.originalFileName}</span><Button variant="secondary" disabled={disabled} onClick={() => setDraft({ ...draft, keepFiles: draft.keepFiles.filter(key => key !== f.key) })}>Remove from revision</Button></li>)}</ul>
    <div className={styles.field}>
     <h4>Add revision files</h4>
+      <ObtlTemplateDownload />
     <div className={styles.dropZone} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); pick(e.dataTransfer.files); }}>
      <Upload size={22} aria-hidden="true"/><span>Drop files here or <label htmlFor="revision-files">Browse Files</label></span>
      <small id="revision-file-help">PDF, PNG, JPG/JPEG or standard HALO XLSX · 3 MB per file. Uploads when you save the draft.</small>

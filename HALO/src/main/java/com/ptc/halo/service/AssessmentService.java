@@ -366,17 +366,9 @@ public class AssessmentService {
             }
             throw conflict;
         }
-        int totalQuestions = submitted.size();
-
-        int score =
-                (int) Math.round(
-                        ((double) correctAnswers
-                                / totalQuestions) * 100
-                );
-
-        boolean passed =
-                score >= attempt.getAssessment()
-                        .getPassingScore();
+        var grade = AssessmentGrade.calculate(correctAnswers, expected.size(), attempt.getAssessment().getPassingScore());
+        int score = grade.percent();
+        boolean passed = grade.passed();
 
         attempt.setScore(score);
         attempt.setPassed(passed);

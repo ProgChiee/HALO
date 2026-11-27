@@ -7,7 +7,7 @@ async function mount(Component,props){const host=document.createElement('div');d
 const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent===text);const click=element=>act(async()=>element.click());
 async function choose(file){const input=document.querySelector('input[type=file]');Object.defineProperty(input,'files',{configurable:true,value:[file]});await act(async()=>input.dispatchEvent(new Event('change',{bubbles:true})));}
 const blob=()=>new Blob(['synthetic'],{type:'image/png'});
-test('missing/null cover uses the exact supplied watermark and custom image errors restore it',async()=>{let ui=await mount(Cover,{subjectId:7});assert.equal(ui.host.querySelector('img').getAttribute('src'),'/image/halo-subject-default.png');assert.equal(ui.host.querySelector('img').alt,'');await ui.close();ui=await mount(Cover,{subjectId:7,load:async()=>blob()});try{assert.equal(ui.host.firstChild.dataset.subjectCover,'custom');await act(async()=>ui.host.querySelector('img').dispatchEvent(new Event('error')));assert.equal(ui.host.firstChild.dataset.subjectCover,'default');}finally{await ui.close();}assert.ok(revoked.length);});
+test('missing/null cover uses the exact supplied watermark and custom image errors restore it',async()=>{let ui=await mount(Cover,{subjectId:7});assert.equal(ui.host.querySelector('img').getAttribute('src'),'/image/halo-subject-default.jpg');assert.equal(ui.host.querySelector('img').alt,'');await ui.close();ui=await mount(Cover,{subjectId:7,load:async()=>blob()});try{assert.equal(ui.host.firstChild.dataset.subjectCover,'custom');await act(async()=>ui.host.querySelector('img').dispatchEvent(new Event('error')));assert.equal(ui.host.firstChild.dataset.subjectCover,'default');}finally{await ui.close();}assert.ok(revoked.length);});
 test('204/no-image and read failures retain the default without blocking academic UI',async()=>{for(const load of [async()=>null,async()=>{throw new Error('unavailable');}]){const ui=await mount(Cover,{subjectId:7,load});try{assert.equal(ui.host.firstChild.dataset.subjectCover,'default');}finally{await ui.close();}}});
 test('changing target cancels old cover responses and never displays their blob',async()=>{let finish,signal;const load=(_id,c)=>{signal=c.signal;return new Promise(r=>finish=r);};const ui=await mount(Cover,{subjectId:7,load});try{await act(async()=>ui.root.render(React.createElement(Cover,{subjectId:8,load:async()=>null})));assert.equal(signal.aborted,true);await act(async()=>finish(blob()));assert.equal(ui.host.firstChild.dataset.subjectCover,'default');}finally{await ui.close();}});
 test('editor previews optional upload, prevents duplicate saves, and retains errors',async()=>{let resolve,calls=0,saved=0;const api={getSubjectCover:async()=>blob(),saveSubjectCover:async(id,file)=>{assert.equal(id,7);assert.equal(file.name,'cover.webp');calls++;await new Promise(r=>resolve=r);},removeSubjectCover:async()=>{}};const ui=await mount(Editor,{subject:{id:7,subjectName:'Synthetic subject'},api,onClose(){},onSaved(){saved++;}});try{assert.ok(button('Save cover').disabled);await choose(new dom.window.File(['test'],'cover.webp',{type:'image/webp'}));assert.ok(!button('Save cover').disabled);await click(button('Save cover'));assert.ok(button('Saving...').disabled);await click(button('Saving...'));assert.equal(calls,1);await act(async()=>resolve());assert.equal(saved,1);}finally{await ui.close();}});
@@ -34,7 +34,7 @@ test('custom picker is labeled, keyboard reachable and opens the native input wi
   assert.match(document.getElementById(input.getAttribute('aria-describedby')).textContent,/Maximum 3 MB/);
   assert.match(document.querySelector('[role=dialog]').textContent,/Upload a subject cover/);
   assert.match(document.querySelector('[role=dialog]').textContent,/Drag and drop an image here, or choose a file/);
-  assert.equal(document.querySelector('img').getAttribute('src'),'/image/halo-subject-default.png');
+  assert.equal(document.querySelector('img').getAttribute('src'),'/image/halo-subject-default.jpg');
   await click(picker);assert.equal(pickers,1);assert.equal(uploads,0);assert.ok(button('Save cover').disabled);
   await act(async()=>picker.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true})));
   assert.equal(document.activeElement,button('Cancel'));
@@ -99,4 +99,19 @@ test('Cancel discards a draft; failed uploads retain it for retry and block drop
 test('uploader keeps hidden input, theme-aware focus and mobile layouts scoped to the cover dialog',async()=>{
  const css=await readFile(new URL('../src/pages/professor/styles/SubjectCoverDialog.module.css',import.meta.url),'utf8');
  assert.match(css,/clip-path: inset\(50%\)/);assert.match(css,/aspect-ratio: 16 \/ 9/);assert.match(css,/:focus-visible/);assert.match(css,/var\(--color-surface\)/);assert.match(css,/@media\(max-width:480px\)/);assert.match(css,/overflow-wrap: anywhere/);
+});
+test('three cards wait for viewport entry and two visible copies share one scoped request', async()=>{
+ const observers=[];window.IntersectionObserver=class {constructor(callback){this.callback=callback;observers.push(this);} observe(){} disconnect(){}};
+ let calls=0,finish;
+ const load=()=>{calls++;return new Promise(resolve=>{finish=resolve;});};
+ const Cards=()=>React.createElement('div',null,...[7,7,9].map((subjectId,key)=>React.createElement(Cover,{key,subjectId,load})));
+ const ui=await mount(Cards,{});
+ try {
+   assert.equal(calls,0);
+   await act(async()=>observers.slice(0,2).forEach(o=>o.callback([{isIntersecting:true}])));
+   assert.equal(calls,1);
+   await act(async()=>finish(blob()));
+   assert.equal(ui.host.querySelectorAll('[data-status=custom]').length,2);
+   assert.equal(ui.host.querySelectorAll('[data-status=loading]').length,1);
+ } finally {await ui.close();delete window.IntersectionObserver;}
 });

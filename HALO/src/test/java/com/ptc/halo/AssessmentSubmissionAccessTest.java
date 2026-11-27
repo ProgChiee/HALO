@@ -31,7 +31,23 @@ class AssessmentSubmissionAccessTest {
  @Autowired StudentAnswerRepository answers;
  @Autowired StudentModuleProgressRepository progress;
  @Autowired StudentBadgeRepository badges;
+ @MockBean LessonSourceScope scope;
  @MockBean AssessmentAiService ai;
+
+ @org.junit.jupiter.params.ParameterizedTest
+ @org.junit.jupiter.params.provider.CsvSource({"20,20,100,true","18,20,90,true","16,20,80,true","15,20,75,true","14,20,70,true","13,20,65,false","10,20,50,false","0,20,0,false","16,23,69,false"})
+ void gradesActualPersistedQuestionSet(int correct,int total,int percent,boolean passed){
+  var quiz=assessments.findById(attempt.getAssessment().getId()).orElseThrow();
+  for(int n=3;n<=total;n++)question(quiz,n,"A");
+  var submitted=new ArrayList<StudentAnswerRequest.AnswerItem>();
+  for(var q:questions.findByAssessmentIdOrderByQuestionNumberAsc(quiz.getId()))
+   submitted.add(item(q.getId(),q.getQuestionNumber()<=correct?q.getCorrectAnswer():"D"));
+  var mapper=org.springframework.http.converter.json.Jackson2ObjectMapperBuilder.json().build();
+  var input=mapper.convertValue(Map.of("answers",submitted,"score",100,"passed",true),StudentAnswerRequest.class);
+  var result=service.submitAttempt(attempt.getId(),student,input);
+  assertEquals(percent,result.getScore());assertEquals(passed,result.getPassed());
+  assertEquals(total,answers.count());assertEquals(passed?1:0,progress.count());
+ }
  @Autowired StudentSubjectEnrollmentRepository enrollments;
  @Autowired StudentProfileRepository profiles;
  @MockBean ActivityLogService audit;

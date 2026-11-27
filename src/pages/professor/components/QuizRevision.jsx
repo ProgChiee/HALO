@@ -47,7 +47,7 @@ export default function QuizRevision({ moduleId }) {
     {state.draft && <Button variant="secondary" disabled={busy} onClick={() => setReview('draft')}>Review Quiz Draft</Button>}
     {state.draft && <Button disabled={busy || review !== 'draft'} onClick={() => setConfirm('approve')}>Approve Quiz</Button>}
    </div>
-   {quiz && <section aria-label={review === 'draft' ? 'Quiz draft questions' : 'Current quiz questions'}><h3>Quiz version {quiz.version}</h3><ol>{quiz.questions.map(q => <li key={q.number} className={styles.revisionText}><p>{q.question}</p><ul>{['A', 'B', 'C', 'D'].map(letter => <li key={letter}>{letter}. {q['option' + letter]}{q.correctAnswer === letter ? ' (correct answer)' : ''}</li>)}</ul></li>)}</ol><Button variant="secondary" onClick={() => setReview(null)}>Close Review</Button></section>}
+   {quiz && <section aria-label={review === 'draft' ? 'Quiz draft questions' : 'Current quiz questions'}><h3>Quiz version {quiz.version} ({quiz.questions.length} questions)</h3><ol>{quiz.questions.map(q => <li key={q.number} className={styles.revisionText}><p>{q.question}</p><ul>{['A', 'B', 'C', 'D'].map(letter => <li key={letter}>{letter}. {q['option' + letter]}{q.correctAnswer === letter ? ' (correct answer)' : ''}</li>)}</ul></li>)}</ol><Button variant="secondary" onClick={() => setReview(null)}>Close Review</Button></section>}
   </>}
   {busy && <p role="status">{confirm === 'generate' ? 'Generating quiz draft...' : 'Approving quiz...'}</p>}
   {confirm && <Dialog className={styles.confirmDialog} labelledBy="quiz-confirm-title" describedBy="quiz-confirm-message" busy={busy} onClose={() => setConfirm(null)} initialFocus="button">

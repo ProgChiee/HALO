@@ -31,6 +31,7 @@ class AssessmentAnswerSetTest {
  @Autowired StudentAnswerRepository answers;
  @Autowired StudentModuleProgressRepository progress;
  @Autowired StudentBadgeRepository badges;
+ @MockBean LessonSourceScope scope;
  @MockBean AssessmentAiService ai;
  @MockBean StudentLearningProgressionService progression;
  @MockBean ActivityLogService audit;

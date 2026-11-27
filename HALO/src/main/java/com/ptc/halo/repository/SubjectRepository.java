@@ -22,6 +22,15 @@ public interface SubjectRepository
     @org.springframework.data.jpa.repository.Query("select count(e) from StudentSubjectEnrollmentEntity e where e.subject.id=:id")
     long enrollmentCount(@org.springframework.data.repository.query.Param("id") Long id);
 
+    @org.springframework.data.jpa.repository.Query("""
+        select count(s) > 0 from SubjectEntity s where s.id=:id and s.yearLevel=:year
+            and s.archivedAt is null and s.professor.user.status=com.ptc.halo.enums.Status.ACTIVE
+            and exists (select m.id from AiLearningModuleEntity m where m.week.subject=s
+                        and m.status=com.ptc.halo.enums.LessonStatus.APPROVED
+                        and m.aiGenerationStatus=com.ptc.halo.enums.AiGenerationStatus.COMPLETED)
+        """)
+    boolean browsableCover(long id, YearLevel year);
+
     long countByProfessor_User_Id(Long professorId);
 
     List<SubjectEntity> findByProfessor_User_Id(Long userId);

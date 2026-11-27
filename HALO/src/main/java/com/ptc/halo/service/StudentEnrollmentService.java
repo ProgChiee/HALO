@@ -20,11 +20,21 @@ public class StudentEnrollmentService {
  private final StudentLessonAccessService access;
  private final ActivityLogService activity;
  public StudentEnrollmentService(StudentSubjectEnrollmentRepository enrollments,StudentProfileRepository profiles,SubjectRepository subjects,UserRepository users,StudentSubjectService summaries,StudentLessonAccessService access,ActivityLogService activity){this.enrollments=enrollments;this.profiles=profiles;this.subjects=subjects;this.users=users;this.summaries=summaries;this.access=access;this.activity=activity;}
+ public boolean canViewCover(UserEntity student,long subjectId){
+  access.validateStudent(student);
+  if(enrollments.existsByStudent_IdAndSubject_IdAndActiveTrue(student.getId(),subjectId)) return true;
+  var profile=profiles.findByUserId(student.getId()).orElseThrow(()->new ResponseStatusException(HttpStatus.CONFLICT,"PROFILE_INCOMPLETE"));
+  requireComplete(profile);
+  return subjects.browsableCover(subjectId,profile.getYearLevel());
+ }
+ private void requireComplete(StudentProfileEntity profile){
+  if(profile.getYearLevel()==null || profile.getStudentId()==null || profile.getStudentId().isBlank() || profile.getSection()==null || profile.getSection().isBlank())
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"PROFILE_INCOMPLETE");
+ }
  private List<StudentSubjectResponse> eligible(UserEntity student){
   access.validateStudent(student);
   var profile=profiles.findByUserId(student.getId()).orElseThrow(()->new ResponseStatusException(HttpStatus.CONFLICT,"PROFILE_INCOMPLETE"));
-  if(profile.getYearLevel()==null || profile.getStudentId()==null || profile.getStudentId().isBlank() || profile.getSection()==null || profile.getSection().isBlank())
-   throw new ResponseStatusException(HttpStatus.CONFLICT,"PROFILE_INCOMPLETE");
+  requireComplete(profile);
   // Reuse published/generated module eligibility and unchanged progress calculation.
   var browsable = subjects.browsableSubjects(profile.getYearLevel());
   return summaries.summarizeSubjects(student,browsable).stream().filter(s->s.getEligibleModuleCount()!=null && s.getEligibleModuleCount()>0).toList();

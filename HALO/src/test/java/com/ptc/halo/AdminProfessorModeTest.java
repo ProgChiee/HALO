@@ -68,7 +68,7 @@ class AdminProfessorModeTest {
  Long module(){return mode.execute(auth,session,s->modules.createModule(week(subject()),"Lesson",null,null,List.of(),s.getTarget(),s)).getBody().getId();}
  void tx(java.util.function.Consumer<org.springframework.transaction.TransactionStatus> f){new TransactionTemplate(manager).executeWithoutResult(f);}
  void ready(Long id){tx(t->{var m=moduleRepo.findById(id).orElseThrow();m.setAiGenerationStatus(AiGenerationStatus.COMPLETED);m.setGeneratedKnowledge("Knowledge");m.setSourceScope("{\"mode\":\"SOURCE_GROUNDED\"}");var file=new AiLearningFileEntity();file.setOriginalFileName("lesson.pdf");file.setStoredFileName("opaque.pdf");file.setFilePath("opaque.pdf");file.setFileType("application/pdf");m.addFile(file);moduleRepo.saveAndFlush(m);});}
- GeneratedAssessment generated(){var result=new GeneratedAssessment();var list=new ArrayList<GeneratedAssessmentQuestion>();for(int n=1;n<=10;n++){var q=new GeneratedAssessmentQuestion();q.setQuestionNumber(n);q.setQuestion("Question "+n+"?");q.setOptionA("A");q.setOptionB("B");q.setOptionC("C");q.setOptionD("D");q.setCorrectAnswer("A");list.add(q);}result.setQuestions(list);return result;}
+ GeneratedAssessment generated(){var result=new GeneratedAssessment();var list=new ArrayList<GeneratedAssessmentQuestion>();for(int n=1;n<=20;n++){var q=new GeneratedAssessmentQuestion();q.setQuestionNumber(n);q.setQuestion("Question "+n+"?");q.setOptionA("A");q.setOptionB("B");q.setOptionC("C");q.setOptionD("D");q.setCorrectAnswer("A");list.add(q);}result.setQuestions(list);return result;}
  @Test void actingCanArchiveAndRestoreOnlyItsTargetSubject(){
   Long id=subject();
   assertNotNull(mode.execute(auth,session,s->academic.setArchived(id,true,s.getTarget(),s)).getArchivedAt());
@@ -156,7 +156,7 @@ class AdminProfessorModeTest {
   when(index.getOrBuild(any())).thenAnswer(call->{assertFalse(TransactionSynchronizationManager.isActualTransactionActive());return null;});
   when(assessmentAi.generateAssessment(any(),any(),any(),any(),any())).thenAnswer(call->{assertFalse(TransactionSynchronizationManager.isActualTransactionActive());return generated();});
   mode.approve(auth,session,id);
-  assertEquals(LessonStatus.APPROVED,moduleRepo.findById(id).orElseThrow().getStatus());assertTrue(assessments.findByModuleId(id).isPresent());assertEquals(10,questions.count());
+  assertEquals(LessonStatus.APPROVED,moduleRepo.findById(id).orElseThrow().getStatus());assertTrue(assessments.findByModuleId(id).isPresent());assertEquals(20,questions.count());
  }
  @org.junit.jupiter.params.ParameterizedTest
  @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})

@@ -30,6 +30,18 @@ class SubjectCoverHttpTest {
   mvc.perform(get("/api/professor/subjects/7/cover")).andExpect(status().isUnauthorized());var actor=token("PROFESSOR");
   mvc.perform(get("/api/professor/subjects/7/cover").header("Authorization","Bearer token")).andExpect(status().isNoContent()).andExpect(header().string("Cache-Control","no-store")).andExpect(header().string("X-Content-Type-Options","nosniff"));verify(covers).professorCover(actor,7L);
  }
+ @Test void conditionalReadStillRequiresOwnership() throws Exception {
+  var actor=token("PROFESSOR");
+  when(covers.professorCover(actor,7)).thenReturn(new byte[]{(byte)255,(byte)216});
+  var first=mvc.perform(get("/api/professor/subjects/7/cover").header("Authorization","Bearer token"))
+      .andExpect(status().isOk()).andExpect(header().string("Cache-Control","private, no-cache"))
+      .andExpect(content().contentType("image/jpeg")).andReturn();
+  String tag=first.getResponse().getHeader("ETag");
+  mvc.perform(get("/api/professor/subjects/7/cover").header("Authorization","Bearer token").header("If-None-Match",tag))
+      .andExpect(status().isNotModified());
+  verify(covers,times(2)).professorCover(actor,7);
+  mvc.perform(get("/api/professor/subjects/7/cover").header("If-None-Match",tag)).andExpect(status().isUnauthorized());
+ }
  @Test void writesUseAuthenticatedOwnerAndStudentsCannotUpload() throws Exception {
   var file=new MockMultipartFile("image","cover.png","image/png",new byte[]{1});var actor=token("PROFESSOR");
   mvc.perform(multipart("/api/professor/subjects/7/cover").file(file).with(r->{r.setMethod("PUT");return r;}).param("professorId","999").header("Authorization","Bearer token")).andExpect(status().isNoContent());verify(covers).change(eq(actor),eq(7L),any(),isNull());

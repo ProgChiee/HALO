@@ -23,7 +23,16 @@ public class SubjectCoverController {
     private final AdminStudentPreviewService studentPreview;
     public SubjectCoverController(SubjectCoverService covers,UserRepository users,StudentLessonAccessService studentAccess,AdminProfessorModeService professorMode,AdminProfessorPreviewService professorPreview,AdminStudentModeService studentMode,AdminStudentPreviewService studentPreview){this.covers=covers;this.users=users;this.studentAccess=studentAccess;this.professorMode=professorMode;this.professorPreview=professorPreview;this.studentMode=studentMode;this.studentPreview=studentPreview;}
     private UserEntity actor(Authentication auth){return AuthenticatedAccount.find(users,auth).orElseThrow(()->new ResponseStatusException(HttpStatus.UNAUTHORIZED));}
-    private ResponseEntity<byte[]> image(byte[] bytes){return ResponseEntity.status(bytes==null?204:200).cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").contentType(MediaType.IMAGE_PNG).body(bytes);}
+    private ResponseEntity<byte[]> image(byte[] bytes) {
+        if (bytes == null) return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").build();
+        // Spring MVC evaluates If-None-Match after the scoped service call has authorized this request.
+        return ResponseEntity.ok().header("Cache-Control", "private, no-cache")
+                .varyBy("Authorization", "X-Acting-Session")
+                .eTag(org.springframework.util.DigestUtils.md5DigestAsHex(bytes))
+                .header("X-Content-Type-Options","nosniff")
+                .contentType(bytes.length >= 2 && bytes[0] == (byte)0xff && bytes[1] == (byte)0xd8 ? MediaType.IMAGE_JPEG : MediaType.IMAGE_PNG)
+                .body(bytes);
+    }
     @GetMapping("/api/professor/subjects/{id}/cover") @PreAuthorize("hasRole('PROFESSOR')")
     public ResponseEntity<byte[]> professor(Authentication auth,@PathVariable long id){return image(covers.professorCover(actor(auth),id));}
     @PutMapping("/api/professor/subjects/{id}/cover") @PreAuthorize("hasRole('PROFESSOR')")

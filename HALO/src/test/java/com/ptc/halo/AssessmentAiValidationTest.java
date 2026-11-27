@@ -26,7 +26,7 @@ class AssessmentAiValidationTest {
     static ObjectNode valid() {
         var root = new ObjectMapper().createObjectNode();
         var questions = root.putArray("questions");
-        for (int number = 1; number <= 10; number++) questions.addObject()
+        for (int number = 1; number <= 20; number++) questions.addObject()
                 .put("questionNumber", number).put("question", "Hospitality question " + number)
                 .put("optionA", "Choice A").put("optionB", "Choice B")
                 .put("optionC", "Choice C").put("optionD", "Choice D").put("correctAnswer", "A");
@@ -48,23 +48,31 @@ class AssessmentAiValidationTest {
         var numberOption = valid(); ((ObjectNode)numberOption.get("questions").get(0)).put("optionA", 123); responses.add(numberOption.toString());
         var extraChoice = valid(); ((ObjectNode)extraChoice.get("questions").get(0)).put("optionE", "Extra"); responses.add(extraChoice.toString());
         var invalidKey = valid(); ((ObjectNode)invalidKey.get("questions").get(0)).put("correctAnswer", "Z"); responses.add(invalidKey.toString());
+        var shortQuiz = valid(); shortQuiz.withArray("questions").remove(19); responses.add(shortQuiz.toString());
+        var longQuiz = valid(); longQuiz.withArray("questions").add(valid().get("questions").get(0)); responses.add(longQuiz.toString());
         return responses.stream();
     }
     @ParameterizedTest @MethodSource("malformed")
     void malformedProviderResponsesHaveSafeConsistentError(String response) {
-        when(chat.prompt().user(anyString()).call().content()).thenReturn(response);
+        when(chat.prompt().user(anyString()).options(any(org.springframework.ai.chat.prompt.ChatOptions.class)).call().content()).thenReturn(response);
         var error = assertThrows(ResponseStatusException.class, () -> service.generateAssessment("Lesson", "Objectives", "Knowledge", "Examples", "Summary"));
         assertEquals(502, error.getStatusCode().value()); assertEquals("QUIZ_GENERATION_INVALID", error.getReason()); assertNull(error.getCause());
     }
     @Test void validResponseKeepsPromptAndAnswerContract() {
-        when(chat.prompt().user(anyString()).call().content()).thenReturn(valid().toString());
+        when(chat.prompt().user(anyString()).options(any(org.springframework.ai.chat.prompt.ChatOptions.class)).call().content()).thenReturn(valid().toString());
         var quiz = service.generateAssessment("Published lesson", "Objectives", "Knowledge", "Examples", "Summary");
-        assertEquals(10, quiz.getQuestions().size()); assertEquals("A", quiz.getQuestions().get(0).getCorrectAnswer());
-        verify(chat.prompt()).user(contains("Generate exactly 10 questions."));
+        assertEquals(20, quiz.getQuestions().size()); assertEquals("A", quiz.getQuestions().get(0).getCorrectAnswer());
+        verify(chat.prompt()).user(contains("Generate exactly 20 questions."));
         verify(chat.prompt()).user(contains("Published lesson"));
     }
+    @Test void timeoutIsSafe(){
+        when(chat.prompt().user(anyString()).options(any(org.springframework.ai.chat.prompt.ChatOptions.class)).call().content())
+            .thenThrow(new RuntimeException(new java.net.SocketTimeoutException()));
+        assertEquals("QUIZ_GENERATION_FAILED",assertThrows(ResponseStatusException.class,
+            () -> service.generateAssessment("lesson", null, null, null, null)).getReason());
+    }
     @Test void providerFailureDoesNotExposeInternalDetails() {
-        when(chat.prompt().user(anyString()).call().content()).thenThrow(new IllegalStateException("provider secret"));
+        when(chat.prompt().user(anyString()).options(any(org.springframework.ai.chat.prompt.ChatOptions.class)).call().content()).thenThrow(new IllegalStateException("provider secret"));
         var error = assertThrows(ResponseStatusException.class, () -> service.generateAssessment("Lesson", null, null, null, null));
         assertEquals(502, error.getStatusCode().value()); assertEquals("QUIZ_GENERATION_FAILED", error.getReason()); assertNull(error.getCause());
     }

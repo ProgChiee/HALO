@@ -47,7 +47,7 @@ public class QuizRevisionService {
   var m=module(id,p,true);
   if(!Objects.equals(m.getVersion(),captured.moduleVersion())||quizzes.latestVersion(id)!=captured.latestQuizVersion()||!Objects.equals(quizzes.findByModuleId(id).map(AssessmentEntity::getId).orElse(null),captured.currentId()))throw stale();
   GeneratedAssessmentValidator.validate(generated);
-  var a=new AssessmentEntity();a.setModule(m);a.setTitle("Module Assessment");a.setPassingScore(quizzes.findByModuleId(id).map(AssessmentEntity::getPassingScore).orElse(70));a.setQuizVersion(captured.latestQuizVersion()+1);a.setSourceModuleVersion(m.getVersion());a.setStatus(AssessmentStatus.DRAFT);a.setCreatedAt(LocalDateTime.now());
+  var a=new AssessmentEntity();a.setModule(m);a.setTitle("Module Assessment");a.setPassingScore(70);a.setQuizVersion(captured.latestQuizVersion()+1);a.setSourceModuleVersion(m.getVersion());a.setStatus(AssessmentStatus.DRAFT);a.setCreatedAt(LocalDateTime.now());
   for(var q:generated.getQuestions()){var n=new AssessmentQuestionEntity();n.setQuestionNumber(q.getQuestionNumber());n.setQuestionText(q.getQuestion());n.setOptionA(q.getOptionA());n.setOptionB(q.getOptionB());n.setOptionC(q.getOptionC());n.setOptionD(q.getOptionD());n.setCorrectAnswer(q.getCorrectAnswer());a.addQuestion(n);}
   quizzes.findTopByModuleIdAndStatusOrderByQuizVersionDesc(id,AssessmentStatus.DRAFT).ifPresent(old->{old.setStatus(AssessmentStatus.RETIRED);quizzes.saveAndFlush(old);});
   quizzes.saveAndFlush(a);log(p,acting,"Generated quiz draft version "+a.getQuizVersion(),id);return get(id,p);
